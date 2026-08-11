@@ -29,7 +29,7 @@ export function Moderation() {
   }, []);
 
   return (
-    <div className="pb-10 flex flex-col h-full min-h-0">
+    <div className="pb-10 flex flex-col lg:h-full lg:min-h-0">
       <PageHeader
         title="Модерация"
         right={<span className="text-[13px] text-text-faint">Среднее время проверки — 6 мин</span>}
@@ -46,7 +46,7 @@ export function Moderation() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-4 sm:px-8">
+      <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8">
         {tab === 'vacancies' && <VacancyQueue items={vacancies} />}
         {tab === 'complaints' && <ComplaintQueue items={complaints} />}
         {tab === 'documents' && <DocumentQueue items={documents} />}
@@ -93,8 +93,8 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
   if (items.length === 0) return <EmptyPanel title="Очередь пуста" description="Новых вакансий на проверку нет." />;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
-      <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 lg:h-full lg:min-h-0 pb-6 lg:pb-0">
+      <div className="lg:overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((v) => (
           <button
             key={v.id}
@@ -194,8 +194,8 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
   if (items.length === 0) return <EmptyPanel title="Жалоб нет" description="Все обращения обработаны." />;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
-      <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 lg:h-full lg:min-h-0 pb-6 lg:pb-0">
+      <div className="lg:overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((c) => (
           <button
             key={c.id}
@@ -279,8 +279,8 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
   if (items.length === 0) return <EmptyPanel title="Документов на проверке нет" description="Все загруженные документы рассмотрены." />;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
-      <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 lg:h-full lg:min-h-0 pb-6 lg:pb-0">
+      <div className="lg:overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((d) => (
           <button
             key={d.id}

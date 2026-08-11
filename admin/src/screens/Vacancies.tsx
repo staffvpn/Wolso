@@ -49,7 +49,7 @@ export function Vacancies() {
   );
 
   return (
-    <div className="pb-10 flex flex-col h-full min-h-0">
+    <div className="pb-10 flex flex-col lg:h-full lg:min-h-0">
       <PageHeader title="Вакансии и смены" subtitle={`${vacancies.length} всего`} />
 
       <div className="px-4 sm:px-8 pb-5 shrink-0">
@@ -66,8 +66,8 @@ export function Vacancies() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
-        <Card className="overflow-hidden flex flex-col">
+      <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
+        <Card className="lg:overflow-hidden flex flex-col">
           <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Вакансия</span>
             <span className="hidden sm:block">Город</span>
@@ -75,7 +75,7 @@ export function Vacancies() {
             <span className="hidden sm:block">Отклики</span>
             <span>Статус</span>
           </div>
-          <div className="overflow-y-auto divide-y divide-border-soft">
+          <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {filtered.map((v) => (
               <button
                 key={v.id}
