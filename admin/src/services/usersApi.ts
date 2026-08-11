@@ -106,6 +106,14 @@ export async function toggleBlockEmployer(id: string): Promise<UserStatus> {
   return status;
 }
 
+export async function switchSeekerToEmployer(id: string): Promise<void> {
+  await apiFetch(`/admin/users/seekers/${id}/switch-role`, { method: 'POST' });
+}
+
+export async function switchEmployerToSeeker(id: string): Promise<void> {
+  await apiFetch(`/admin/users/employers/${id}/switch-role`, { method: 'POST' });
+}
+
 export async function inviteTeamMember(name: string, telegramId: number, roleId: string): Promise<void> {
   await apiFetch('/admin/users/team/invite', { method: 'POST', body: { name, telegramId, roleId } });
 }

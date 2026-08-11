@@ -6,7 +6,8 @@ export type PermissionKey =
   | 'refundsPayouts'
   | 'changeCommission'
   | 'manageTeam'
-  | 'transferOwnership';
+  | 'transferOwnership'
+  | 'switchUserRole';
 
 export type PermissionValue = 'yes' | 'no' | 'confirm';
 
@@ -103,6 +104,15 @@ export interface DocumentReview {
   docType: string;
   applicantCity: string;
   applicantRating: number;
+  submittedMinAgo: number;
+  status: ModerationStatus;
+}
+
+export interface EmployerReview {
+  id: string;
+  companyName: string;
+  city: string;
+  inn?: string;
   submittedMinAgo: number;
   status: ModerationStatus;
 }

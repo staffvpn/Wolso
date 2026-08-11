@@ -19,7 +19,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const logout = useSessionStore((s) => s.logout);
   const role = useCurrentRole();
   const items = navForRole(role);
-  const moderationCount = useModerationStore((s) => s.vacancies.length);
+  const moderationCount = useModerationStore((s) => s.vacancies.length + s.employers.length + s.complaints.length + s.documents.length);
 
   return (
     <>

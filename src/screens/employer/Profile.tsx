@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Clock, XCircle } from 'lucide-react';
 import { LogoBadge } from '@/components/ui/Avatar';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ListRow } from '@/components/ui/ListRow';
 import { useCompanyStore } from '@/store/useCompanyStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { useAppStore } from '@/store/useAppStore';
 import { FEATURES } from '@/lib/features';
 
 export function EmployerProfileScreen() {
@@ -16,7 +15,6 @@ export function EmployerProfileScreen() {
   const loadCompany = useCompanyStore((s) => s.load);
   const vacancies = useEmployerStore((s) => s.vacancies);
   const candidates = useEmployerStore((s) => s.candidates);
-  const switchRole = useAppStore((s) => s.switchRole);
 
   useEffect(() => {
     if (!company) loadCompany();
@@ -41,6 +39,29 @@ export function EmployerProfileScreen() {
         </div>
       </div>
 
+      {company.verificationStatus === 'pending_review' && (
+        <div className="flex items-start gap-3 rounded-card bg-warning-soft text-warning px-4 py-3 mt-5">
+          <Clock size={17} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-[14px]">Профиль на проверке</p>
+            <p className="text-[13px] leading-relaxed mt-0.5">
+              Команда Wolso проверяет заведение — обычно это занимает до суток. Публиковать вакансии можно будет после одобрения.
+            </p>
+          </div>
+        </div>
+      )}
+      {company.verificationStatus === 'rejected' && (
+        <div className="flex items-start gap-3 rounded-card bg-danger-soft text-danger px-4 py-3 mt-5">
+          <XCircle size={17} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-[14px]">Проверка не пройдена</p>
+            <p className="text-[13px] leading-relaxed mt-0.5">
+              Напишите в поддержку, чтобы узнать причину и как это исправить.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3 mt-6">
         <Card className="flex-1 p-4">
           <p className="text-[22px] font-extrabold">{vacancies.length}</p>
@@ -63,14 +84,14 @@ export function EmployerProfileScreen() {
               <ListRow label="Карта для оплаты откликов" value="···4120" />
             </div>
           )}
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <SectionLabel>Поддержка</SectionLabel>
+        <Card className="divide-y divide-border-soft px-1">
           <div className="px-3">
-            <ListRow
-              label="Переключиться на работника"
-              onClick={() => {
-                switchRole('worker');
-                navigate('/w/feed', { replace: true });
-              }}
-            />
+            <ListRow label="Помощь" onClick={() => navigate('/e/support')} />
           </div>
         </Card>
       </div>

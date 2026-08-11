@@ -6,7 +6,6 @@ import { SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { IconButton } from '@/components/ui/IconButton';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import { useAppStore } from '@/store/useAppStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { hapticNotify } from '@/lib/telegram';
 import { FEATURES } from '@/lib/features';
@@ -14,7 +13,6 @@ import { FEATURES } from '@/lib/features';
 export function Settings() {
   const navigate = useNavigate();
   const s = useSettingsStore();
-  const switchRole = useAppStore((st) => st.switchRole);
   const referralCode = useProfileStore((st) => st.referralCode);
   const referralLink = `wolso.app/i/${referralCode}`;
 
@@ -72,7 +70,11 @@ export function Settings() {
         <SectionLabel className="mt-6">Аккаунт</SectionLabel>
         <div className="divide-y divide-border-soft">
           <ListRow label="Город" value={s.city} />
-          <ListRow label="Переключиться на работодателя" onClick={() => { switchRole('employer'); navigate('/e/profile', { replace: true }); }} />
+        </div>
+
+        <SectionLabel className="mt-6">Поддержка</SectionLabel>
+        <div className="divide-y divide-border-soft">
+          <ListRow label="Помощь" onClick={() => navigate('/w/support')} />
         </div>
 
         <div className="mt-4">

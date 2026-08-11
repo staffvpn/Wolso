@@ -4,10 +4,12 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from './ui/Button';
 import { Logo } from './ui/Logo';
+import { Welcome } from '@/screens/onboarding/Welcome';
 
 /** Blocks rendering the real app until we've exchanged Telegram's initData
- *  for session tokens. Nothing else can talk to the API before this
- *  resolves, so it sits above the router. */
+ *  for session tokens AND resolved a permanent role (worker or employer —
+ *  one account, one role, chosen once). Nothing else can talk to the API
+ *  before this resolves, so it sits above the router. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const status = useAuthStore((s) => s.status);
   const error = useAuthStore((s) => s.error);
@@ -18,6 +20,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [status, bootstrap]);
 
   if (status === 'ready') return <>{children}</>;
+  if (status === 'needs_role') return <Welcome />;
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-8 gap-5 text-center safe-top safe-bottom">

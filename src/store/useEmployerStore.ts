@@ -27,6 +27,7 @@ interface EmployerState {
     endMin: number;
     hourlyRate: number;
     requirements: string[];
+    description?: string;
     urgent: boolean;
   }) => Promise<Vacancy>;
 }

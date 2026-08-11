@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware } from '../middleware/auth';
+import { provisionWorker, provisionCompany } from '../routes/auth';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -56,6 +57,49 @@ adminUserRoutes.post('/employers/:id/block', requirePermission('blockUsers'), as
   const actor = await actorLabel(c.env, session);
   await logAction(c.env, actor, `${next === 'suspended' ? 'заблокировала' : 'разблокировала'} ${company.name}`, next === 'suspended' ? 'danger' : 'neutral');
   return c.json({ ok: true, status: next });
+});
+
+/** Wolso is one-account-one-role: a Telegram id is permanently locked to
+ *  worker or employer at onboarding. Only staff with switchUserRole can
+ *  move someone across — provisions the target role's row (if it doesn't
+ *  exist yet) the same way onboarding would, so their next login just
+ *  works. */
+adminUserRoutes.post('/seekers/:id/switch-role', requirePermission('switchUserRole'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const worker = await c.env.DB.prepare('SELECT telegram_id, name FROM workers WHERE id = ?').bind(id).first<{
+    telegram_id: number;
+    name: string;
+  }>();
+  if (!worker) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare("INSERT OR REPLACE INTO telegram_accounts (telegram_id, active_role) VALUES (?, 'employer')")
+    .bind(worker.telegram_id)
+    .run();
+  await provisionCompany(c.env, { id: worker.telegram_id, first_name: worker.name });
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `переключила ${worker.name} на роль работодателя`, 'neutral');
+  return c.json({ ok: true });
+});
+
+adminUserRoutes.post('/employers/:id/switch-role', requirePermission('switchUserRole'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const company = await c.env.DB.prepare('SELECT owner_telegram_id, name FROM companies WHERE id = ?').bind(id).first<{
+    owner_telegram_id: number;
+    name: string;
+  }>();
+  if (!company) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare("INSERT OR REPLACE INTO telegram_accounts (telegram_id, active_role) VALUES (?, 'worker')")
+    .bind(company.owner_telegram_id)
+    .run();
+  await provisionWorker(c.env, { id: company.owner_telegram_id, first_name: company.name }, company.name);
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `переключила ${company.name} на роль соискателя`, 'neutral');
+  return c.json({ ok: true });
 });
 
 /** Inviting staff needs their numeric Telegram id up front (there's no

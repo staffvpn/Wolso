@@ -10,6 +10,7 @@ import { chatRoutes } from './routes/chats';
 import { notificationRoutes } from './routes/notifications';
 import { profileRoutes } from './routes/profile';
 import { employerRoutes } from './routes/employer';
+import { supportRoutes } from './routes/support';
 
 import { adminModerationRoutes } from './admin/moderation';
 import { adminUserRoutes } from './admin/users';
@@ -17,6 +18,7 @@ import { adminRoleRoutes } from './admin/roles';
 import { adminAuditLogRoutes } from './admin/auditLog';
 import { adminDashboardRoutes } from './admin/dashboard';
 import { adminVacancyRoutes } from './admin/vacancies';
+import { adminSupportRoutes } from './admin/support';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -39,6 +41,7 @@ app.route('/chats', chatRoutes);
 app.route('/notifications', notificationRoutes);
 app.route('/me', profileRoutes);
 app.route('/employer', employerRoutes);
+app.route('/support', supportRoutes);
 
 app.route('/admin/moderation', adminModerationRoutes);
 app.route('/admin/users', adminUserRoutes);
@@ -46,6 +49,7 @@ app.route('/admin/roles', adminRoleRoutes);
 app.route('/admin/audit-log', adminAuditLogRoutes);
 app.route('/admin/dashboard', adminDashboardRoutes);
 app.route('/admin/vacancies', adminVacancyRoutes);
+app.route('/admin/support', adminSupportRoutes);
 
 app.onError((err, c) => {
   console.error(err);

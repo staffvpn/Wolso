@@ -24,6 +24,7 @@ export function NewVacancy() {
   const [endHour, setEndHour] = useState(19);
   const [rate, setRate] = useState(450);
   const [requirements, setRequirements] = useState<string[]>(['Опыт от 1 года', 'Медкнижка']);
+  const [description, setDescription] = useState('');
   const [urgent, setUrgent] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
@@ -47,6 +48,7 @@ export function NewVacancy() {
       endMin: 0,
       hourlyRate: rate,
       requirements,
+      description: description.trim(),
       urgent,
     });
     setPublishing(false);
@@ -123,6 +125,17 @@ export function NewVacancy() {
               </Chip>
             ))}
           </div>
+        </div>
+
+        <div>
+          <SectionLabel>Описание</SectionLabel>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Что нужно будет делать, какие навыки пригодятся — соискатели видят это в карточке смены"
+            rows={4}
+            className="w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint resize-none outline-none focus:border-accent"
+          />
         </div>
 
         <label className="flex items-center justify-between gap-3">

@@ -12,6 +12,7 @@ interface CompanyRow {
   reviews_count: number;
   verified: number;
   inn: string | null;
+  verification_status: 'pending_review' | 'approved' | 'rejected';
 }
 
 function fromApi(c: CompanyRow): Company {
@@ -25,6 +26,7 @@ function fromApi(c: CompanyRow): Company {
     reviewsCount: c.reviews_count,
     verified: !!c.verified,
     inn: c.inn ?? undefined,
+    verificationStatus: c.verification_status,
   };
 }
 

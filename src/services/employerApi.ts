@@ -102,6 +102,7 @@ export async function createVacancy(input: {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  description?: string;
   urgent: boolean;
 }): Promise<Vacancy> {
   const { shift } = await apiFetch<{ shift: VacancyApiResponse & { responseCount?: number } }>('/employer/vacancies', {
@@ -117,6 +118,7 @@ export async function createVacancy(input: {
       endMin: input.endMin,
       hourlyRate: input.hourlyRate,
       requirements: input.requirements,
+      description: input.description,
       urgency: input.urgent ? 'urgent' : 'normal',
     },
   });

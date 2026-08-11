@@ -15,7 +15,8 @@ export type PermissionKey =
   | 'refundsPayouts'
   | 'changeCommission'
   | 'manageTeam'
-  | 'transferOwnership';
+  | 'transferOwnership'
+  | 'switchUserRole';
 
 export type PermissionValue = 'yes' | 'no' | 'confirm';
 

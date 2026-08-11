@@ -1,7 +1,7 @@
 import { apiFetch } from '@/lib/apiClient';
 import { minutesSince } from '@/lib/format';
 import { useSessionStore } from '@/store/useSessionStore';
-import type { ComplaintItem, DocumentReview, ModerationVacancy } from '@/types';
+import type { ComplaintItem, DocumentReview, EmployerReview, ModerationVacancy } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
@@ -114,6 +114,34 @@ export async function fetchPendingDocuments(): Promise<DocumentReview[]> {
 
 export async function decideDocument(id: string, status: 'verified' | 'missing'): Promise<void> {
   await apiFetch(`/admin/moderation/documents/${id}/decide`, { method: 'POST', body: { status } });
+}
+
+interface EmployerApiRow {
+  id: number;
+  name: string;
+  city: string;
+  inn: string | null;
+  created_at: string;
+}
+
+function fromApiEmployer(e: EmployerApiRow): EmployerReview {
+  return {
+    id: String(e.id),
+    companyName: e.name,
+    city: e.city,
+    inn: e.inn ?? undefined,
+    submittedMinAgo: minutesSince(e.created_at),
+    status: 'pending',
+  };
+}
+
+export async function fetchPendingEmployers(): Promise<EmployerReview[]> {
+  const { employers } = await apiFetch<{ employers: EmployerApiRow[] }>('/admin/moderation/employers');
+  return employers.map(fromApiEmployer);
+}
+
+export async function decideEmployer(id: string, status: 'approved' | 'rejected'): Promise<void> {
+  await apiFetch(`/admin/moderation/employers/${id}/decide`, { method: 'POST', body: { status } });
 }
 
 /** Bearer-token auth means an <img src> can't hit the API directly — fetch

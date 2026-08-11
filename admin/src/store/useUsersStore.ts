@@ -9,6 +9,8 @@ import {
   inviteTeamMember,
   setTeamMemberRole,
   revokeTeamAccess,
+  switchSeekerToEmployer,
+  switchEmployerToSeeker,
 } from '@/services/usersApi';
 
 interface UsersState {
@@ -22,6 +24,7 @@ interface UsersState {
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
   inviteMember: (name: string, telegramId: number, roleId: string) => Promise<void>;
   revokeAccess: (memberId: string) => Promise<void>;
+  switchRole: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
 }
 
 export const useUsersStore = create<UsersState>((set, get) => ({
@@ -59,5 +62,12 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   revokeAccess: async (memberId) => {
     set({ team: get().team.map((m) => (m.id === memberId ? { ...m, status: 'suspended' } : m)) });
     await revokeTeamAccess(memberId);
+  },
+
+  switchRole: async (id, kind) => {
+    if (kind === 'seeker') await switchSeekerToEmployer(id);
+    else await switchEmployerToSeeker(id);
+    const [seekers, employers] = await Promise.all([fetchSeekers(), fetchEmployers()]);
+    set({ seekers, employers });
   },
 }));

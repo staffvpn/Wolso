@@ -9,6 +9,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'changeCommission', label: 'Менять комиссию платформы' },
   { key: 'manageTeam', label: 'Приглашать и удалять команду' },
   { key: 'transferOwnership', label: 'Передача владения платформой' },
+  { key: 'switchUserRole', label: 'Переключать роль пользователя (работник ↔ работодатель)' },
 ];
 
 /** Roles themselves come from the API (`useRolesStore`) — this only has the

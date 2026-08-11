@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
+import { useCompanyStore } from '@/store/useCompanyStore';
 import { formatMoney, timeAgoSince } from '@/lib/format';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,9 +26,13 @@ export function Vacancies() {
   const candidates = useEmployerStore((s) => s.candidates);
   const loading = useEmployerStore((s) => s.loading);
   const loadAll = useEmployerStore((s) => s.loadAll);
+  const company = useCompanyStore((s) => s.company);
+  const loadCompany = useCompanyStore((s) => s.load);
+  const approved = company?.verificationStatus === 'approved';
 
   useEffect(() => {
     if (vacancies.length === 0) loadAll();
+    if (!company) loadCompany();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -37,8 +42,9 @@ export function Vacancies() {
         title="Вакансии"
         right={
           <button
-            onClick={() => navigate('/e/vacancies/new')}
-            className="h-10 w-10 rounded-full bg-accent text-accent-fg flex items-center justify-center"
+            onClick={() => approved && navigate('/e/vacancies/new')}
+            disabled={!approved}
+            className="h-10 w-10 rounded-full bg-accent text-accent-fg flex items-center justify-center disabled:opacity-40"
             aria-label="Новая смена"
           >
             <Plus size={19} />
@@ -47,6 +53,17 @@ export function Vacancies() {
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4">
+        {!approved && company && (
+          <div className="flex items-start gap-3 rounded-card bg-warning-soft text-warning px-4 py-3 mb-4">
+            <Clock size={17} className="shrink-0 mt-0.5" />
+            <p className="text-[13px] leading-relaxed">
+              {company.verificationStatus === 'rejected'
+                ? 'Проверка не пройдена — публикация вакансий недоступна, напишите в поддержку.'
+                : 'Заведение ещё на проверке — как только Wolso одобрит профиль, сможете публиковать вакансии.'}
+            </p>
+          </div>
+        )}
+
         {!loading && vacancies.length === 0 && (
           <EmptyState
             title="Пока нет вакансий"

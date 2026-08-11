@@ -20,6 +20,9 @@ export interface Company {
   reviewsCount: number;
   verified: boolean;
   inn?: string;
+  /** Moderation gate — a company must be `approved` before it can publish
+   *  vacancies. Only present on the owner's own `/employer/me` response. */
+  verificationStatus?: 'pending_review' | 'approved' | 'rejected';
 }
 
 export type ShiftUrgency = 'normal' | 'urgent';

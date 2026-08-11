@@ -78,6 +78,28 @@ adminModerationRoutes.get('/documents/:id/file', requirePermission('verifyDocume
   return new Response(doc.file_data, { headers: { 'Content-Type': doc.content_type ?? 'application/octet-stream' } });
 });
 
+adminModerationRoutes.get('/employers', requirePermission('approveVacancies'), async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT * FROM companies WHERE verification_status = 'pending_review' ORDER BY created_at ASC",
+  ).all();
+  return c.json({ employers: results });
+});
+
+adminModerationRoutes.post('/employers/:id/decide', requirePermission('approveVacancies'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const { status } = await c.req.json<{ status: 'approved' | 'rejected' }>();
+
+  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(id).first<{ name: string }>();
+  if (!company) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare('UPDATE companies SET verification_status = ? WHERE id = ?').bind(status, id).run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `${status === 'approved' ? 'одобрил(а)' : 'отклонил(а)'} регистрацию «${company.name}»`, status === 'approved' ? 'accent' : 'danger');
+  return c.json({ ok: true });
+});
+
 adminModerationRoutes.get('/documents', requirePermission('verifyDocuments'), async (c) => {
   const status = c.req.query('status') ?? 'pending';
   const { results } = await c.env.DB.prepare(

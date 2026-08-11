@@ -1,19 +1,26 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { Illustration } from '@/components/Illustration';
-import { useAppStore } from '@/store/useAppStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { Role } from '@/types';
 
+/** Rendered directly by AuthGate when the server says this Telegram
+ *  account has no role yet — not a router page. The choice is permanent:
+ *  one account, one role; the app itself re-renders into the real UI the
+ *  moment chooseRole resolves, no navigation needed here. */
 export function Welcome() {
-  const navigate = useNavigate();
-  const setOnboarded = useAppStore((s) => s.setOnboarded);
+  const chooseRole = useAuthStore((s) => s.chooseRole);
+  const status = useAuthStore((s) => s.status);
+  const [picked, setPicked] = useState<Role | null>(null);
 
   function choose(role: Role) {
-    setOnboarded(role);
-    navigate(role === 'worker' ? '/w/feed' : '/e/candidates', { replace: true });
+    setPicked(role);
+    chooseRole(role);
   }
+
+  const busy = status === 'loading';
 
   return (
     <div className="flex flex-col h-full px-6 pt-6 safe-top safe-bottom">
@@ -52,13 +59,15 @@ export function Welcome() {
         transition={{ duration: 0.4, delay: 0.25 }}
         className="flex flex-col gap-3 pb-4"
       >
-        <Button fullWidth onClick={() => choose('worker')}>
-          Я ищу смены
+        <Button fullWidth disabled={busy} onClick={() => choose('worker')}>
+          {busy && picked === 'worker' ? 'Секунду…' : 'Я ищу смены'}
         </Button>
-        <Button fullWidth variant="dark" onClick={() => choose('employer')}>
-          Я ищу сотрудников
+        <Button fullWidth variant="dark" disabled={busy} onClick={() => choose('employer')}>
+          {busy && picked === 'employer' ? 'Секунду…' : 'Я ищу сотрудников'}
         </Button>
-        <p className="text-center text-[12px] text-text-faint mt-1">Вход через Telegram · без пароля</p>
+        <p className="text-center text-[12px] text-text-faint mt-1">
+          Вход через Telegram · без пароля · выбор роли нельзя изменить самому — если ошиблись, напишите в поддержку
+        </p>
       </motion.div>
     </div>
   );

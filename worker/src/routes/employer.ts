@@ -72,6 +72,14 @@ employerRoutes.get('/vacancies', async (c) => {
 employerRoutes.post('/vacancies', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const company = await c.env.DB.prepare('SELECT verification_status FROM companies WHERE id = ?')
+    .bind(session.companyId)
+    .first<{ verification_status: string }>();
+  if (company?.verification_status !== 'approved') {
+    return c.json({ error: 'company_not_verified' }, 403);
+  }
+
   const body = await c.req.json<{
     position: string;
     positionLabel: string;

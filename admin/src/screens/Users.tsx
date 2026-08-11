@@ -186,7 +186,9 @@ function TeamDetail({ member }: { member: TeamMember }) {
 
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
+  const switchRole = useUsersStore((s) => s.switchRole);
   const canBlock = useCan('blockUsers');
+  const canSwitchRole = useCan('switchUserRole');
   const blocked = user.status === 'suspended';
 
   return (
@@ -205,16 +207,23 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
         Профиль соискателя: документы, история откликов и отзывы заведений доступны в карточке пользователя на платформе.
       </div>
-      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>
-        {blocked ? 'Разблокировать' : 'Заблокировать'}
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>
+          {blocked ? 'Разблокировать' : 'Заблокировать'}
+        </Button>
+        <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'seeker')}>
+          Переключить на работодателя
+        </Button>
+      </div>
     </div>
   );
 }
 
 function EmployerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
+  const switchRole = useUsersStore((s) => s.switchRole);
   const canBlock = useCan('blockUsers');
+  const canSwitchRole = useCan('switchUserRole');
   const blocked = user.status === 'suspended';
 
   return (
@@ -233,9 +242,14 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
         Профиль работодателя: опубликованные вакансии, история сотрудничества и отзывы соискателей доступны в карточке компании.
       </div>
-      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer')}>
-        {blocked ? 'Разблокировать' : 'Заблокировать'}
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer')}>
+          {blocked ? 'Разблокировать' : 'Заблокировать'}
+        </Button>
+        <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'employer')}>
+          Переключить на соискателя
+        </Button>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Finance } from './screens/Finance';
 import { Roles } from './screens/Roles';
 import { AuditLog } from './screens/AuditLog';
 import { Settings } from './screens/Settings';
+import { Support } from './screens/Support';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
               <Route path="/moderation" element={<Moderation />} />
               <Route path="/users" element={<Users />} />
               <Route path="/vacancies" element={<Vacancies />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/audit-log" element={<AuditLog />} />
