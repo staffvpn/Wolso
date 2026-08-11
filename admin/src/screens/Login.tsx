@@ -39,7 +39,7 @@ export function Login() {
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-bg">
-      <div className="w-[360px] flex flex-col items-center text-center">
+      <div className="w-full max-w-[360px] flex flex-col items-center text-center">
         <div className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center mb-4">
           <Logo size={26} className="text-accent" />
         </div>

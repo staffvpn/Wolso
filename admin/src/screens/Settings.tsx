@@ -19,8 +19,8 @@ export function Settings() {
     <div className="pb-10">
       <PageHeader title="Настройки" subtitle="Общие параметры платформы Wolso" />
 
-      <div className="px-8 grid grid-cols-2 gap-4">
-        <Card className={cn('p-6', !FEATURES.payments && 'col-span-2')}>
+      <div className="px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className={cn('p-6', !FEATURES.payments && 'sm:col-span-2')}>
           <SectionLabel className="mb-4">Общее</SectionLabel>
           <div className="space-y-4">
             <div>
@@ -73,7 +73,7 @@ export function Settings() {
           </Card>
         )}
 
-        <Card className="p-6 col-span-2">
+        <Card className="p-6 sm:col-span-2">
           <SectionLabel className="mb-4">Уведомления администраторам</SectionLabel>
           <div className="divide-y divide-border-soft">
             <NotifyRow
@@ -101,7 +101,7 @@ export function Settings() {
         </Card>
       </div>
 
-      <div className="px-8 mt-4">
+      <div className="px-4 sm:px-8 mt-4">
         <Button variant="dark" disabled={!canEdit}>Сохранить изменения</Button>
       </div>
     </div>

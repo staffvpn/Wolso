@@ -54,15 +54,15 @@ export function Dashboard() {
         }
       />
 
-      <div className="px-8 grid grid-cols-4 gap-4">
+      <div className="px-4 sm:px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Смен опубликовано" value={formatNumber(s.vacanciesPublished)} delta={`${s.vacanciesPublishedDeltaPct}% к июлю`} />
         <StatCard label="Закрыто в тот же день" value={`${s.closedSameDayPct}%`} delta={`${s.closedSameDayDeltaPp} п.п.`} />
         <StatCard label="Активных исполнителей" value={formatNumber(s.activeWorkers)} delta={`${s.activeWorkersDeltaPct}%`} />
         <StatCard label="Откликов за неделю" value={formatNumber(weeklyResponses)} dark />
       </div>
 
-      <div className="px-8 mt-4 grid grid-cols-3 gap-4">
-        <Card className="col-span-2 p-6">
+      <div className="px-4 sm:px-8 mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 p-6">
           <p className="font-bold text-[15px] mb-5">Смены и отклики по дням</p>
           <BarChart data={s.weekly} />
         </Card>
@@ -75,7 +75,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="px-8 mt-4">
+      <div className="px-4 sm:px-8 mt-4">
         <Card className="p-6">
           <p className="font-bold text-[15px] mb-2">Требует внимания</p>
           <div className="divide-y divide-border-soft">

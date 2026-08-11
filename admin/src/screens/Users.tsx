@@ -70,8 +70,8 @@ export function Users() {
     <div className="pb-10 flex flex-col h-full min-h-0">
       <PageHeader title="Пользователи" />
 
-      <div className="px-8 pb-5 flex items-center gap-3 flex-wrap shrink-0">
-        <div className="relative w-[260px]">
+      <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap shrink-0">
+        <div className="relative w-full sm:w-[260px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" />
           <Input placeholder="Имя, телефон, ИНН" className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
@@ -90,13 +90,13 @@ export function Users() {
         </Button>
       </div>
 
-      <div className="flex-1 min-h-0 px-8 grid grid-cols-[1.5fr_1fr] gap-5">
+      <div className="flex-1 min-h-0 px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
         <Card className="overflow-hidden flex flex-col">
-          <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+          <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_1fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Пользователь</span>
-            <span>Роль</span>
+            <span className="hidden sm:block">Роль</span>
             <span>Статус</span>
-            <span>Активность</span>
+            <span className="hidden sm:block">Активность</span>
           </div>
           <div className="overflow-y-auto divide-y divide-border-soft">
             {filtered.map((r) => {
@@ -111,7 +111,7 @@ export function Users() {
                 <button
                   key={rowKey(r)}
                   onClick={() => setSelected(r)}
-                  className={cn('w-full grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors', selectedKey === rowKey(r) && 'bg-surface-2')}
+                  className={cn('w-full grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_1fr_1fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors', selectedKey === rowKey(r) && 'bg-surface-2')}
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
                     <Avatar name={name} size={32} square={r.kind === 'employer'} />
@@ -120,11 +120,11 @@ export function Users() {
                       <span className="block text-[12px] text-text-faint truncate">{contact}</span>
                     </span>
                   </span>
-                  <span>
+                  <span className="hidden sm:block">
                     <Badge tone={r.kind === 'team' ? 'dark' : 'neutral'}>{roleLabel}</Badge>
                   </span>
                   <span className={cn('text-[13px] font-medium', STATUS_COLOR[statusKey])}>{statusLabel}</span>
-                  <span className="text-[13px] text-text-faint">{timeAgo(lastActive)}</span>
+                  <span className="hidden sm:block text-[13px] text-text-faint">{timeAgo(lastActive)}</span>
                 </button>
               );
             })}
@@ -132,7 +132,7 @@ export function Users() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit sticky top-0">
+        <Card className="p-6 h-fit lg:sticky lg:top-0">
           {!selected && <EmptyPanel title="Выберите пользователя" description="Нажмите на строку слева, чтобы увидеть подробности." />}
           {selected?.kind === 'team' && <TeamDetail member={selected.member} />}
           {selected?.kind === 'seeker' && <SeekerDetail user={selected.user} />}

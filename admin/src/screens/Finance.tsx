@@ -57,13 +57,13 @@ export function Finance() {
         }
       />
 
-      <div className="px-8 grid grid-cols-3 gap-4">
+      <div className="px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="К выплате сегодня" value={formatMoney(payoutToday)} />
         <StatCard label="Комиссия платформы" value={`${PLATFORM_COMMISSION_PCT}%`} />
         <StatCard label="Спорные выплаты" value={disputeCount} />
       </div>
 
-      <div className="px-8 mt-4 grid grid-cols-[1.6fr_1fr] gap-4 items-start">
+      <div className="px-4 sm:px-8 mt-4 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 items-start">
         <Card className="overflow-hidden">
           <div className="grid grid-cols-[1.4fr_1.2fr_0.8fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Исполнитель</span>

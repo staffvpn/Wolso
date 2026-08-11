@@ -53,7 +53,7 @@ export function Roles() {
         }
       />
 
-      <div className="px-8 grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(roles.length, 4)}, 1fr)` }}>
+      <div className="px-4 sm:px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
         {roles.map((role) => (
           <button key={role.id} onClick={() => setSelectedRoleId(role.id)} className="text-left">
             <Card
@@ -75,7 +75,7 @@ export function Roles() {
         ))}
       </div>
 
-      <div className="px-8 mt-4">
+      <div className="px-4 sm:px-8 mt-4">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -112,7 +112,7 @@ export function Roles() {
         </Card>
       </div>
 
-      <div className="px-8 mt-4">
+      <div className="px-4 sm:px-8 mt-4">
         <Card className="p-5 flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-warning-soft text-warning flex items-center justify-center shrink-0">
             <ShieldAlert size={17} />

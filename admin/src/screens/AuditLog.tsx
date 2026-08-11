@@ -43,12 +43,12 @@ export function AuditLog() {
         }
       />
 
-      <div className="px-8 pb-5 flex items-center gap-3 flex-wrap">
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по действию или человеку" className="w-[280px]" />
+      <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap">
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по действию или человеку" className="w-full sm:w-[280px]" />
         <Tabs value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTERS.map((r) => ({ id: r, label: r }))} />
       </div>
 
-      <div className="px-8">
+      <div className="px-4 sm:px-8">
         <Card className="p-6">
           {filtered.length === 0 ? (
             <p className="text-center text-[13px] text-text-faint py-8">Ничего не найдено</p>

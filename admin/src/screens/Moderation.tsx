@@ -34,7 +34,7 @@ export function Moderation() {
         title="Модерация"
         right={<span className="text-[13px] text-text-faint">Среднее время проверки — 6 мин</span>}
       />
-      <div className="px-8 pb-5 shrink-0">
+      <div className="px-4 sm:px-8 pb-5 shrink-0">
         <Tabs
           value={tab}
           onChange={(v) => setTab(v as typeof tab)}
@@ -46,7 +46,7 @@ export function Moderation() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-8">
+      <div className="flex-1 min-h-0 px-4 sm:px-8">
         {tab === 'vacancies' && <VacancyQueue items={vacancies} />}
         {tab === 'complaints' && <ComplaintQueue items={complaints} />}
         {tab === 'documents' && <DocumentQueue items={documents} />}
@@ -93,7 +93,7 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
   if (items.length === 0) return <EmptyPanel title="Очередь пуста" description="Новых вакансий на проверку нет." />;
 
   return (
-    <div className="grid grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
       <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((v) => (
           <button
@@ -114,7 +114,7 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
       </div>
 
       {selected && (
-        <Card className="p-6 h-fit sticky top-0">
+        <Card className="p-6 h-fit lg:sticky lg:top-0">
           <div className="flex items-start justify-between gap-3 mb-5">
             <div className="flex items-center gap-3">
               <Avatar name={selected.companyName} size={44} square />
@@ -128,7 +128,7 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
             <Badge tone="warning">На проверке</Badge>
           </div>
 
-          <div className="grid grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             <Stat label="Ставка" value={`${selected.hourlyRate} ₽/ч`} />
             <Stat label="Смена" value={`${selected.durationHours} ч`} />
             <Stat label="Адрес" value={selected.city} />
@@ -194,7 +194,7 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
   if (items.length === 0) return <EmptyPanel title="Жалоб нет" description="Все обращения обработаны." />;
 
   return (
-    <div className="grid grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
       <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((c) => (
           <button
@@ -213,7 +213,7 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
       </div>
 
       {selected && (
-        <Card className="p-6 h-fit sticky top-0">
+        <Card className="p-6 h-fit lg:sticky lg:top-0">
           <div className="flex items-center gap-3 mb-5">
             <Avatar name={selected.targetName} size={44} square />
             <div>
@@ -279,7 +279,7 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
   if (items.length === 0) return <EmptyPanel title="Документов на проверке нет" description="Все загруженные документы рассмотрены." />;
 
   return (
-    <div className="grid grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 h-full min-h-0 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
       <div className="overflow-y-auto pr-1 space-y-2.5 pb-6">
         {items.map((d) => (
           <button
@@ -298,7 +298,7 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
       </div>
 
       {selected && (
-        <Card className="p-6 h-fit sticky top-0">
+        <Card className="p-6 h-fit lg:sticky lg:top-0">
           <div className="flex items-center gap-3 mb-5">
             <Avatar name={selected.applicantName} size={44} />
             <div>

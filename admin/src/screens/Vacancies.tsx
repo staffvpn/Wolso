@@ -52,7 +52,7 @@ export function Vacancies() {
     <div className="pb-10 flex flex-col h-full min-h-0">
       <PageHeader title="Вакансии и смены" subtitle={`${vacancies.length} всего`} />
 
-      <div className="px-8 pb-5 shrink-0">
+      <div className="px-4 sm:px-8 pb-5 shrink-0">
         <Tabs
           value={status}
           onChange={(v) => setStatus(v as typeof status)}
@@ -66,13 +66,13 @@ export function Vacancies() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-8 grid grid-cols-[1.6fr_1fr] gap-5">
+      <div className="flex-1 min-h-0 px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 overflow-y-auto lg:overflow-visible pb-6 lg:pb-0">
         <Card className="overflow-hidden flex flex-col">
-          <div className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+          <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Вакансия</span>
-            <span>Город</span>
-            <span>Ставка</span>
-            <span>Отклики</span>
+            <span className="hidden sm:block">Город</span>
+            <span className="hidden sm:block">Ставка</span>
+            <span className="hidden sm:block">Отклики</span>
             <span>Статус</span>
           </div>
           <div className="overflow-y-auto divide-y divide-border-soft">
@@ -81,7 +81,7 @@ export function Vacancies() {
                 key={v.id}
                 onClick={() => setSelectedId(v.id)}
                 className={cn(
-                  'w-full grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors',
+                  'w-full grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors',
                   selectedId === v.id && 'bg-surface-2',
                 )}
               >
@@ -92,9 +92,9 @@ export function Vacancies() {
                     <span className="block text-[12px] text-text-faint truncate">{v.companyName}</span>
                   </span>
                 </span>
-                <span className="text-[13px] text-text-muted">{v.city}</span>
-                <span className="text-[13px] font-semibold text-text">{v.hourlyRate} ₽/ч</span>
-                <span className="text-[13px] text-text-muted">{v.responses}</span>
+                <span className="hidden sm:block text-[13px] text-text-muted">{v.city}</span>
+                <span className="hidden sm:block text-[13px] font-semibold text-text">{v.hourlyRate} ₽/ч</span>
+                <span className="hidden sm:block text-[13px] text-text-muted">{v.responses}</span>
                 <span>
                   <Badge tone={STATUS_BADGE[v.status].tone}>{STATUS_BADGE[v.status].label}</Badge>
                 </span>
@@ -104,7 +104,7 @@ export function Vacancies() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit sticky top-0">
+        <Card className="p-6 h-fit lg:sticky lg:top-0">
           {!selected && <EmptyPanel title="Выберите вакансию" description="Нажмите на строку слева, чтобы увидеть подробности." />}
           {selected && (
             <div>
