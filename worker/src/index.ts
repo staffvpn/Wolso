@@ -32,8 +32,9 @@ app.use('*', async (c, next) => {
 app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
 
 // TEMPORARY — deployment diagnostics only, reveals no secret values.
-// Remove once the BOT_TOKEN / SESSION_SECRET setup is confirmed working.
-// (forcing a fresh deploy so newly-saved dashboard secrets actually apply)
+// Remove once the BOT_TOKEN / SESSION_SECRET / OWNER_TELEGRAM_ID setup is
+// confirmed working. (forcing a fresh deploy so the OWNER_TELEGRAM_ID
+// secret, just switched from a Text var to a Secret, actually applies)
 app.get('/debug/env', (c) =>
   c.json({
     botTokenLength: c.env.BOT_TOKEN?.length ?? 0,
