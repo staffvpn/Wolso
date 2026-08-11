@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronRight, Plus } from 'lucide-react';
+import { Check, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Avatar } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
@@ -26,16 +26,50 @@ export function WorkerProfileScreen() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto px-5 pt-5 safe-top pb-4">
       <div className="flex items-center gap-4">
-        <Avatar name={profile.name} size={64} />
-        <div className="min-w-0">
-          <h1 className="text-[20px] font-extrabold truncate">{profile.name}</h1>
+        <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[20px] font-extrabold truncate">
+            {profile.name}
+            {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
+          </h1>
           <p className="text-[13px] text-text-muted">{positions[0]?.positionLabel} · {profile.city}</p>
           <div className="flex items-center gap-1 mt-1">
             <span className="text-accent text-[13px] font-bold">★ {profile.rating.toFixed(1)}</span>
             <span className="text-text-faint text-[13px]">· {profile.shiftsCompleted} смен</span>
           </div>
         </div>
+        <button
+          onClick={() => navigate('/w/profile/edit')}
+          aria-label="Редактировать профиль"
+          className="h-9 w-9 rounded-full bg-surface-2 flex items-center justify-center shrink-0"
+        >
+          <Pencil size={15} className="text-text-muted" />
+        </button>
       </div>
+
+      {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4">{profile.bio}</p>}
+
+      {profile.skills && (
+        <div className="mt-3">
+          <SectionLabel>Навыки</SectionLabel>
+          <p className="text-[13px] text-text-muted leading-relaxed">{profile.skills}</p>
+        </div>
+      )}
+
+      {(profile.smoking || profile.alcohol) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {profile.smoking && <Badge tone="neutral">{profile.smoking === 'yes' ? 'Курит' : 'Не курит'}</Badge>}
+          {profile.alcohol && <Badge tone="neutral">{profile.alcohol === 'yes' ? 'Употребляет алкоголь' : 'Не употребляет алкоголь'}</Badge>}
+        </div>
+      )}
+
+      {profile.photos.length > 0 && (
+        <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">
+          {profile.photos.map((p) => (
+            <img key={p.id} src={p.url} alt="" className="h-24 w-24 rounded-2xl object-cover shrink-0" />
+          ))}
+        </div>
+      )}
 
       <motion.button
         whileTap={{ scale: 0.98 }}

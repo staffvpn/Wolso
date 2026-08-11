@@ -9,8 +9,12 @@ CREATE TABLE telegram_accounts (
 
 -- Companies must pass moderation before they can publish vacancies.
 -- Separate from `status` (active/suspended — block/unblock), this tracks
--- whether staff have reviewed the employer at all.
-ALTER TABLE companies ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'pending_review';
+-- whether staff have reviewed the employer at all. Starts 'incomplete' —
+-- a brand-new company has nothing worth reviewing yet; it flips to
+-- 'pending_review' automatically once the mandatory profile fields are
+-- filled in (see routes/employer.ts), which is what actually puts it in
+-- the moderation queue.
+ALTER TABLE companies ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'incomplete';
 
 -- New permission: only staff who have it can move a user between the
 -- worker/employer roles.

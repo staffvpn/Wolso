@@ -70,3 +70,16 @@ export function minutesSince(timestamp: string): number {
 export function timeAgoSince(timestamp: string) {
   return timeAgo(minutesSince(timestamp));
 }
+
+/** Age from an ISO birthdate — profiles only ever show the computed age,
+ *  never the date of birth itself. */
+export function ageFrom(birthdate?: string | null): number | undefined {
+  if (!birthdate) return undefined;
+  const dob = new Date(birthdate);
+  if (Number.isNaN(dob.getTime())) return undefined;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}

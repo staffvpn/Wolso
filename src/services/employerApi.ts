@@ -1,5 +1,6 @@
-import type { Candidate, Position, Vacancy } from '@/types';
-import { apiFetch } from '@/lib/apiClient';
+import type { Candidate, Position, Vacancy, YesNo } from '@/types';
+import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
+import { ageFrom } from '@/lib/format';
 
 interface VacancyApiResponse {
   id: number;
@@ -52,10 +53,19 @@ interface CandidateApiResponse {
   worker_shifts_completed: number;
   worker_city: string;
   worker_med_book: number;
+  worker_bio: string | null;
+  worker_skills: string | null;
+  worker_birthdate: string | null;
+  worker_smoking: YesNo | null;
+  worker_alcohol: YesNo | null;
+  worker_avatar_url: string | null;
+  worker_photos: string[];
   shift_position_label?: string;
 }
 
 function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: string): Candidate {
+  const avatar = resolveMediaUrl(c.worker_avatar_url);
+  const gallery = c.worker_photos.map((p) => resolveMediaUrl(p)!);
   return {
     id: String(c.id),
     vacancyId: String(c.shift_id),
@@ -67,6 +77,12 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     city: c.worker_city,
     medBook: !!c.worker_med_book,
     status: c.status as Candidate['status'],
+    bio: c.worker_bio ?? undefined,
+    skills: c.worker_skills ?? undefined,
+    age: ageFrom(c.worker_birthdate),
+    smoking: c.worker_smoking ?? undefined,
+    alcohol: c.worker_alcohol ?? undefined,
+    photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }
 

@@ -34,6 +34,8 @@ export interface ShiftRow {
   company_reviews_count?: number;
   company_verified?: number;
   company_inn?: string;
+  company_has_avatar?: number;
+  company_description?: string;
 }
 
 export function shiftToJson(r: ShiftRow) {
@@ -70,6 +72,8 @@ export function shiftToJson(r: ShiftRow) {
           reviewsCount: r.company_reviews_count,
           verified: !!r.company_verified,
           inn: r.company_inn,
+          avatarUrl: r.company_has_avatar ? `/media/companies/${r.company_id}/avatar` : null,
+          description: r.company_description || undefined,
         }
       : undefined,
   };
@@ -79,7 +83,8 @@ export const SHIFT_SELECT = `
   SELECT s.*, c.name as company_name, c.address as company_address, c.city as company_city,
          c.logo_initial as company_logo_initial, c.logo_color as company_logo_color,
          c.rating as company_rating, c.reviews_count as company_reviews_count,
-         c.verified as company_verified, c.inn as company_inn
+         c.verified as company_verified, c.inn as company_inn,
+         (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description
   FROM shifts s JOIN companies c ON c.id = s.company_id
 `;
 

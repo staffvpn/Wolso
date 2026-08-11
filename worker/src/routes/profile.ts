@@ -1,50 +1,119 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
+import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 
 export const profileRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 profileRoutes.use('*', attachSession);
+
+interface WorkerRow {
+  id: number;
+  name: string;
+  city: string;
+  bio: string;
+  birthdate: string | null;
+  skills: string;
+  smoking: string | null;
+  alcohol: string | null;
+  photo_url: string | null;
+  avatar_data: ArrayBuffer | null;
+}
+
+function ageFrom(birthdate: string | null): number | null {
+  if (!birthdate) return null;
+  const dob = new Date(birthdate);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+/** Every field on this list must be present for a worker to be able to
+ *  browse the feed / apply to shifts — see ProfileGate on the client. */
+function isComplete(worker: WorkerRow, hasExperience: boolean) {
+  const fields = [
+    !!worker.name,
+    !!worker.city,
+    !!worker.bio,
+    !!worker.skills,
+    !!worker.birthdate,
+    !!worker.smoking,
+    !!worker.alcohol,
+    !!(worker.avatar_data || worker.photo_url),
+    hasExperience,
+  ];
+  return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
+}
+
+async function loadProfile(env: Env, workerId: number) {
+  const worker = await env.DB.prepare('SELECT * FROM workers WHERE id = ?').bind(workerId).first<WorkerRow>();
+  if (!worker) return null;
+
+  const { results: positions } = await env.DB.prepare('SELECT position, position_label, years FROM worker_positions WHERE worker_id = ?')
+    .bind(workerId)
+    .all();
+  const { results: documents } = await env.DB.prepare('SELECT * FROM worker_documents WHERE worker_id = ?').bind(workerId).all();
+  const { results: photoRows } = await env.DB.prepare('SELECT id FROM worker_photos WHERE worker_id = ? ORDER BY position ASC')
+    .bind(workerId)
+    .all<{ id: number }>();
+
+  const { complete, percent } = isComplete(worker, positions.length > 0);
+  const avatarUrl = worker.avatar_data ? `/media/workers/${worker.id}/avatar` : worker.photo_url;
+
+  return {
+    worker: {
+      ...worker,
+      avatar_data: undefined,
+      avatarUrl,
+      age: ageFrom(worker.birthdate),
+      profileComplete: complete,
+      profileCompletion: percent,
+    },
+    positions,
+    documents,
+    photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${workerId}/photos/${p.id}` })),
+  };
+}
 
 profileRoutes.get('/', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
-  const worker = await c.env.DB.prepare('SELECT * FROM workers WHERE id = ?').bind(session.workerId).first();
-  if (!worker) return c.json({ error: 'not_found' }, 404);
-
-  const { results: positions } = await c.env.DB.prepare('SELECT position, position_label, years FROM worker_positions WHERE worker_id = ?')
-    .bind(session.workerId)
-    .all();
-  const { results: documents } = await c.env.DB.prepare('SELECT * FROM worker_documents WHERE worker_id = ?')
-    .bind(session.workerId)
-    .all();
-
-  const completionFields = [worker.city, positions.length > 0, documents.some((d) => d.status === 'verified')];
-  const profileCompletion = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
-
-  return c.json({ worker: { ...worker, profileCompletion }, positions, documents });
+  const profile = await loadProfile(c.env, session.workerId);
+  if (!profile) return c.json({ error: 'not_found' }, 404);
+  return c.json(profile);
 });
 
 profileRoutes.patch('/', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const body = await c.req.json<{ city?: string; name?: string }>();
+  const body = await c.req.json<{
+    city?: string;
+    name?: string;
+    bio?: string;
+    birthdate?: string;
+    skills?: string;
+    smoking?: 'yes' | 'no';
+    alcohol?: 'yes' | 'no';
+  }>();
 
   const fields: string[] = [];
   const binds: unknown[] = [];
-  if (body.city) {
-    fields.push('city = ?');
-    binds.push(body.city);
-  }
-  if (body.name) {
-    fields.push('name = ?');
-    binds.push(body.name);
+  for (const key of ['city', 'name', 'bio', 'birthdate', 'skills', 'smoking', 'alcohol'] as const) {
+    if (body[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      binds.push(body[key]);
+    }
   }
   if (fields.length) {
     binds.push(session.workerId);
     await c.env.DB.prepare(`UPDATE workers SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
   }
-  return c.json({ ok: true });
+
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
 });
 
 profileRoutes.post('/positions', async (c) => {
@@ -55,7 +124,54 @@ profileRoutes.post('/positions', async (c) => {
   await c.env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, years) VALUES (?, ?, ?, ?)')
     .bind(session.workerId, position, positionLabel, years ?? 0)
     .run();
-  return c.json({ ok: true });
+
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
+});
+
+/** Avatar upload — same D1-BLOB pattern as documents, but served publicly
+ *  (see routes/media.ts) since it needs to show up in an <img> the other
+ *  side is swiping through. */
+profileRoutes.post('/avatar', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
+  const bytes = await c.req.arrayBuffer();
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  await setAvatar(c.env, 'workers', session.workerId, bytes, contentType);
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
+});
+
+/** Portfolio gallery — up to 6 photos, tap-through on the card the way a
+ *  Tinder profile's extra photos work. Optional, not part of the mandatory
+ *  profile-completion checklist. */
+profileRoutes.post('/photos', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
+  const bytes = await c.req.arrayBuffer();
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  const result = await addGalleryPhoto(c.env, 'worker_photos', 'worker_id', session.workerId, bytes, contentType);
+  if (!result.ok) return c.json({ error: result.error }, 400);
+
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
+});
+
+profileRoutes.delete('/photos/:id', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  await deleteGalleryPhoto(c.env, 'worker_photos', 'worker_id', session.workerId, c.req.param('id'));
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
 });
 
 /** Document upload — raw file bytes in the body, doc type in the URL.
@@ -74,9 +190,8 @@ profileRoutes.post('/documents/:docType/upload', async (c) => {
 
   const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
   const bytes = await c.req.arrayBuffer();
-  if (bytes.byteLength === 0) return c.json({ error: 'empty_upload' }, 400);
-  // D1 caps a row at 2MB total — leave headroom for the rest of the row.
-  if (bytes.byteLength > 1.5 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413);
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
 
   await c.env.DB.prepare(
     "UPDATE worker_documents SET status = 'pending', file_data = ?, content_type = ?, note = 'На проверке', updated_at = datetime('now') WHERE id = ?",

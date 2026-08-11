@@ -21,8 +21,20 @@ export interface Company {
   verified: boolean;
   inn?: string;
   /** Moderation gate — a company must be `approved` before it can publish
-   *  vacancies. Only present on the owner's own `/employer/me` response. */
-  verificationStatus?: 'pending_review' | 'approved' | 'rejected';
+   *  vacancies. Only present on the owner's own `/employer/me` response.
+   *  `incomplete` means the mandatory profile fields (avatar, description,
+   *  founded year) aren't filled in yet — the account moves itself into
+   *  `pending_review` automatically the moment they are. */
+  verificationStatus?: 'incomplete' | 'pending_review' | 'approved' | 'rejected';
+  /** Uploaded main photo — undefined until the employer uploads one, in
+   *  which case UI falls back to the colored logoInitial badge. */
+  avatarUrl?: string;
+  description?: string;
+  foundedYear?: number;
+  /** Only present on the owner's own `/employer/me` response. */
+  profileComplete?: boolean;
+  profileCompletion?: number;
+  photos?: { id: string; url: string }[];
 }
 
 export type ShiftUrgency = 'normal' | 'urgent';
@@ -110,16 +122,27 @@ export interface WorkerReview {
   text: string;
 }
 
+export type YesNo = 'yes' | 'no';
+
 export interface WorkerProfile {
   name: string;
   city: string;
   rating: number;
   shiftsCompleted: number;
   profileCompletion: number;
+  profileComplete: boolean;
   positions: WorkerExperience[];
   documents: WorkerDocument[];
   reviews: WorkerReview[];
   referralCode: string;
+  bio: string;
+  skills: string;
+  birthdate?: string;
+  age?: number;
+  smoking?: YesNo;
+  alcohol?: YesNo;
+  avatarUrl?: string;
+  photos: { id: string; url: string }[];
 }
 
 export interface Transaction {
@@ -146,6 +169,14 @@ export interface Candidate {
   city: string;
   medBook: boolean;
   status: 'pending' | 'accepted' | 'declined';
+  bio?: string;
+  skills?: string;
+  age?: number;
+  smoking?: YesNo;
+  alcohol?: YesNo;
+  /** Avatar first, then any portfolio photos — the card taps through this
+   *  whole list left-to-right, Tinder-style. */
+  photos: string[];
 }
 
 export interface Vacancy {

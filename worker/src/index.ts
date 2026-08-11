@@ -11,6 +11,7 @@ import { notificationRoutes } from './routes/notifications';
 import { profileRoutes } from './routes/profile';
 import { employerRoutes } from './routes/employer';
 import { supportRoutes } from './routes/support';
+import { mediaRoutes } from './routes/media';
 
 import { adminModerationRoutes } from './admin/moderation';
 import { adminUserRoutes } from './admin/users';
@@ -42,6 +43,7 @@ app.route('/notifications', notificationRoutes);
 app.route('/me', profileRoutes);
 app.route('/employer', employerRoutes);
 app.route('/support', supportRoutes);
+app.route('/media', mediaRoutes);
 
 app.route('/admin/moderation', adminModerationRoutes);
 app.route('/admin/users', adminUserRoutes);

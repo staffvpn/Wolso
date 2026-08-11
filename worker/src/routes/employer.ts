@@ -2,11 +2,58 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
 
 const REGIONAL_MIN_WAGE = 280;
+
+interface CompanyRow {
+  id: number;
+  name: string;
+  description: string;
+  founded_year: number | null;
+  avatar_data: ArrayBuffer | null;
+  verification_status: string;
+}
+
+/** Every field on this list must be present before a company profile counts
+ *  as "complete" — see ProfileGate on the client. There's no Telegram photo
+ *  fallback for companies (unlike workers), so the avatar has to be
+ *  uploaded here. */
+function companyIsComplete(company: CompanyRow) {
+  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data];
+  return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
+}
+
+async function loadCompanyProfile(env: Env, companyId: number) {
+  const company = await env.DB.prepare('SELECT * FROM companies WHERE id = ?').bind(companyId).first<CompanyRow>();
+  if (!company) return null;
+
+  const { results: photoRows } = await env.DB.prepare('SELECT id FROM company_photos WHERE company_id = ? ORDER BY position ASC')
+    .bind(companyId)
+    .all<{ id: number }>();
+
+  const { complete, percent } = companyIsComplete(company);
+  // A freshly-created company has nothing worth reviewing yet — once the
+  // profile is filled in, it moves itself into the moderation queue.
+  if (complete && company.verification_status === 'incomplete') {
+    await env.DB.prepare("UPDATE companies SET verification_status = 'pending_review' WHERE id = ?").bind(companyId).run();
+    company.verification_status = 'pending_review';
+  }
+
+  return {
+    company: {
+      ...company,
+      avatar_data: undefined,
+      avatarUrl: company.avatar_data ? `/media/companies/${company.id}/avatar` : null,
+      profileComplete: complete,
+      profileCompletion: percent,
+    },
+    photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${companyId}/photos/${p.id}` })),
+  };
+}
 
 /** Lets an employer message a candidate before deciding — a chat can exist
  *  with no shift_id, just company+worker. */
@@ -29,28 +76,78 @@ employerRoutes.post('/candidates/:workerId/chat', async (c) => {
 employerRoutes.get('/me', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const company = await c.env.DB.prepare('SELECT * FROM companies WHERE id = ?').bind(session.companyId).first();
-  return c.json({ company });
+  const profile = await loadCompanyProfile(c.env, session.companyId);
+  if (!profile) return c.json({ error: 'not_found' }, 404);
+  return c.json(profile);
 });
 
 employerRoutes.patch('/me', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const body = await c.req.json<{ name?: string; address?: string; city?: string }>();
+  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number }>();
 
   const fields: string[] = [];
   const binds: unknown[] = [];
-  for (const key of ['name', 'address', 'city'] as const) {
+  for (const key of ['name', 'address', 'city', 'description'] as const) {
     if (body[key]) {
       fields.push(`${key} = ?`);
       binds.push(body[key]);
     }
   }
+  if (body.foundedYear) {
+    fields.push('founded_year = ?');
+    binds.push(body.foundedYear);
+  }
   if (fields.length) {
     binds.push(session.companyId);
     await c.env.DB.prepare(`UPDATE companies SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
   }
-  return c.json({ ok: true });
+
+  const profile = await loadCompanyProfile(c.env, session.companyId);
+  return c.json({ ok: true, ...profile });
+});
+
+/** Avatar upload — same D1-BLOB pattern as worker documents/avatar, served
+ *  publicly via routes/media.ts. */
+employerRoutes.post('/me/avatar', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
+  const bytes = await c.req.arrayBuffer();
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  await setAvatar(c.env, 'companies', session.companyId, bytes, contentType);
+  const profile = await loadCompanyProfile(c.env, session.companyId);
+  return c.json({ ok: true, ...profile });
+});
+
+/** Additional gallery photos — optional, up to 6, shown alongside the main
+ *  avatar on the company's profile and vacancy cards. */
+employerRoutes.post('/me/photos', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
+  const bytes = await c.req.arrayBuffer();
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  const result = await addGalleryPhoto(c.env, 'company_photos', 'company_id', session.companyId, bytes, contentType);
+  if (!result.ok) return c.json({ error: result.error }, 400);
+
+  const profile = await loadCompanyProfile(c.env, session.companyId);
+  return c.json({ ok: true, ...profile });
+});
+
+employerRoutes.delete('/me/photos/:id', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  await deleteGalleryPhoto(c.env, 'company_photos', 'company_id', session.companyId, c.req.param('id'));
+  const profile = await loadCompanyProfile(c.env, session.companyId);
+  return c.json({ ok: true, ...profile });
 });
 
 employerRoutes.get('/vacancies', async (c) => {
@@ -143,6 +240,35 @@ employerRoutes.post('/vacancies', async (c) => {
   return c.json({ shift: shiftToJson(row!) });
 });
 
+/** Worker columns joined into both candidate queries below — enough for
+ *  the swipe card to show a real profile (avatar, bio, skills, age,
+ *  alcohol/smoking) instead of just a name and a rating. */
+const CANDIDATE_WORKER_FIELDS = `
+  w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
+  w.bio as worker_bio, w.skills as worker_skills, w.birthdate as worker_birthdate,
+  w.smoking as worker_smoking, w.alcohol as worker_alcohol,
+  (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
+  EXISTS(SELECT 1 FROM worker_documents d WHERE d.worker_id = w.id AND d.doc_type = 'med_book' AND d.status = 'verified') as worker_med_book,
+  (SELECT json_group_array(id) FROM worker_photos wp WHERE wp.worker_id = w.id) as worker_photo_ids
+`;
+
+interface CandidateWorkerRow {
+  worker_id: number;
+  worker_has_avatar: number;
+  worker_photo_url: string | null;
+  worker_photo_ids: string | null;
+  [key: string]: unknown;
+}
+
+/** Turns the joined `worker_*` columns into a small `worker` object with
+ *  ready-to-use photo URLs — same avatar-or-Telegram-fallback logic as the
+ *  worker's own profile endpoint. */
+function withWorkerPhotos<T extends CandidateWorkerRow>(row: T) {
+  const avatarUrl = row.worker_has_avatar ? `/media/workers/${row.worker_id}/avatar` : row.worker_photo_url;
+  const photoIds = row.worker_photo_ids ? (JSON.parse(row.worker_photo_ids) as number[]) : [];
+  return { ...row, worker_avatar_url: avatarUrl, worker_photos: photoIds.map((id) => `/media/workers/${row.worker_id}/photos/${id}`) };
+}
+
 /** All pending applicants across every vacancy this company owns — feeds
  *  the employer's swipe deck without an N+1 fetch per vacancy. */
 employerRoutes.get('/candidates', async (c) => {
@@ -150,9 +276,8 @@ employerRoutes.get('/candidates', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT a.*, w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
-            s.position_label as shift_position_label, s.date as shift_date, s.start_hour as shift_start_hour, s.start_min as shift_start_min,
-            EXISTS(SELECT 1 FROM worker_documents d WHERE d.worker_id = w.id AND d.doc_type = 'med_book' AND d.status = 'verified') as worker_med_book
+    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS},
+            s.position_label as shift_position_label, s.date as shift_date, s.start_hour as shift_start_hour, s.start_min as shift_start_min
      FROM applications a
      JOIN shifts s ON s.id = a.shift_id
      JOIN workers w ON w.id = a.worker_id
@@ -160,9 +285,9 @@ employerRoutes.get('/candidates', async (c) => {
      ORDER BY a.created_at ASC`,
   )
     .bind(session.companyId)
-    .all();
+    .all<CandidateWorkerRow>();
 
-  return c.json({ candidates: results });
+  return c.json({ candidates: results.map(withWorkerPhotos) });
 });
 
 employerRoutes.get('/vacancies/:id/candidates', async (c) => {
@@ -174,14 +299,13 @@ employerRoutes.get('/vacancies/:id/candidates', async (c) => {
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT a.*, w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
-            EXISTS(SELECT 1 FROM worker_documents d WHERE d.worker_id = w.id AND d.doc_type = 'med_book' AND d.status = 'verified') as worker_med_book
+    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS}
      FROM applications a JOIN workers w ON w.id = a.worker_id WHERE a.shift_id = ? ORDER BY a.created_at ASC`,
   )
     .bind(shiftId)
-    .all();
+    .all<CandidateWorkerRow>();
 
-  return c.json({ candidates: results });
+  return c.json({ candidates: results.map(withWorkerPhotos) });
 });
 
 employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) => {

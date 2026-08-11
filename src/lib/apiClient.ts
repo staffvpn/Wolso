@@ -2,6 +2,15 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
+/** Profile photo endpoints (routes/media.ts) are public and return a
+ *  relative path like `/media/workers/12/avatar` — an already-absolute
+ *  Telegram CDN URL passes through unchanged. */
+export function resolveMediaUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//.test(path)) return path;
+  return `${API_URL ?? ''}${path}`;
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;
