@@ -6,6 +6,8 @@ import { Toggle } from '@/components/ui/Toggle';
 import { Button } from '@/components/ui/Button';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useCan } from '@/store/useSessionStore';
+import { FEATURES } from '@/lib/features';
+import { cn } from '@/lib/cn';
 
 const CITIES = ['Москва', 'Санкт-Петербург', 'Казань', 'Екатеринбург', 'Новосибирск'];
 
@@ -18,7 +20,7 @@ export function Settings() {
       <PageHeader title="Настройки" subtitle="Общие параметры платформы Wolso" />
 
       <div className="px-8 grid grid-cols-2 gap-4">
-        <Card className="p-6">
+        <Card className={cn('p-6', !FEATURES.payments && 'col-span-2')}>
           <SectionLabel className="mb-4">Общее</SectionLabel>
           <div className="space-y-4">
             <div>
@@ -40,34 +42,36 @@ export function Settings() {
           </div>
         </Card>
 
-        <Card className="p-6">
-          <SectionLabel className="mb-4">Платежи</SectionLabel>
-          <div className="space-y-4">
-            <div>
-              <Label>Комиссия платформы по умолчанию</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  max={30}
-                  value={s.defaultCommissionPct}
-                  disabled={!canEdit}
-                  onChange={(e) => s.set('defaultCommissionPct', Number(e.target.value))}
-                  className="w-24"
-                />
-                <span className="text-[14px] text-text-muted">%</span>
+        {FEATURES.payments && (
+          <Card className="p-6">
+            <SectionLabel className="mb-4">Платежи</SectionLabel>
+            <div className="space-y-4">
+              <div>
+                <Label>Комиссия платформы по умолчанию</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={s.defaultCommissionPct}
+                    disabled={!canEdit}
+                    onChange={(e) => s.set('defaultCommissionPct', Number(e.target.value))}
+                    className="w-24"
+                  />
+                  <span className="text-[14px] text-text-muted">%</span>
+                </div>
+              </div>
+              <div>
+                <Label>Периодичность выплат</Label>
+                <Select value={s.payoutSchedule} disabled={!canEdit} onChange={(e) => s.set('payoutSchedule', e.target.value as typeof s.payoutSchedule)}>
+                  <option value="instant">Сразу после смены</option>
+                  <option value="daily">Раз в день</option>
+                  <option value="weekly">Раз в неделю</option>
+                </Select>
               </div>
             </div>
-            <div>
-              <Label>Периодичность выплат</Label>
-              <Select value={s.payoutSchedule} disabled={!canEdit} onChange={(e) => s.set('payoutSchedule', e.target.value as typeof s.payoutSchedule)}>
-                <option value="instant">Сразу после смены</option>
-                <option value="daily">Раз в день</option>
-                <option value="weekly">Раз в неделю</option>
-              </Select>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         <Card className="p-6 col-span-2">
           <SectionLabel className="mb-4">Уведомления администраторам</SectionLabel>

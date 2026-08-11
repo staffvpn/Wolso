@@ -1,0 +1,27 @@
+name = "wolso-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# CORS origins the API accepts requests from. Update once you know the
+# real Pages URLs (or a custom domain) — see src/lib/cors.ts.
+[vars]
+ADMIN_ORIGIN = "https://wolso-admin.pages.dev"
+APP_ORIGIN = "https://wolso.pages.dev"
+
+# Created with: wrangler d1 create wolso
+# Paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "wolso"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Created with: wrangler r2 bucket create wolso-documents
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "wolso-documents"
+
+# Secrets (never put these here — set with `wrangler secret put <NAME>`):
+#   BOT_TOKEN          — the Telegram bot token from @BotFather
+#   SESSION_SECRET      — any long random string, used to sign session tokens
+#   OWNER_TELEGRAM_ID   — your own numeric Telegram user id, to bootstrap the first Owner

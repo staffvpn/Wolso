@@ -1,25 +1,124 @@
-import type { Candidate, Vacancy } from '@/types';
-import { CANDIDATES, VACANCIES } from '@/data/employer';
-import { delay } from './delay';
+import type { Candidate, Position, Vacancy } from '@/types';
+import { apiFetch } from '@/lib/apiClient';
+
+interface VacancyApiResponse {
+  id: number;
+  position: string;
+  positionLabel: string;
+  date: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  hourlyRate: number;
+  requirements: string[];
+  urgency: string;
+  status: string;
+  createdAt: string;
+  responseCount: number;
+}
+
+function fromApiVacancy(v: VacancyApiResponse): Vacancy {
+  return {
+    id: String(v.id),
+    position: v.position as Position,
+    positionLabel: v.positionLabel,
+    date: v.date,
+    startHour: v.startHour,
+    startMin: v.startMin,
+    endHour: v.endHour,
+    endMin: v.endMin,
+    hourlyRate: v.hourlyRate,
+    requirements: v.requirements,
+    urgent: v.urgency === 'urgent',
+    createdAt: v.createdAt,
+    status: v.status as Vacancy['status'],
+    responseCount: v.responseCount,
+  };
+}
 
 export async function fetchVacancies(): Promise<Vacancy[]> {
-  await delay();
-  return VACANCIES;
+  const { shifts } = await apiFetch<{ shifts: VacancyApiResponse[] }>('/employer/vacancies', { as: 'company' });
+  return shifts.map(fromApiVacancy);
 }
 
-export async function fetchCandidates(): Promise<Candidate[]> {
-  await delay();
-  return CANDIDATES;
+interface CandidateApiResponse {
+  id: number;
+  shift_id: number;
+  worker_id: number;
+  status: string;
+  worker_name: string;
+  worker_rating: number;
+  worker_shifts_completed: number;
+  worker_city: string;
+  worker_med_book: number;
+  shift_position_label?: string;
 }
 
-/** Simulated POST /vacancies */
-export async function createVacancy(input: Omit<Vacancy, 'id' | 'publishedMinAgo' | 'status' | 'reach'>): Promise<Vacancy> {
-  await delay(400);
+function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: string): Candidate {
   return {
-    ...input,
-    id: `vac-${Date.now()}`,
-    publishedMinAgo: 0,
-    status: 'active',
-    reach: Math.round(120 + Math.random() * 160),
+    id: String(c.id),
+    vacancyId: String(c.shift_id),
+    workerId: String(c.worker_id),
+    name: c.worker_name,
+    positionLabel: c.shift_position_label ?? fallbackPositionLabel ?? '',
+    rating: c.worker_rating,
+    shiftsCompleted: c.worker_shifts_completed,
+    city: c.worker_city,
+    medBook: !!c.worker_med_book,
+    status: c.status as Candidate['status'],
   };
+}
+
+/** All pending applicants across every vacancy this company owns — feeds
+ *  the employer's swipe deck. */
+export async function fetchCandidates(): Promise<Candidate[]> {
+  const { candidates } = await apiFetch<{ candidates: CandidateApiResponse[] }>('/employer/candidates', { as: 'company' });
+  return candidates.map((c) => fromApiCandidate(c));
+}
+
+export async function fetchVacancyCandidates(vacancyId: string, positionLabel?: string): Promise<Candidate[]> {
+  const { candidates } = await apiFetch<{ candidates: CandidateApiResponse[] }>(`/employer/vacancies/${vacancyId}/candidates`, {
+    as: 'company',
+  });
+  return candidates.map((c) => fromApiCandidate(c, positionLabel));
+}
+
+export async function decideCandidate(vacancyId: string, applicationId: string, status: 'accepted' | 'declined'): Promise<void> {
+  await apiFetch(`/employer/vacancies/${vacancyId}/candidates/${applicationId}/decide`, {
+    method: 'POST',
+    body: { status },
+    as: 'company',
+  });
+}
+
+export async function createVacancy(input: {
+  position: Position;
+  positionLabel: string;
+  date: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  hourlyRate: number;
+  requirements: string[];
+  urgent: boolean;
+}): Promise<Vacancy> {
+  const { shift } = await apiFetch<{ shift: VacancyApiResponse & { responseCount?: number } }>('/employer/vacancies', {
+    method: 'POST',
+    as: 'company',
+    body: {
+      position: input.position,
+      positionLabel: input.positionLabel,
+      date: input.date,
+      startHour: input.startHour,
+      startMin: input.startMin,
+      endHour: input.endHour,
+      endMin: input.endMin,
+      hourlyRate: input.hourlyRate,
+      requirements: input.requirements,
+      urgency: input.urgent ? 'urgent' : 'normal',
+    },
+  });
+  return fromApiVacancy({ ...shift, responseCount: shift.responseCount ?? 0 });
 }

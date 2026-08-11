@@ -1,98 +1,55 @@
 import { create } from 'zustand';
 import type { Chat, ChatMessage } from '@/types';
-import { SEED_CHATS, SEED_MESSAGES } from '@/data/chats';
-import { getShift } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
-import { postMessage } from '@/services/chatApi';
+import { fetchChats, fetchMessages, postMessage, startChatWithWorker, type ChatActor } from '@/services/chatApi';
 
 interface ChatState {
   chats: Chat[];
   messagesByChat: Record<string, ChatMessage[]>;
-  openOrCreateChatForShift: (shiftId: string) => string;
-  openOrCreateChatForCandidate: (candidateId: string, candidateName: string) => string;
-  sendMessage: (chatId: string, text: string) => Promise<void>;
+  loading: boolean;
+  load: (as: ChatActor) => Promise<void>;
+  loadMessages: (chatId: string, as: ChatActor) => Promise<void>;
+  sendMessage: (chatId: string, text: string, as: ChatActor) => Promise<void>;
   markRead: (chatId: string) => void;
+  startChatWithWorker: (workerId: string) => Promise<string>;
 }
 
-const seedMessagesByChat = SEED_MESSAGES.reduce<Record<string, ChatMessage[]>>((acc, m) => {
-  (acc[m.chatId] ??= []).push(m);
-  return acc;
-}, {});
-
 export const useChatStore = create<ChatState>((set, get) => ({
-  chats: SEED_CHATS,
-  messagesByChat: seedMessagesByChat,
+  chats: [],
+  messagesByChat: {},
+  loading: false,
 
-  openOrCreateChatForShift: (shiftId) => {
-    const existing = get().chats.find((c) => c.shiftId === shiftId);
-    if (existing) return existing.id;
-
-    const shift = getShift(shiftId);
-    const company = shift ? getCompany(shift.companyId) : undefined;
-    const chat: Chat = {
-      id: `chat-${shiftId}`,
-      companyId: company?.id ?? 'cofix',
-      contactName: company ? `${company.name} · Марина` : 'Менеджер',
-      online: true,
-      shiftId,
-      unread: 1,
-    };
-    const intro: ChatMessage = {
-      id: `m-${Date.now()}`,
-      chatId: chat.id,
-      from: 'them',
-      kind: 'system',
-      text: shift
-        ? `ОТКЛИК НА СМЕНУ\n${shift.positionLabel} · сегодня ${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}–${String(shift.endHour).padStart(2, '0')}:${String(shift.endMin).padStart(2, '0')}\n${shift.totalPay} ₽ · ${company?.address ?? ''}`
-        : 'Вас взяли на смену. Менеджер скоро напишет.',
-      createdAt: new Date().toISOString(),
-    };
-
-    set((s) => ({
-      chats: [chat, ...s.chats],
-      messagesByChat: { ...s.messagesByChat, [chat.id]: [intro] },
-    }));
-    return chat.id;
+  load: async (as) => {
+    set({ loading: true });
+    try {
+      const chats = await fetchChats(as);
+      set({ chats, loading: false });
+    } catch {
+      set({ loading: false });
+    }
   },
 
-  openOrCreateChatForCandidate: (candidateId, candidateName) => {
-    const existing = get().chats.find((c) => c.id === `chat-cand-${candidateId}`);
-    if (existing) return existing.id;
-
-    const chat: Chat = {
-      id: `chat-cand-${candidateId}`,
-      companyId: 'cofix',
-      contactName: candidateName,
-      online: true,
-      unread: 0,
-    };
-    const intro: ChatMessage = {
-      id: `m-${Date.now()}`,
-      chatId: chat.id,
-      from: 'me',
-      kind: 'system',
-      text: `Вы взяли ${candidateName} на смену. Напишите детали.`,
-      createdAt: new Date().toISOString(),
-    };
-    set((s) => ({
-      chats: [chat, ...s.chats],
-      messagesByChat: { ...s.messagesByChat, [chat.id]: [intro] },
-    }));
-    return chat.id;
+  loadMessages: async (chatId, as) => {
+    const messages = await fetchMessages(chatId, as);
+    set((s) => ({ messagesByChat: { ...s.messagesByChat, [chatId]: messages } }));
   },
 
-  sendMessage: async (chatId, text) => {
+  sendMessage: async (chatId, text, as) => {
     const optimistic: ChatMessage = { id: `local-${Date.now()}`, chatId, from: 'me', text, createdAt: new Date().toISOString() };
     set((s) => ({ messagesByChat: { ...s.messagesByChat, [chatId]: [...(s.messagesByChat[chatId] ?? []), optimistic] } }));
-    const saved = await postMessage(chatId, text);
+    const saved = await postMessage(chatId, text, as);
     set((s) => ({
       messagesByChat: {
         ...s.messagesByChat,
-        [chatId]: s.messagesByChat[chatId].map((m) => (m.id === optimistic.id ? saved : m)),
+        [chatId]: (s.messagesByChat[chatId] ?? []).map((m) => (m.id === optimistic.id ? saved : m)),
       },
     }));
   },
 
-  markRead: (chatId) =>
-    set((s) => ({ chats: s.chats.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c)) })),
+  markRead: (chatId) => set((s) => ({ chats: s.chats.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c)) })),
+
+  startChatWithWorker: async (workerId) => {
+    const chatId = await startChatWithWorker(workerId);
+    await get().load('company');
+    return chatId;
+  },
 }));

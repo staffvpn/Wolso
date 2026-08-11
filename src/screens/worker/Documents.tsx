@@ -1,18 +1,43 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Lock, Loader2, Plus } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Button } from '@/components/ui/Button';
-import { useDocumentsStore } from '@/store/useDocumentsStore';
+import { useProfileStore } from '@/store/useProfileStore';
 import { cn } from '@/lib/cn';
 
 export function Documents() {
   const navigate = useNavigate();
-  const { documents, upload } = useDocumentsStore();
-  const allVerified = documents.every((d) => d.status === 'verified');
+  const documents = useProfileStore((s) => s.documents);
+  const loaded = useProfileStore((s) => s.loaded);
+  const load = useProfileStore((s) => s.load);
+  const uploadDocument = useProfileStore((s) => s.uploadDocument);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!loaded) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const allVerified = documents.length > 0 && documents.every((d) => d.status === 'verified');
+
+  function pickFile(docId: string) {
+    setActiveDocId(docId);
+    fileInputRef.current?.click();
+  }
+
+  function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file && activeDocId) uploadDocument(activeDocId, file);
+    setActiveDocId(null);
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <TopBar title="Документы" onBack={() => navigate(-1)} />
+      <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={onFileChosen} />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
         <h1 className="text-[24px] font-extrabold leading-tight mb-2">
@@ -41,8 +66,8 @@ export function Documents() {
                   <p className="text-[12px] text-text-muted">{doc.note}</p>
                 </div>
                 {doc.status === 'missing' && (
-                  <button onClick={() => upload(doc.id)} className="text-accent text-[13px] font-semibold shrink-0">
-                    {doc.id === 'passport' ? 'Загрузить' : doc.id === 'medbook' ? 'Загрузить' : 'Добавить'}
+                  <button onClick={() => pickFile(doc.id)} className="text-accent text-[13px] font-semibold shrink-0">
+                    Загрузить
                   </button>
                 )}
                 {doc.status === 'pending' && <span className="text-warning text-[12px] font-semibold shrink-0">Проверка</span>}
@@ -50,7 +75,7 @@ export function Documents() {
 
               {doc.id === 'medbook' && doc.status === 'missing' && (
                 <button
-                  onClick={() => upload(doc.id)}
+                  onClick={() => pickFile(doc.id)}
                   className="mt-3 w-full h-24 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-text-faint"
                 >
                   <Plus size={18} />
@@ -68,8 +93,8 @@ export function Documents() {
       </div>
 
       <div className="px-5 pb-5 pt-2 shrink-0 space-y-2">
-        <Button fullWidth disabled={allVerified}>
-          {allVerified ? 'Все документы проверены' : 'Отправить на проверку'}
+        <Button fullWidth disabled>
+          {allVerified ? 'Все документы проверены' : 'Загрузите документы выше'}
         </Button>
         {!allVerified && <p className="text-center text-[12px] text-text-faint">Обычно занимает до 2 часов</p>}
       </div>

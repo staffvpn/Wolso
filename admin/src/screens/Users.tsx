@@ -269,7 +269,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
         {user.verified && <Badge tone="info">ИНН проверен</Badge>}
       </div>
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
-        Профиль работодателя: опубликованные вакансии, история выплат и отзывы соискателей доступны в карточке компании.
+        Профиль работодателя: опубликованные вакансии, история сотрудничества и отзывы соискателей доступны в карточке компании.
       </div>
       <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer', actor)}>
         {blocked ? 'Разблокировать' : 'Заблокировать'}

@@ -27,6 +27,9 @@ export type ShiftUrgency = 'normal' | 'urgent';
 export interface Shift {
   id: string;
   companyId: string;
+  /** Embedded by the API on every shift response (the SQL always joins
+   *  companies) — read company info from here, not a separate lookup. */
+  company?: Company;
   position: Position;
   positionLabel: string;
   date: string; // ISO date, day only
@@ -36,12 +39,13 @@ export interface Shift {
   endMin: number;
   hourlyRate: number;
   totalPay: number;
-  distanceKm: number;
+  /** No location source wired up yet (needs Telegram's location API or
+   *  geocoding) — undefined until that lands; UI hides the chip when absent. */
+  distanceKm?: number;
   description: string;
   tags: string[];
   meal: boolean;
   urgency: ShiftUrgency;
-  responseTimeMin: number;
   employmentType: 'shift' | 'permanent' | 'internship';
   timeOfDay: 'morning' | 'day' | 'evening' | 'night';
 }
@@ -52,6 +56,9 @@ export type WorkStage = 'upcoming' | 'checked_in' | 'completed' | 'reviewed';
 export interface Application {
   id: string;
   shiftId: string;
+  /** Embedded by the API alongside every application — the shift a given
+   *  application is for, company included. */
+  shift?: Shift;
   status: ApplicationStatus;
   createdAt: string; // ISO datetime
   workStage?: WorkStage;
@@ -71,11 +78,14 @@ export interface ChatMessage {
 
 export interface Chat {
   id: string;
-  companyId: string;
+  companyId?: string;
+  workerId?: string;
   contactName: string;
-  online: boolean;
+  logoInitial?: string;
+  logoColor?: string;
   shiftId?: string;
   unread: number;
+  lastMessagePreview?: string;
 }
 
 export interface WorkerExperience {
@@ -118,27 +128,20 @@ export interface Transaction {
   createdAt: string;
 }
 
-export interface CandidateExperienceEntry {
-  role: string;
-  place: string;
-  period: string;
-}
-
+/** A pending applicant, as seen by the employer swiping candidates.
+ *  Fields are limited to what the backend actually knows about a worker —
+ *  no fabricated distance/online-presence/skills/reviews. */
 export interface Candidate {
   id: string;
+  /** The shift (vacancy) this application is for. */
   vacancyId: string;
+  workerId: string;
   name: string;
-  position: Position;
   positionLabel: string;
-  distanceKm: number;
   rating: number;
   shiftsCompleted: number;
-  online: boolean;
+  city: string;
   medBook: boolean;
-  passportVerified: boolean;
-  skills: string[];
-  experience: CandidateExperienceEntry[];
-  review?: { company: string; text: string };
   status: 'pending' | 'accepted' | 'declined';
 }
 
@@ -154,9 +157,9 @@ export interface Vacancy {
   hourlyRate: number;
   requirements: string[];
   urgent: boolean;
-  publishedMinAgo: number;
-  status: 'active' | 'closed' | 'draft';
-  reach: number;
+  createdAt: string;
+  status: 'pending_review' | 'active' | 'rejected';
+  responseCount: number;
 }
 
 export interface AppNotification {

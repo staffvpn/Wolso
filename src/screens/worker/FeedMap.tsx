@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { ChevronLeft, List, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
 import { LogoBadge } from '@/components/ui/Avatar';
-import { SHIFTS } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
+import { resolveCompany } from '@/data/companies';
 import { relativeDay } from '@/lib/format';
-import { useFiltersStore } from '@/store/useFiltersStore';
-import { matchesFilters } from '@/services/shiftsApi';
+import { useShiftsStore } from '@/store/useShiftsStore';
+import { FEATURES } from '@/lib/features';
 
 const PIN_POSITIONS = [
   { top: '18%', left: '58%' },
@@ -20,10 +19,12 @@ const PIN_POSITIONS = [
 
 export function FeedMap() {
   const navigate = useNavigate();
-  const filters = useFiltersStore((s) => s.filters);
+  const deck = useShiftsStore((s) => s.deck);
 
-  const nearby = useMemo(() => SHIFTS.filter((s) => matchesFilters(s, filters)).slice(0, 8), [filters]);
+  const nearby = useMemo(() => deck.slice(0, 8), [deck]);
   const preview = nearby.slice(0, 2);
+
+  if (!FEATURES.map) return <Navigate to="/w/feed" replace />;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -90,7 +91,7 @@ export function FeedMap() {
         </div>
         <div className="space-y-3 pb-2">
           {preview.map((shift) => {
-            const company = getCompany(shift.companyId);
+            const company = resolveCompany(shift);
             return (
               <div key={shift.id} className="flex items-center gap-3">
                 <LogoBadge initial={company.logoInitial} color={company.logoColor} size={38} />

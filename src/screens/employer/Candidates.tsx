@@ -16,7 +16,7 @@ export function Candidates() {
   const candidates = useEmployerStore((s) => s.candidates);
   const loadAll = useEmployerStore((s) => s.loadAll);
   const decideCandidate = useEmployerStore((s) => s.decideCandidate);
-  const openChatForCandidate = useChatStore((s) => s.openOrCreateChatForCandidate);
+  const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
 
   useEffect(() => {
     loadAll();
@@ -49,7 +49,7 @@ export function Candidates() {
         keyOf={(c) => c.id}
         loading={loading}
         renderCard={(candidate) => <CandidateCard candidate={candidate} />}
-        onSwiped={(candidate, direction) => decideCandidate(candidate.id, direction === 'right' ? 'accepted' : 'declined')}
+        onSwiped={(candidate, direction) => decideCandidate(candidate.vacancyId, candidate.id, direction === 'right' ? 'accepted' : 'declined')}
         empty={
           <EmptyState
             title="Пока нет новых кандидатов"
@@ -74,7 +74,7 @@ export function Candidates() {
           <IconButton
             size={56}
             aria-label="Написать"
-            onClick={() => navigate(`/e/chats/${openChatForCandidate(current.id, current.name)}`)}
+            onClick={async () => navigate(`/e/chats/${await startChatWithWorker(current.workerId)}`)}
           >
             <Mail size={19} />
           </IconButton>

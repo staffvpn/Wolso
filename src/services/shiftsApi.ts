@@ -1,35 +1,100 @@
 import type { Filters, Shift } from '@/types';
-import { SHIFTS } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
-import { delay } from './delay';
+import { apiFetch } from '@/lib/apiClient';
 
-export function matchesFilters(shift: Shift, filters: Filters): boolean {
-  if (filters.positions.length > 0 && !filters.positions.includes(shift.position)) return false;
-  if (shift.hourlyRate < filters.rateFrom) return false;
-  if (filters.radiusKm !== 'city' && shift.distanceKm > filters.radiusKm) return false;
-  if (filters.urgentOnly && shift.urgency !== 'urgent') return false;
-  if (filters.employmentType && shift.employmentType !== filters.employmentType) return false;
-  if (filters.timeOfDay.length > 0 && !filters.timeOfDay.includes(shift.timeOfDay)) return false;
-  if (filters.verifiedOnly && !getCompany(shift.companyId).verified) return false;
-
-  if (filters.when !== 'custom') {
-    const today = new Date();
-    const target = new Date(today);
-    if (filters.when === 'tomorrow') target.setDate(today.getDate() + 1);
-    if (shift.date !== target.toISOString().slice(0, 10)) return false;
-  }
-
-  return true;
+function buildQuery(filters: Filters): string {
+  const params = new URLSearchParams();
+  if (filters.positions.length) params.set('positions', filters.positions.join(','));
+  if (filters.rateFrom) params.set('rateFrom', String(filters.rateFrom));
+  if (filters.radiusKm !== 'city') params.set('radiusKm', String(filters.radiusKm));
+  if (filters.urgentOnly) params.set('urgentOnly', 'true');
+  if (filters.employmentType) params.set('employmentType', filters.employmentType);
+  if (filters.when) params.set('when', filters.when);
+  if (filters.timeOfDay.length) params.set('timeOfDay', filters.timeOfDay.join(','));
+  if (filters.verifiedOnly) params.set('verifiedOnly', 'true');
+  return params.toString();
 }
 
-/** Simulated GET /shifts?filters=... */
+interface ShiftApiResponse {
+  id: number;
+  companyId: number;
+  position: string;
+  positionLabel: string;
+  date: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  hourlyRate: number;
+  totalPay: number;
+  description: string;
+  meal: boolean;
+  urgency: string;
+  employmentType: string;
+  timeOfDay: string;
+  requirements: string[];
+  status: string;
+  moderationFlag: { label: string; tone: string } | null;
+  createdAt: string;
+  company?: {
+    id: number;
+    name: string;
+    address?: string;
+    city?: string;
+    logoInitial?: string;
+    logoColor?: string;
+    rating?: number;
+    reviewsCount?: number;
+    verified: boolean;
+    inn?: string;
+  };
+}
+
+function fromApi(s: ShiftApiResponse): Shift {
+  return {
+    id: String(s.id),
+    companyId: String(s.companyId),
+    position: s.position as Shift['position'],
+    positionLabel: s.positionLabel,
+    date: s.date,
+    startHour: s.startHour,
+    startMin: s.startMin,
+    endHour: s.endHour,
+    endMin: s.endMin,
+    hourlyRate: s.hourlyRate,
+    totalPay: s.totalPay,
+    // Real distance needs a location source (Telegram's location API or
+    // manual city/address geocoding) — not wired up yet, so we simply
+    // don't claim a number. UI hides the distance chip when it's absent.
+    distanceKm: undefined,
+    description: s.description,
+    tags: [],
+    meal: s.meal,
+    urgency: (s.urgency as Shift['urgency']) ?? 'normal',
+    employmentType: s.employmentType as Shift['employmentType'],
+    timeOfDay: s.timeOfDay as Shift['timeOfDay'],
+    company: s.company
+      ? {
+          id: String(s.company.id),
+          name: s.company.name,
+          address: s.company.address ?? '',
+          logoInitial: s.company.logoInitial ?? '?',
+          logoColor: s.company.logoColor ?? '#999',
+          rating: s.company.rating ?? 0,
+          reviewsCount: s.company.reviewsCount ?? 0,
+          verified: s.company.verified,
+          inn: s.company.inn,
+        }
+      : undefined,
+  };
+}
+
 export async function fetchShifts(filters: Filters): Promise<Shift[]> {
-  await delay();
-  return SHIFTS.filter((s) => matchesFilters(s, filters));
+  const query = buildQuery(filters);
+  const { shifts } = await apiFetch<{ shifts: ShiftApiResponse[] }>(`/shifts${query ? `?${query}` : ''}`);
+  return shifts.map(fromApi);
 }
 
-/** Simulated POST /shifts/:id/apply */
-export async function applyToShift(_shiftId: string): Promise<{ ok: true }> {
-  await delay(320);
+export async function applyToShift(shiftId: string): Promise<{ ok: true }> {
+  await apiFetch('/applications', { method: 'POST', body: { shiftId: Number(shiftId) } });
   return { ok: true };
 }

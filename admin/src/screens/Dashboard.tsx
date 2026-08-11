@@ -7,7 +7,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { BarChart } from '@/components/charts/BarChart';
 import { RankList } from '@/components/charts/RankList';
 import { DASHBOARD_STATS } from '@/data/dashboard';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
 const ATTENTION_LINKS: Record<string, string> = {
@@ -25,6 +25,7 @@ const TONE_DOT: Record<string, string> = {
 export function Dashboard() {
   const navigate = useNavigate();
   const s = DASHBOARD_STATS;
+  const weeklyResponses = s.weekly.reduce((sum, d) => sum + d.responses, 0);
 
   return (
     <div className="pb-10">
@@ -47,12 +48,7 @@ export function Dashboard() {
         <StatCard label="Смен опубликовано" value={formatNumber(s.vacanciesPublished)} delta={`${s.vacanciesPublishedDeltaPct}% к июлю`} />
         <StatCard label="Закрыто в тот же день" value={`${s.closedSameDayPct}%`} delta={`${s.closedSameDayDeltaPp} п.п.`} />
         <StatCard label="Активных исполнителей" value={formatNumber(s.activeWorkers)} delta={`${s.activeWorkersDeltaPct}%`} />
-        <StatCard
-          label="Оборот выплат"
-          value={<span>{(s.payoutVolume / 1_000_000).toFixed(1)} млн ₽</span>}
-          footnote={`комиссия ${formatMoney(s.platformCommission)}`}
-          dark
-        />
+        <StatCard label="Откликов за неделю" value={formatNumber(weeklyResponses)} dark />
       </div>
 
       <div className="px-8 mt-4 grid grid-cols-3 gap-4">

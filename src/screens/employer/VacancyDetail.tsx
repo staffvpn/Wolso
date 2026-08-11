@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Mail, X } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
@@ -9,19 +9,42 @@ import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
-import { getVacancy } from '@/data/employer';
-import { timeAgo } from '@/lib/format';
+import { timeAgoSince } from '@/lib/format';
+
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Активна',
+  pending_review: 'На модерации',
+  rejected: 'Отклонена',
+};
+const STATUS_TONE: Record<string, 'accent' | 'neutral' | 'danger'> = {
+  active: 'accent',
+  pending_review: 'neutral',
+  rejected: 'danger',
+};
 
 export function VacancyDetail() {
   const navigate = useNavigate();
   const { vacancyId } = useParams<{ vacancyId: string }>();
-  const vacancy = getVacancy(vacancyId ?? '');
+  const vacancy = useEmployerStore((s) => s.vacancies.find((v) => v.id === vacancyId));
+  const vacanciesLoaded = useEmployerStore((s) => s.vacancies.length > 0);
   const allCandidates = useEmployerStore((s) => s.candidates);
   const decideCandidate = useEmployerStore((s) => s.decideCandidate);
-  const openChat = useChatStore((s) => s.openOrCreateChatForCandidate);
+  const loadAll = useEmployerStore((s) => s.loadAll);
+  const loadVacancyCandidates = useEmployerStore((s) => s.loadVacancyCandidates);
+  const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
 
   const [medBookOnly, setMedBookOnly] = useState(false);
   const [ratingOnly, setRatingOnly] = useState(false);
+
+  useEffect(() => {
+    if (!vacanciesLoaded) loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (vacancyId) loadVacancyCandidates(vacancyId, vacancy?.positionLabel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vacancyId]);
 
   const candidates = useMemo(() => allCandidates.filter((c) => c.vacancyId === vacancyId), [allCandidates, vacancyId]);
   const pending = useMemo(() => candidates.filter((c) => c.status === 'pending'), [candidates]);
@@ -31,7 +54,7 @@ export function VacancyDetail() {
   );
 
   if (!vacancy) {
-    navigate('/e/vacancies', { replace: true });
+    if (vacanciesLoaded) navigate('/e/vacancies', { replace: true });
     return null;
   }
 
@@ -42,8 +65,8 @@ export function VacancyDetail() {
       <TopBar
         onBack={() => navigate(-1)}
         title={`${vacancy.positionLabel} · сегодня`}
-        subtitle={`${String(vacancy.startHour).padStart(2, '0')}:${String(vacancy.startMin).padStart(2, '0')}–${String(vacancy.endHour).padStart(2, '0')}:${String(vacancy.endMin).padStart(2, '0')} · опубликовано ${timeAgo(vacancy.publishedMinAgo)} назад`}
-        right={<Badge tone="accent">Активна</Badge>}
+        subtitle={`${String(vacancy.startHour).padStart(2, '0')}:${String(vacancy.startMin).padStart(2, '0')}–${String(vacancy.endHour).padStart(2, '0')}:${String(vacancy.endMin).padStart(2, '0')} · опубликовано ${timeAgoSince(vacancy.createdAt)} назад`}
+        right={<Badge tone={STATUS_TONE[vacancy.status] ?? 'neutral'}>{STATUS_LABEL[vacancy.status] ?? vacancy.status}</Badge>}
       />
 
       <div className="flex gap-2 px-5 pb-3 shrink-0">
@@ -63,24 +86,25 @@ export function VacancyDetail() {
                   <Avatar name={top.name} size={52} />
                   <div className="min-w-0">
                     <p className="font-bold text-[17px]">{top.name}</p>
-                    <p className="text-[13px] text-text-muted">★ {top.rating} · {top.shiftsCompleted} смен</p>
+                    <p className="text-[13px] text-text-muted">★ {top.rating.toFixed(1)} · {top.shiftsCompleted} смен</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
                   {top.medBook && <Badge tone="accent">Медкнижка</Badge>}
-                  {top.skills.slice(0, 2).map((s) => (
-                    <Badge key={s} tone="neutral">{s}</Badge>
-                  ))}
-                  {top.online && <Badge tone="dark">Онлайн</Badge>}
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <Button className="flex-1" onClick={() => decideCandidate(top.id, 'accepted')}>
+                  <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
                     Взять на смену
                   </Button>
-                  <Button variant="dark" size="icon" onClick={() => navigate(`/e/chats/${openChat(top.id, top.name)}`)} aria-label="Написать">
+                  <Button
+                    variant="dark"
+                    size="icon"
+                    onClick={async () => navigate(`/e/chats/${await startChatWithWorker(top.workerId)}`)}
+                    aria-label="Написать"
+                  >
                     <Mail size={17} />
                   </Button>
-                  <Button variant="dark" size="icon" onClick={() => decideCandidate(top.id, 'declined')} aria-label="Отклонить">
+                  <Button variant="dark" size="icon" onClick={() => decideCandidate(vacancy.id, top.id, 'declined')} aria-label="Отклонить">
                     <X size={17} />
                   </Button>
                 </div>
@@ -93,10 +117,10 @@ export function VacancyDetail() {
                   <Avatar name={c.name} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
-                    <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · ★ {c.rating}</p>
+                    <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · ★ {c.rating.toFixed(1)}</p>
                   </div>
                   <button
-                    onClick={() => decideCandidate(c.id, 'accepted')}
+                    onClick={() => decideCandidate(vacancy.id, c.id, 'accepted')}
                     className="text-[13px] font-semibold text-accent shrink-0"
                   >
                     Взять

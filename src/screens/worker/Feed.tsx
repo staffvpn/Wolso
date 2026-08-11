@@ -13,8 +13,9 @@ import { useShiftsStore } from '@/store/useShiftsStore';
 import { useFiltersStore } from '@/store/useFiltersStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
-import { getCompany } from '@/data/companies';
+import { resolveCompany } from '@/data/companies';
 import { formatMoney } from '@/lib/format';
+import { FEATURES } from '@/lib/features';
 import type { Shift } from '@/types';
 
 export function Feed() {
@@ -25,10 +26,12 @@ export function Feed() {
   const { deck, index, loading, lastApplied, loadDeck, swipe, clearLastApplied } = useShiftsStore();
   const filters = useFiltersStore((s) => s.filters);
   const unread = useNotificationsStore((s) => s.unreadCount());
+  const loadNotifications = useNotificationsStore((s) => s.load);
   const openPaywall = useEntitlementsStore((s) => s.openPaywall);
 
   useEffect(() => {
     loadDeck();
+    loadNotifications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -50,9 +53,11 @@ export function Feed() {
           <Chip tone="dark" onClick={() => setFilterOpen(true)} className="h-9 px-3.5">
             Фильтры{filters.positions.length > 0 ? ` · ${filters.positions.length}` : ''}
           </Chip>
-          <IconButton size={36} onClick={() => navigate('/w/map')} aria-label="Карта">
-            <MapIcon size={17} />
-          </IconButton>
+          {FEATURES.map && (
+            <IconButton size={36} onClick={() => navigate('/w/map')} aria-label="Карта">
+              <MapIcon size={17} />
+            </IconButton>
+          )}
           <IconButton size={36} onClick={() => navigate('/w/notifications')} aria-label="Уведомления" className="relative">
             <Bell size={17} />
             {unread > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-danger" />}
@@ -126,7 +131,7 @@ export function Feed() {
 
 function ApplySuccessOverlay({ shift, onClose }: { shift: Shift; onClose: () => void }) {
   const navigate = useNavigate();
-  const company = getCompany(shift.companyId);
+  const company = resolveCompany(shift);
 
   return (
     <motion.div

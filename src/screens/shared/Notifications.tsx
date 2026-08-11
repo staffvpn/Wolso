@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Zap, Mail, Banknote } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -19,6 +20,12 @@ export function Notifications() {
   const navigate = useNavigate();
   const notifications = useNotificationsStore((s) => s.notifications);
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
+  const load = useNotificationsStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col h-full min-h-0">

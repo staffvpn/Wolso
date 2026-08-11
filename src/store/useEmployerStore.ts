@@ -1,6 +1,12 @@
 import { create } from 'zustand';
-import type { Candidate, Vacancy } from '@/types';
-import { fetchCandidates, fetchVacancies, createVacancy as createVacancyApi } from '@/services/employerApi';
+import type { Candidate, Position, Vacancy } from '@/types';
+import {
+  fetchCandidates,
+  fetchVacancies,
+  fetchVacancyCandidates,
+  decideCandidate as decideCandidateApi,
+  createVacancy as createVacancyApi,
+} from '@/services/employerApi';
 import { haptic, hapticNotify } from '@/lib/telegram';
 
 interface EmployerState {
@@ -8,9 +14,21 @@ interface EmployerState {
   candidates: Candidate[];
   loading: boolean;
   loadAll: () => Promise<void>;
+  loadVacancyCandidates: (vacancyId: string, positionLabel?: string) => Promise<void>;
   pendingCandidates: () => Candidate[];
-  decideCandidate: (candidateId: string, decision: 'accepted' | 'declined') => void;
-  createVacancy: (input: Omit<Vacancy, 'id' | 'publishedMinAgo' | 'status' | 'reach'>) => Promise<Vacancy>;
+  decideCandidate: (vacancyId: string, candidateId: string, decision: 'accepted' | 'declined') => Promise<void>;
+  createVacancy: (input: {
+    position: Position;
+    positionLabel: string;
+    date: string;
+    startHour: number;
+    startMin: number;
+    endHour: number;
+    endMin: number;
+    hourlyRate: number;
+    requirements: string[];
+    urgent: boolean;
+  }) => Promise<Vacancy>;
 }
 
 export const useEmployerStore = create<EmployerState>((set, get) => ({
@@ -24,14 +42,30 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
     set({ vacancies, candidates, loading: false });
   },
 
+  /** Merges in candidates for one vacancy — used by VacancyDetail so it works
+   *  even before /employer/candidates has loaded everything. */
+  loadVacancyCandidates: async (vacancyId, positionLabel) => {
+    const fresh = await fetchVacancyCandidates(vacancyId, positionLabel);
+    set((s) => ({
+      candidates: [...s.candidates.filter((c) => c.vacancyId !== vacancyId), ...fresh],
+    }));
+  },
+
   pendingCandidates: () => get().candidates.filter((c) => c.status === 'pending'),
 
-  decideCandidate: (candidateId, decision) => {
+  decideCandidate: async (vacancyId, candidateId, decision) => {
     if (decision === 'accepted') hapticNotify('success');
     else haptic('light');
     set((s) => ({
       candidates: s.candidates.map((c) => (c.id === candidateId ? { ...c, status: decision } : c)),
     }));
+    try {
+      await decideCandidateApi(vacancyId, candidateId, decision);
+    } catch {
+      // Best-effort rollback — refetch to reconcile with the server.
+      const candidates = await fetchCandidates();
+      set({ candidates });
+    }
   },
 
   createVacancy: async (input) => {

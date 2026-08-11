@@ -6,7 +6,18 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatMoney, timeAgo } from '@/lib/format';
+import { formatMoney, timeAgoSince } from '@/lib/format';
+
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Активна',
+  pending_review: 'На модерации',
+  rejected: 'Отклонена',
+};
+const STATUS_TONE: Record<string, 'accent' | 'neutral' | 'danger'> = {
+  active: 'accent',
+  pending_review: 'neutral',
+  rejected: 'danger',
+};
 
 export function Vacancies() {
   const navigate = useNavigate();
@@ -45,7 +56,6 @@ export function Vacancies() {
 
         <div className="space-y-3">
           {vacancies.map((vac, i) => {
-            const total = candidates.filter((c) => c.vacancyId === vac.id).length;
             const pending = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'pending').length;
             return (
               <motion.button
@@ -57,17 +67,15 @@ export function Vacancies() {
                 className="w-full text-left rounded-card bg-surface border border-border-soft p-4"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <Badge tone={vac.status === 'active' ? 'accent' : 'neutral'}>
-                    {vac.status === 'active' ? 'Активна' : 'Закрыта'}
-                  </Badge>
-                  <span className="text-[12px] text-text-faint">опубликовано {timeAgo(vac.publishedMinAgo)} назад</span>
+                  <Badge tone={STATUS_TONE[vac.status] ?? 'neutral'}>{STATUS_LABEL[vac.status] ?? vac.status}</Badge>
+                  <span className="text-[12px] text-text-faint">опубликовано {timeAgoSince(vac.createdAt)} назад</span>
                 </div>
                 <p className="font-bold text-[17px]">{vac.positionLabel} · сегодня</p>
                 <p className="text-[13px] text-text-muted mt-0.5">
                   {String(vac.startHour).padStart(2, '0')}:{String(vac.startMin).padStart(2, '0')}–{String(vac.endHour).padStart(2, '0')}:{String(vac.endMin).padStart(2, '0')} · {formatMoney(vac.hourlyRate)}/ч
                 </p>
                 <div className="flex items-center gap-2 mt-3">
-                  <Badge tone="dark">Отклики · {total}</Badge>
+                  <Badge tone="dark">Отклики · {vac.responseCount}</Badge>
                   {pending > 0 && <Badge tone="warning">{pending} ждут решения</Badge>}
                 </div>
               </motion.button>

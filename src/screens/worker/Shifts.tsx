@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -8,18 +8,31 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
-import { useWalletStore } from '@/store/useWalletStore';
-import { getShift } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
+import { resolveCompany } from '@/data/companies';
 import { formatMoney, isSameDay, weekdayShort } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import type { Shift } from '@/types';
+
+function timeUntil(shift: Shift): string | null {
+  const start = new Date(shift.date);
+  start.setHours(shift.startHour, shift.startMin, 0, 0);
+  const diffMin = Math.round((start.getTime() - Date.now()) / 60000);
+  if (diffMin < 0) return 'Уже началась';
+  if (diffMin < 60) return `Через ${diffMin} минут`;
+  return `Через ${Math.round(diffMin / 60)} ч`;
+}
 
 export function Shifts() {
   const navigate = useNavigate();
   const applications = useApplicationsStore((s) => s.applications);
+  const load = useApplicationsStore((s) => s.load);
   const checkIn = useApplicationsStore((s) => s.checkIn);
   const checkOut = useApplicationsStore((s) => s.checkOut);
-  const monthTotal = useWalletStore((s) => s.monthTotal);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const confirmed = useMemo(
     () => applications.filter((a) => a.status === 'accepted' && a.workStage !== 'reviewed'),
@@ -38,8 +51,8 @@ export function Shifts() {
   });
 
   const withDates = confirmed
-    .map((a) => ({ app: a, shift: getShift(a.shiftId) }))
-    .filter((x): x is { app: (typeof confirmed)[number]; shift: NonNullable<ReturnType<typeof getShift>> } => !!x.shift)
+    .map((a) => ({ app: a, shift: a.shift }))
+    .filter((x): x is { app: (typeof confirmed)[number]; shift: Shift } => !!x.shift)
     .sort((a, b) => a.shift.date.localeCompare(b.shift.date));
 
   const todays = withDates.filter((x) => isSameDay(new Date(x.shift.date), today));
@@ -51,12 +64,12 @@ export function Shifts() {
 
       <div className="px-5 flex gap-3 shrink-0">
         <Card className="flex-1 p-4">
-          <p className="text-[22px] font-extrabold">{formatMoney(monthTotal)}</p>
-          <p className="text-[12px] text-text-muted mt-0.5">заработано в этом месяце</p>
-        </Card>
-        <Card className="p-4 min-w-[92px] flex flex-col justify-center items-center">
           <p className="text-[22px] font-extrabold">{shiftsCompletedCount}</p>
-          <p className="text-[12px] text-text-muted mt-0.5 text-center">смен отработано</p>
+          <p className="text-[12px] text-text-muted mt-0.5">смен отработано</p>
+        </Card>
+        <Card className="flex-1 p-4">
+          <p className="text-[22px] font-extrabold">{withDates.length}</p>
+          <p className="text-[12px] text-text-muted mt-0.5">подтверждённых впереди</p>
         </Card>
       </div>
 
@@ -86,11 +99,11 @@ export function Shifts() {
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-2.5">Сегодня</p>
             <div className="space-y-3">
               {todays.map(({ app, shift }) => {
-                const company = getCompany(shift.companyId);
+                const company = resolveCompany(shift);
                 return (
                   <motion.div key={app.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-card bg-surface border border-border-soft p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <Badge tone="accent">Через 40 минут</Badge>
+                      <Badge tone="accent">{timeUntil(shift)}</Badge>
                       <span className="text-[13px] text-text-muted">
                         {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}–{String(shift.endHour).padStart(2, '0')}:{String(shift.endMin).padStart(2, '0')}
                       </span>
@@ -107,8 +120,8 @@ export function Shifts() {
                       {app.workStage === 'checked_in' && (
                         <Button
                           className="flex-1"
-                          onClick={() => {
-                            checkOut(app.id);
+                          onClick={async () => {
+                            await checkOut(app.id);
                             navigate(`/w/checkout/${app.id}`);
                           }}
                         >
@@ -131,7 +144,7 @@ export function Shifts() {
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-2.5">Дальше</p>
             <div className="space-y-2.5">
               {upcoming.map(({ app, shift }) => {
-                const company = getCompany(shift.companyId);
+                const company = resolveCompany(shift);
                 const d = new Date(shift.date);
                 return (
                   <div key={app.id} className="flex items-center gap-3 rounded-card bg-surface border border-border-soft p-3.5">

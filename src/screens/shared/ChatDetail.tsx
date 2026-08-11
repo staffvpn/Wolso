@@ -6,17 +6,17 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
-import { getShift } from '@/data/shifts';
-import { getCompany, COMPANIES } from '@/data/companies';
 import { QUICK_REPLIES } from '@/data/chats';
 import { cn } from '@/lib/cn';
 
 export function ChatDetail() {
   const navigate = useNavigate();
   const role = useRole();
+  const actor = role === 'worker' ? 'worker' : 'company';
   const { chatId } = useParams<{ chatId: string }>();
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const messages = useChatStore((s) => s.messagesByChat[chatId ?? ''] ?? []);
+  const loadMessages = useChatStore((s) => s.loadMessages);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
 
@@ -24,8 +24,12 @@ export function ChatDetail() {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (chatId) markRead(chatId);
-  }, [chatId, markRead]);
+    if (chatId) {
+      loadMessages(chatId, actor);
+      markRead(chatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -36,12 +40,9 @@ export function ChatDetail() {
     return null;
   }
 
-  const company = COMPANIES.some((c) => c.id === chat.companyId) ? getCompany(chat.companyId) : undefined;
-  const shift = chat.shiftId ? getShift(chat.shiftId) : undefined;
-
   function handleSend(value: string) {
     if (!value.trim() || !chatId) return;
-    sendMessage(chatId, value.trim());
+    sendMessage(chatId, value.trim(), actor);
     setText('');
   }
 
@@ -51,12 +52,15 @@ export function ChatDetail() {
         <IconButton onClick={() => navigate(-1)} aria-label="Назад">
           <ChevronLeft size={20} />
         </IconButton>
-        {company ? <LogoBadge initial={company.logoInitial} color={company.logoColor} size={38} /> : <Avatar name={chat.contactName} size={38} />}
+        {chat.logoInitial ? (
+          <LogoBadge initial={chat.logoInitial} color={chat.logoColor ?? '#6b6d76'} size={38} />
+        ) : (
+          <Avatar name={chat.contactName} size={38} />
+        )}
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[15px] truncate">{chat.contactName}</p>
-          <p className="text-[12px] text-accent">{chat.online ? 'онлайн' : 'офлайн'}</p>
         </div>
-        {shift && (
+        {chat.shiftId && (
           <span className="text-[12px] font-semibold text-text-muted bg-surface-2 rounded-full px-3 py-1.5 shrink-0">Смена</span>
         )}
       </div>

@@ -13,8 +13,27 @@ export const COMPANIES: Company[] = [
   { id: 'lucky-sushi', name: 'Lucky Sushi', address: 'Проспект Мира 33', logoInitial: 'L', logoColor: '#ef4d9e', rating: 4.2, reviewsCount: 88, verified: false, inn: '778901' },
 ];
 
+const FALLBACK_COMPANY: Company = {
+  id: 'unknown',
+  name: 'Заведение',
+  address: '',
+  logoInitial: 'З',
+  logoColor: '#6b6d76',
+  rating: 0,
+  reviewsCount: 0,
+  verified: false,
+};
+
+/** Legacy mock lookup — only still hit by screens that haven't been wired
+ *  to the API yet. Returns a neutral placeholder instead of throwing so a
+ *  stray real (numeric) id can't crash a screen. */
 export function getCompany(id: string): Company {
-  const found = COMPANIES.find((c) => c.id === id);
-  if (!found) throw new Error(`Unknown company ${id}`);
-  return found;
+  return COMPANIES.find((c) => c.id === id) ?? FALLBACK_COMPANY;
+}
+
+/** Prefer this wherever a shift/chat already carries embedded company info
+ *  (real API responses do) — falls back to the mock lookup only when it
+ *  doesn't, so still-mocked screens keep working during the transition. */
+export function resolveCompany(source: { companyId: string; company?: Company }): Company {
+  return source.company ?? getCompany(source.companyId);
 }

@@ -1,15 +1,15 @@
 import type { Shift } from '@/types';
-import { getCompany } from '@/data/companies';
+import { resolveCompany } from '@/data/companies';
 import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { formatDistance, formatMoney, relativeDay, timeRange } from '@/lib/format';
-import { ShieldCheck, Zap, Heart } from 'lucide-react';
+import { ShieldCheck, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
 
 export function ShiftCard({ shift }: { shift: Shift }) {
-  const company = getCompany(shift.companyId);
+  const company = resolveCompany(shift);
   const day = relativeDay(new Date(shift.date));
   const durationH = shift.endHour - shift.startHour;
   const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
@@ -23,7 +23,9 @@ export function ShiftCard({ shift }: { shift: Shift }) {
           <div className="min-w-0">
             <p className="font-bold text-[16px] truncate">{company.name}</p>
             <p className="text-[13px] text-text-muted truncate">
-              {company.address} · {formatDistance(shift.distanceKm)} · ★ {company.rating}
+              {[company.address, shift.distanceKm !== undefined && formatDistance(shift.distanceKm), company.rating > 0 && `★ ${company.rating}`]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
         </div>
@@ -68,10 +70,6 @@ export function ShiftCard({ shift }: { shift: Shift }) {
       </p>
 
       <div className="flex-1" />
-
-      <div className="flex items-center gap-2 rounded-2xl bg-accent-soft text-accent px-3.5 py-2.5 text-[13px] font-semibold">
-        <Zap size={15} /> Менеджер отвечает за {shift.responseTimeMin} минут
-      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { LayoutDashboard, Flag, Users, Briefcase, Wallet, ShieldCheck, History, Settings } from 'lucide-react';
 import type { RoleDef } from '@/types';
+import { FEATURES } from '@/lib/features';
 
 export interface NavItem {
   to: string;
@@ -15,7 +16,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/moderation', label: 'Модерация', icon: Flag, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/users', label: 'Пользователи', icon: Users, visible: () => true },
   { to: '/vacancies', label: 'Вакансии и смены', icon: Briefcase, visible: (r) => yes(r, 'approveVacancies') },
-  { to: '/finance', label: 'Финансы', icon: Wallet, visible: (r) => yes(r, 'refundsPayouts') },
+  { to: '/finance', label: 'Финансы', icon: Wallet, visible: (r) => FEATURES.payments && yes(r, 'refundsPayouts') },
   { to: '/roles', label: 'Роли и права', icon: ShieldCheck, visible: (r) => yes(r, 'manageTeam') },
   { to: '/audit-log', label: 'Аудит-лог', icon: History, visible: (r) => yes(r, 'manageTeam') || yes(r, 'changeCommission') },
   { to: '/settings', label: 'Настройки', icon: Settings, visible: (r) => yes(r, 'manageTeam') },

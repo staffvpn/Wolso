@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,8 +10,7 @@ import { LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
-import { getShift } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
+import { resolveCompany } from '@/data/companies';
 import { formatMoney, relativeDay } from '@/lib/format';
 import type { ApplicationStatus } from '@/types';
 
@@ -26,8 +25,16 @@ const STATUS_COPY: Record<ApplicationStatus, { label: string; tone: 'accent' | '
 export function Responses() {
   const navigate = useNavigate();
   const applications = useApplicationsStore((s) => s.applications);
+  const loadApplications = useApplicationsStore((s) => s.load);
   const chats = useChatStore((s) => s.chats);
+  const loadChats = useChatStore((s) => s.load);
   const [tab, setTab] = useState<Tab>('all');
+
+  useEffect(() => {
+    loadApplications();
+    loadChats('worker');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     if (tab === 'pending') return applications.filter((a) => a.status === 'pending');
@@ -61,9 +68,9 @@ export function Responses() {
         ) : (
           <div className="space-y-3">
             {filtered.map((app, i) => {
-              const shift = getShift(app.shiftId);
+              const shift = app.shift;
               if (!shift) return null;
-              const company = getCompany(shift.companyId);
+              const company = resolveCompany(shift);
               const status = STATUS_COPY[app.status];
               const chat = chats.find((c) => c.shiftId === shift.id);
 

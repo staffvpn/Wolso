@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, MoreHorizontal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
@@ -7,10 +7,13 @@ import { IconButton } from '@/components/ui/IconButton';
 import { useWalletStore } from '@/store/useWalletStore';
 import { formatMoney, formatMoneySigned } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { FEATURES } from '@/lib/features';
 
 export function Wallet() {
   const navigate = useNavigate();
   const { available, monthTotal, defaultCard, transactions, withdrawing, withdraw } = useWalletStore();
+
+  if (!FEATURES.payments) return <Navigate to="/w/profile" replace />;
 
   return (
     <div className="flex flex-col h-full min-h-0">

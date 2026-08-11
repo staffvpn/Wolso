@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BottomSheet } from './ui/BottomSheet';
 import { Chip } from './ui/Chip';
 import { Toggle } from './ui/Toggle';
@@ -7,8 +7,7 @@ import { Button } from './ui/Button';
 import { SectionLabel } from './ui/Card';
 import { useFiltersStore } from '@/store/useFiltersStore';
 import { POSITIONS, TOP_POSITIONS } from '@/data/positions';
-import { SHIFTS } from '@/data/shifts';
-import { matchesFilters } from '@/services/shiftsApi';
+import { fetchShifts } from '@/services/shiftsApi';
 
 interface FilterSheetProps {
   open: boolean;
@@ -40,8 +39,28 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
   const { filters, togglePosition, setRateFrom, setRadius, setUrgentOnly, setEmploymentType, setWhen, toggleTimeOfDay, setVerifiedOnly, reset } =
     useFiltersStore();
   const [showAllPositions, setShowAllPositions] = useState(false);
+  const [matchCount, setMatchCount] = useState<number | null>(null);
 
-  const matchCount = useMemo(() => SHIFTS.filter((s) => matchesFilters(s, filters)).length, [filters]);
+  // Live count from the server as the draft filters change, debounced so we
+  // don't fire a request per keystroke/tap.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetchShifts(filters)
+        .then((shifts) => {
+          if (!cancelled) setMatchCount(shifts.length);
+        })
+        .catch(() => {
+          if (!cancelled) setMatchCount(null);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [filters, open]);
+
   const shownPositions = showAllPositions ? POSITIONS : TOP_POSITIONS;
 
   return (
@@ -150,7 +169,7 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
             onClose();
           }}
         >
-          Показать {matchCount} смен
+          Показать{matchCount !== null ? ` ${matchCount}` : ''} смен
         </Button>
       </div>
     </BottomSheet>

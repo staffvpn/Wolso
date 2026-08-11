@@ -1,91 +1,134 @@
 import { create } from 'zustand';
-import type { Application } from '@/types';
-import { applyToShift as applyToShiftApi } from '@/services/shiftsApi';
+import type { Application, Shift } from '@/types';
+import { apiFetch } from '@/lib/apiClient';
 import { useNotificationsStore } from './useNotificationsStore';
-import { useChatStore } from './useChatStore';
-import { getShift } from '@/data/shifts';
-import { getCompany } from '@/data/companies';
+
+interface ApiApplication {
+  id: number;
+  shiftId: number;
+  status: Application['status'];
+  workStage: Application['workStage'];
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  rating: number | null;
+  reviewTags: string[];
+  reviewComment: string | null;
+  createdAt: string;
+  shift?: {
+    id: number;
+    companyId: number;
+    position: string;
+    positionLabel: string;
+    date: string;
+    startHour: number;
+    startMin: number;
+    endHour: number;
+    endMin: number;
+    hourlyRate: number;
+    totalPay: number;
+    description: string;
+    meal: boolean;
+    urgency: string;
+    employmentType: string;
+    timeOfDay: string;
+    company?: Shift['company'];
+  };
+}
+
+function fromApi(a: ApiApplication): Application {
+  return {
+    id: String(a.id),
+    shiftId: String(a.shiftId),
+    status: a.status,
+    workStage: a.workStage,
+    checkInAt: a.checkInAt ?? undefined,
+    checkOutAt: a.checkOutAt ?? undefined,
+    createdAt: a.createdAt,
+    shift: a.shift
+      ? {
+          id: String(a.shift.id),
+          companyId: String(a.shift.companyId),
+          company: a.shift.company,
+          position: a.shift.position as Shift['position'],
+          positionLabel: a.shift.positionLabel,
+          date: a.shift.date,
+          startHour: a.shift.startHour,
+          startMin: a.shift.startMin,
+          endHour: a.shift.endHour,
+          endMin: a.shift.endMin,
+          hourlyRate: a.shift.hourlyRate,
+          totalPay: a.shift.totalPay,
+          description: a.shift.description,
+          tags: [],
+          meal: a.shift.meal,
+          urgency: (a.shift.urgency as Shift['urgency']) ?? 'normal',
+          employmentType: a.shift.employmentType as Shift['employmentType'],
+          timeOfDay: a.shift.timeOfDay as Shift['timeOfDay'],
+        }
+      : undefined,
+  };
+}
 
 interface ApplicationsState {
   applications: Application[];
+  loading: boolean;
+  load: () => Promise<void>;
   apply: (shiftId: string) => Promise<void>;
-  checkIn: (applicationId: string) => void;
-  checkOut: (applicationId: string) => void;
-  submitReview: (applicationId: string, rating: number, tags: string[], comment: string) => void;
-  skipReview: (applicationId: string) => void;
-}
-
-function randomBetween(min: number, max: number) {
-  return Math.random() * (max - min) + min;
+  checkIn: (applicationId: string) => Promise<void>;
+  checkOut: (applicationId: string) => Promise<void>;
+  submitReview: (applicationId: string, rating: number, tags: string[], comment: string) => Promise<void>;
+  skipReview: (applicationId: string) => Promise<void>;
 }
 
 export const useApplicationsStore = create<ApplicationsState>((set, get) => ({
   applications: [],
+  loading: false,
 
-  apply: async (shiftId) => {
-    await applyToShiftApi(shiftId);
-    const application: Application = {
-      id: `app-${Date.now()}`,
-      shiftId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      workStage: 'upcoming',
-    };
-    set((s) => ({ applications: [application, ...s.applications] }));
-
-    // Simulate the manager responding a little later, like the mock chat does.
-    const delayMs = randomBetween(4000, 9000);
-    setTimeout(() => {
-      const shift = getShift(shiftId);
-      if (!shift) return;
-      const company = getCompany(shift.companyId);
-      const accepted = Math.random() > 0.25;
-
-      set((s) => ({
-        applications: s.applications.map((a) =>
-          a.id === application.id ? { ...a, status: accepted ? 'accepted' : 'declined' } : a,
-        ),
-      }));
-
-      if (accepted) {
-        useNotificationsStore.getState().push({
-          kind: 'accepted',
-          title: `${company.name} взял(а) вас на смену`,
-          subtitle: `${shift.date === new Date().toISOString().slice(0, 10) ? 'Сегодня' : shift.date} ${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}, ${company.address}`,
-        });
-        useChatStore.getState().openOrCreateChatForShift(shift.id);
-      }
-    }, delayMs);
+  load: async () => {
+    set({ loading: true });
+    try {
+      const { applications } = await apiFetch<{ applications: ApiApplication[] }>('/applications');
+      set({ applications: applications.map(fromApi), loading: false });
+    } catch {
+      set({ loading: false });
+    }
   },
 
-  checkIn: (applicationId) =>
-    set((s) => ({
-      applications: s.applications.map((a) =>
-        a.id === applicationId ? { ...a, workStage: 'checked_in', checkInAt: new Date().toISOString() } : a,
-      ),
-    })),
+  apply: async (shiftId) => {
+    const { application } = await apiFetch<{ application: ApiApplication }>('/applications', {
+      method: 'POST',
+      body: { shiftId: Number(shiftId) },
+    });
+    set((s) => ({ applications: [fromApi(application), ...s.applications] }));
+  },
 
-  checkOut: (applicationId) =>
+  checkIn: async (applicationId) => {
+    await apiFetch(`/applications/${applicationId}/check-in`, { method: 'POST' });
     set((s) => ({
-      applications: s.applications.map((a) =>
-        a.id === applicationId ? { ...a, workStage: 'completed', checkOutAt: new Date().toISOString() } : a,
-      ),
-    })),
+      applications: s.applications.map((a) => (a.id === applicationId ? { ...a, workStage: 'checked_in' } : a)),
+    }));
+  },
 
-  submitReview: (applicationId, _rating, _tags, _comment) => {
+  checkOut: async (applicationId) => {
+    await apiFetch(`/applications/${applicationId}/check-out`, { method: 'POST' });
+    set((s) => ({
+      applications: s.applications.map((a) => (a.id === applicationId ? { ...a, workStage: 'completed' } : a)),
+    }));
+  },
+
+  submitReview: async (applicationId, rating, tags, comment) => {
+    await apiFetch(`/applications/${applicationId}/review`, { method: 'POST', body: { rating, tags, comment } });
     set((s) => ({
       applications: s.applications.map((a) => (a.id === applicationId ? { ...a, workStage: 'reviewed' } : a)),
     }));
     useNotificationsStore.getState().push({
-      kind: 'payout',
-      title: 'Выплата отправлена',
-      subtitle: 'Деньги придут на карту в течение часа',
+      kind: 'accepted',
+      title: 'Смена засчитана',
+      subtitle: 'Спасибо за отзыв — до встречи на следующей смене',
     });
   },
 
-  skipReview: (applicationId) => {
-    const app = get().applications.find((a) => a.id === applicationId);
-    if (!app) return;
-    get().submitReview(applicationId, 0, [], '');
+  skipReview: async (applicationId) => {
+    await get().submitReview(applicationId, 0, [], '');
   },
 }));

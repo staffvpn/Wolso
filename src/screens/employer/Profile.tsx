@@ -1,22 +1,31 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { LogoBadge } from '@/components/ui/Avatar';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ListRow } from '@/components/ui/ListRow';
-import { getCompany } from '@/data/companies';
+import { useCompanyStore } from '@/store/useCompanyStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useAppStore } from '@/store/useAppStore';
-import { EMPLOYER_COMPANY_ID } from '@/data/employer';
+import { FEATURES } from '@/lib/features';
 
 export function EmployerProfileScreen() {
   const navigate = useNavigate();
-  const company = getCompany(EMPLOYER_COMPANY_ID);
+  const company = useCompanyStore((s) => s.company);
+  const loadCompany = useCompanyStore((s) => s.load);
   const vacancies = useEmployerStore((s) => s.vacancies);
   const candidates = useEmployerStore((s) => s.candidates);
   const switchRole = useAppStore((s) => s.switchRole);
 
+  useEffect(() => {
+    if (!company) loadCompany();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const hires = candidates.filter((c) => c.status === 'accepted').length;
+
+  if (!company) return null;
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto px-5 pt-5 safe-top pb-4">
@@ -49,9 +58,11 @@ export function EmployerProfileScreen() {
           <div className="px-3">
             <ListRow label="Реквизиты и ИНН" value={company.inn} />
           </div>
-          <div className="px-3">
-            <ListRow label="Карта для оплаты откликов" value="···4120" />
-          </div>
+          {FEATURES.payments && (
+            <div className="px-3">
+              <ListRow label="Карта для оплаты откликов" value="···4120" />
+            </div>
+          )}
           <div className="px-3">
             <ListRow
               label="Переключиться на работника"
