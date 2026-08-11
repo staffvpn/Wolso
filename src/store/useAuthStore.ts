@@ -47,7 +47,11 @@ export const useAuthStore = create<AuthState>()(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ initData }),
           });
-          if (!res.ok) throw new Error(`auth_failed_${res.status}`);
+          if (!res.ok) {
+            const payload = await res.json().catch(() => ({}));
+            const code = (payload as { error?: string }).error;
+            throw new Error(`Сервер ответил ошибкой ${res.status}${code ? ` (${code})` : ''}.`);
+          }
           const data = await res.json() as { workerToken: string; companyToken: string; telegramUser: TelegramAuthUser };
           set({
             workerToken: data.workerToken,
@@ -55,8 +59,9 @@ export const useAuthStore = create<AuthState>()(
             telegramUser: data.telegramUser,
             status: 'ready',
           });
-        } catch {
-          set({ status: 'error', error: 'Не получилось связаться с сервером. Проверь соединение и попробуй ещё раз.' });
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          set({ status: 'error', error: `Не получилось связаться с сервером: ${detail}` });
         }
       },
     }),
