@@ -31,6 +31,18 @@ app.use('*', async (c, next) => {
 
 app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
 
+// TEMPORARY — deployment diagnostics only, reveals no secret values.
+// Remove once the BOT_TOKEN / SESSION_SECRET setup is confirmed working.
+app.get('/debug/env', (c) =>
+  c.json({
+    botTokenLength: c.env.BOT_TOKEN?.length ?? 0,
+    sessionSecretLength: c.env.SESSION_SECRET?.length ?? 0,
+    ownerTelegramId: c.env.OWNER_TELEGRAM_ID ?? null,
+    appOrigin: c.env.APP_ORIGIN,
+    adminOrigin: c.env.ADMIN_ORIGIN,
+  }),
+);
+
 app.route('/auth', authRoutes);
 app.route('/shifts', feedRoutes);
 app.route('/applications', applicationRoutes);
