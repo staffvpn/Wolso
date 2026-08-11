@@ -1,8 +1,9 @@
 import { useEffect, type ReactNode } from 'react';
-import { Circle, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from './ui/Button';
+import { Logo } from './ui/Logo';
 
 /** Blocks rendering the real app until we've exchanged Telegram's initData
  *  for session tokens. Nothing else can talk to the API before this
@@ -25,7 +26,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
         className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center"
       >
-        <Circle size={20} className="fill-accent text-accent" />
+        <Logo size={22} className="text-accent" />
       </motion.div>
 
       {status === 'error' ? (

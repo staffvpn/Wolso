@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Circle, Mail, X, Check } from 'lucide-react';
+import { Mail, X, Check } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -30,9 +31,7 @@ export function Candidates() {
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-5 pt-4 pb-2 safe-top shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-accent-soft flex items-center justify-center">
-            <Circle size={13} className="fill-accent text-accent" />
-          </div>
+          <Logo size={22} className="text-accent" />
           <span className="font-extrabold tracking-tight text-[15px]">WOLSO</span>
         </div>
       </div>

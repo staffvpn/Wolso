@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Circle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Logo } from '@/components/ui/Logo';
 import { Illustration } from '@/components/Illustration';
 import { useAppStore } from '@/store/useAppStore';
 import type { Role } from '@/types';
@@ -18,9 +18,7 @@ export function Welcome() {
   return (
     <div className="flex flex-col h-full px-6 pt-6 safe-top safe-bottom">
       <div className="flex items-center gap-2">
-        <div className="h-7 w-7 rounded-full bg-accent-soft flex items-center justify-center">
-          <Circle size={13} className="fill-accent text-accent" />
-        </div>
+        <Logo size={22} className="text-accent" />
         <span className="font-extrabold tracking-tight text-[15px]">WOLSO</span>
       </div>
 

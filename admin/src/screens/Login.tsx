@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Circle } from 'lucide-react';
 import { useSessionStore } from '@/store/useSessionStore';
+import { Logo } from '@/components/ui/Logo';
 import type { TelegramLoginPayload } from '@/services/authApi';
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME as string | undefined;
@@ -41,7 +41,7 @@ export function Login() {
     <div className="flex h-screen w-screen items-center justify-center bg-bg">
       <div className="w-[360px] flex flex-col items-center text-center">
         <div className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center mb-4">
-          <Circle size={22} className="fill-accent text-accent" />
+          <Logo size={26} className="text-accent" />
         </div>
         <h1 className="font-extrabold text-[22px] tracking-tight">Wolso Admin</h1>
         <p className="text-[14px] text-text-muted mt-1.5 mb-8">

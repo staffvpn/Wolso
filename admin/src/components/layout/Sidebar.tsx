@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Circle, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { navForRole } from './nav';
 import { useCurrentRole, useSessionStore } from '@/store/useSessionStore';
 import { useModerationStore } from '@/store/useModerationStore';
 import { Avatar } from '../ui/Avatar';
+import { Logo } from '../ui/Logo';
 
 export function Sidebar() {
   const staff = useSessionStore((s) => s.staff);
@@ -16,9 +17,7 @@ export function Sidebar() {
   return (
     <aside className="w-[248px] shrink-0 bg-sidebar flex flex-col h-full">
       <div className="flex items-center gap-2 px-5 pt-6 pb-6">
-        <div className="h-7 w-7 rounded-full bg-accent-soft flex items-center justify-center">
-          <Circle size={13} className="fill-accent text-accent" />
-        </div>
+        <Logo size={22} className="text-accent" />
         <span className="font-extrabold tracking-tight text-[15px] text-sidebar-text">WOLSO</span>
         <span className="ml-auto text-[10px] font-bold tracking-wide text-sidebar-text-muted border border-white/15 rounded px-1.5 py-0.5">
           ADMIN
