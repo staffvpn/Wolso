@@ -72,11 +72,18 @@ input, textarea {
   scrollbar-width: none;
 }
 
+/*
+ * --tg-safe-top / --tg-safe-bottom are set from JS (see src/lib/telegram.ts)
+ * once the Telegram bridge reports its insets — they already include both the
+ * device safe area and the strip Telegram's own floating header controls
+ * (close / collapse / ⋯) occupy, which is present even in fullscreen mode.
+ * The env() fallback covers plain-browser / pre-bridge rendering.
+ */
 .safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
 }
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 .wolso-slider {

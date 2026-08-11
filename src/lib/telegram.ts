@@ -35,14 +35,20 @@ export function bootstrapTelegram() {
   tg.setBottomBarColor?.('#0a0b0a');
   tg.enableClosingConfirmation();
 
-  document.documentElement.style.setProperty('--tg-safe-top', `${tg.safeAreaInset?.top ?? 0}px`);
-  document.documentElement.style.setProperty('--tg-safe-bottom', `${tg.safeAreaInset?.bottom ?? 0}px`);
-
+  // `safeAreaInset` is the device notch/home-indicator area. `contentSafeAreaInset`
+  // is separate: it's the strip Telegram's own floating chrome sits in (the
+  // close/collapse/⋯ cluster at the top, still present even in fullscreen).
+  // Both stack — content has to clear the device inset *and* Telegram's own
+  // controls — so every top-anchored interactive element needs both added in.
   const syncSafeArea = () => {
-    document.documentElement.style.setProperty('--tg-safe-top', `${tg.safeAreaInset?.top ?? 0}px`);
-    document.documentElement.style.setProperty('--tg-safe-bottom', `${tg.safeAreaInset?.bottom ?? 0}px`);
+    const top = (tg.safeAreaInset?.top ?? 0) + (tg.contentSafeAreaInset?.top ?? 0);
+    const bottom = (tg.safeAreaInset?.bottom ?? 0) + (tg.contentSafeAreaInset?.bottom ?? 0);
+    document.documentElement.style.setProperty('--tg-safe-top', `${top}px`);
+    document.documentElement.style.setProperty('--tg-safe-bottom', `${bottom}px`);
   };
+  syncSafeArea();
   tg.onEvent('safeAreaChanged', syncSafeArea);
+  tg.onEvent('contentSafeAreaChanged', syncSafeArea);
   tg.onEvent('fullscreenChanged', syncSafeArea);
 }
 
