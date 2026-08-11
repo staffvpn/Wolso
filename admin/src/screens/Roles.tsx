@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, History, Plus, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -9,20 +9,25 @@ import { Toggle } from '@/components/ui/Toggle';
 import { Modal } from '@/components/ui/Modal';
 import { Input, Label } from '@/components/ui/Input';
 import { useRolesStore } from '@/store/useRolesStore';
-import { useAuditStore } from '@/store/useAuditStore';
-import { useCurrentActor } from '@/store/useModerationStore';
+import { useUsersStore } from '@/store/useUsersStore';
 import { useCan } from '@/store/useSessionStore';
 import { PERMISSIONS } from '@/data/permissions';
-import { TEAM } from '@/data/team';
 import { cn } from '@/lib/cn';
 import type { PermissionKey, PermissionValue, RoleDef } from '@/types';
 
 export function Roles() {
   const navigate = useNavigate();
   const { roles, memberCountFor, updatePermission, twoFactorRequired, setTwoFactorRequired } = useRolesStore();
+  const team = useUsersStore((s) => s.team);
+  const loadUsers = useUsersStore((s) => s.load);
   const canManageTeam = useCan('manageTeam');
   const [selectedRoleId, setSelectedRoleId] = useState('owner');
   const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function cyclePermission(role: RoleDef, key: PermissionKey) {
     if (!canManageTeam || role.id === 'owner') return;
@@ -35,7 +40,7 @@ export function Roles() {
     <div className="pb-10">
       <PageHeader
         title="Роли и права"
-        subtitle={`${roles.length} роли · ${TEAM.length} человек в команде`}
+        subtitle={`${roles.length} роли · ${team.length} человек в команде`}
         right={
           <>
             <Button variant="outline" onClick={() => navigate('/audit-log')}>
@@ -133,8 +138,6 @@ function PermissionCell({ value }: { value: PermissionValue }) {
 
 function CreateRoleModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   const createRole = useRolesStore((s) => s.createRole);
-  const actor = useCurrentActor();
-  const log = useAuditStore((s) => s.log);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [perms, setPerms] = useState<Record<PermissionKey, PermissionValue>>(() =>
@@ -145,10 +148,9 @@ function CreateRoleModal({ open, onClose, onCreated }: { open: boolean; onClose:
     setPerms((prev) => ({ ...prev, [key]: prev[key] === 'yes' ? 'no' : 'yes' }));
   }
 
-  function submit() {
+  async function submit() {
     if (!name.trim()) return;
-    const role = createRole(name.trim(), description.trim() || 'Своя роль', { ...perms, transferOwnership: 'no' });
-    log(actor.name, actor.role, `создала роль «${role.name}»`, 'neutral');
+    const role = await createRole(name.trim(), description.trim() || 'Своя роль', { ...perms, transferOwnership: 'no' });
     onCreated(role.id);
     setName('');
     setDescription('');

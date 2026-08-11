@@ -1,18 +1,28 @@
 import { create } from 'zustand';
 import type { VacancyRecord } from '@/types';
-import { VACANCIES } from '@/data/vacancies';
-import { useAuditStore } from './useAuditStore';
+import { fetchAllVacancies, closeVacancy as closeVacancyApi } from '@/services/vacanciesApi';
 
 interface VacanciesState {
   vacancies: VacancyRecord[];
-  closeVacancy: (id: string, actor: { name: string; role: string }) => void;
+  loading: boolean;
+  loaded: boolean;
+  load: () => Promise<void>;
+  closeVacancy: (id: string) => Promise<void>;
 }
 
 export const useVacanciesStore = create<VacanciesState>((set, get) => ({
-  vacancies: VACANCIES,
-  closeVacancy: (id, actor) => {
-    const item = get().vacancies.find((v) => v.id === id);
-    set((s) => ({ vacancies: s.vacancies.map((v) => (v.id === id ? { ...v, status: 'closed' } : v)) }));
-    if (item) useAuditStore.getState().log(actor.name, actor.role, `закрыла вакансию «${item.position} · ${item.companyName}»`, 'neutral');
+  vacancies: [],
+  loading: false,
+  loaded: false,
+
+  load: async () => {
+    set({ loading: true });
+    const vacancies = await fetchAllVacancies();
+    set({ vacancies, loading: false, loaded: true });
+  },
+
+  closeVacancy: async (id) => {
+    set({ vacancies: get().vacancies.map((v) => (v.id === id ? { ...v, status: 'closed' } : v)) });
+    await closeVacancyApi(id);
   },
 }));

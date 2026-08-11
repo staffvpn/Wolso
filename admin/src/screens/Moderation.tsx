@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyPanel } from '@/components/EmptyPanel';
-import { useCurrentActor, useModerationStore } from '@/store/useModerationStore';
+import { useModerationStore } from '@/store/useModerationStore';
 import { useCan } from '@/store/useSessionStore';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -17,12 +17,15 @@ const FLAG_TONE_MAP = { danger: 'danger', warning: 'warning', info: 'info', neut
 
 export function Moderation() {
   const [tab, setTab] = useState<'vacancies' | 'complaints' | 'documents'>('vacancies');
-  const allVacancies = useModerationStore((s) => s.vacancies);
-  const allComplaints = useModerationStore((s) => s.complaints);
-  const allDocuments = useModerationStore((s) => s.documents);
-  const vacancies = useMemo(() => allVacancies.filter((v) => v.status === 'pending'), [allVacancies]);
-  const complaints = useMemo(() => allComplaints.filter((c) => c.status === 'pending'), [allComplaints]);
-  const documents = useMemo(() => allDocuments.filter((d) => d.status === 'pending'), [allDocuments]);
+  const vacancies = useModerationStore((s) => s.vacancies);
+  const complaints = useModerationStore((s) => s.complaints);
+  const documents = useModerationStore((s) => s.documents);
+  const load = useModerationStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="pb-10 flex flex-col h-full min-h-0">
@@ -54,7 +57,6 @@ export function Moderation() {
 function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
   const decide = useModerationStore((s) => s.decideVacancy);
-  const actor = useCurrentActor();
   const canApprove = useCan('approveVacancies');
 
   const selected = useMemo(() => items.find((v) => v.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
@@ -66,7 +68,7 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
   function act(status: 'approved' | 'returned' | 'rejected') {
     if (!selected) return;
     const idx = items.findIndex((v) => v.id === selected.id);
-    decide(selected.id, status, actor);
+    decide(selected.id, status);
     const next = items[idx + 1] ?? items[idx - 1];
     setSelectedId(next?.id ?? null);
   }
@@ -174,7 +176,6 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
 function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
   const decide = useModerationStore((s) => s.decideComplaint);
-  const actor = useCurrentActor();
   const canModerate = useCan('blockUsers');
   const selected = useMemo(() => items.find((c) => c.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
 
@@ -185,7 +186,7 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
   function act(status: 'approved' | 'returned' | 'rejected') {
     if (!selected) return;
     const idx = items.findIndex((c) => c.id === selected.id);
-    decide(selected.id, status, actor);
+    decide(selected.id, status);
     setSelectedId((items[idx + 1] ?? items[idx - 1])?.id ?? null);
   }
 
@@ -245,7 +246,6 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
 function DocumentQueue({ items }: { items: DocumentReview[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
   const decide = useModerationStore((s) => s.decideDocument);
-  const actor = useCurrentActor();
   const canVerify = useCan('verifyDocuments');
   const selected = useMemo(() => items.find((d) => d.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
 
@@ -256,7 +256,7 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
   function act(status: 'approved' | 'returned' | 'rejected') {
     if (!selected) return;
     const idx = items.findIndex((d) => d.id === selected.id);
-    decide(selected.id, status, actor);
+    decide(selected.id, status);
     setSelectedId((items[idx + 1] ?? items[idx - 1])?.id ?? null);
   }
 

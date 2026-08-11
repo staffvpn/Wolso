@@ -1,63 +1,67 @@
 import { create } from 'zustand';
 import type { ComplaintItem, DocumentReview, ModerationStatus, ModerationVacancy } from '@/types';
-import { COMPLAINTS, DOCUMENT_REVIEWS, MODERATION_QUEUE } from '@/data/moderation';
-import { useAuditStore } from './useAuditStore';
-import { useCurrentMember, useCurrentRole } from './useSessionStore';
+import {
+  fetchPendingVacancies,
+  fetchPendingComplaints,
+  fetchPendingDocuments,
+  decideVacancy as decideVacancyApi,
+  decideComplaint as decideComplaintApi,
+  decideDocument as decideDocumentApi,
+} from '@/services/moderationApi';
 
 interface ModerationState {
   vacancies: ModerationVacancy[];
   complaints: ComplaintItem[];
   documents: DocumentReview[];
-  decideVacancy: (id: string, status: ModerationStatus, actor: { name: string; role: string }) => void;
-  decideComplaint: (id: string, status: ModerationStatus, actor: { name: string; role: string }) => void;
-  decideDocument: (id: string, status: ModerationStatus, actor: { name: string; role: string }) => void;
+  loading: boolean;
+  loaded: boolean;
+  load: () => Promise<void>;
+  decideVacancy: (id: string, status: ModerationStatus) => Promise<void>;
+  decideComplaint: (id: string, status: ModerationStatus) => Promise<void>;
+  decideDocument: (id: string, status: ModerationStatus) => Promise<void>;
 }
 
-const STATUS_VERB: Record<ModerationStatus, string> = {
-  approved: 'одобрил(а)',
-  returned: 'вернул(а) на правку',
-  rejected: 'отклонил(а)',
-  pending: 'вернул(а) в очередь',
+const VACANCY_STATUS: Record<string, 'active' | 'pending_review' | 'rejected'> = {
+  approved: 'active',
+  returned: 'pending_review',
+  rejected: 'rejected',
 };
 
-export const useModerationStore = create<ModerationState>((set) => ({
-  vacancies: MODERATION_QUEUE,
-  complaints: COMPLAINTS,
-  documents: DOCUMENT_REVIEWS,
+const DOCUMENT_STATUS: Record<string, 'verified' | 'missing'> = {
+  approved: 'verified',
+  returned: 'missing',
+  rejected: 'missing',
+};
 
-  decideVacancy: (id, status, actor) => {
-    const item = MODERATION_QUEUE.find((v) => v.id === id);
-    set((s) => ({ vacancies: s.vacancies.map((v) => (v.id === id ? { ...v, status } : v)) }));
-    if (item) {
-      useAuditStore.getState().log(
-        actor.name,
-        actor.role,
-        `${STATUS_VERB[status]} вакансию «${item.position} · ${item.companyName}»`,
-        status === 'rejected' ? 'danger' : status === 'approved' ? 'accent' : 'neutral',
-      );
-    }
+export const useModerationStore = create<ModerationState>((set, get) => ({
+  vacancies: [],
+  complaints: [],
+  documents: [],
+  loading: false,
+  loaded: false,
+
+  load: async () => {
+    set({ loading: true });
+    const [vacancies, complaints, documents] = await Promise.all([
+      fetchPendingVacancies(),
+      fetchPendingComplaints(),
+      fetchPendingDocuments(),
+    ]);
+    set({ vacancies, complaints, documents, loading: false, loaded: true });
   },
 
-  decideComplaint: (id, status, actor) => {
-    const item = COMPLAINTS.find((c) => c.id === id);
-    set((s) => ({ complaints: s.complaints.map((c) => (c.id === id ? { ...c, status } : c)) }));
-    if (item) {
-      useAuditStore.getState().log(actor.name, actor.role, `${STATUS_VERB[status]} жалобу на «${item.targetName}»`, status === 'rejected' ? 'danger' : 'neutral');
-    }
+  decideVacancy: async (id, status) => {
+    set({ vacancies: get().vacancies.filter((v) => v.id !== id) });
+    await decideVacancyApi(id, VACANCY_STATUS[status] ?? 'pending_review');
   },
 
-  decideDocument: (id, status, actor) => {
-    const item = DOCUMENT_REVIEWS.find((d) => d.id === id);
-    set((s) => ({ documents: s.documents.map((d) => (d.id === id ? { ...d, status } : d)) }));
-    if (item) {
-      useAuditStore.getState().log(actor.name, actor.role, `${STATUS_VERB[status]} документ «${item.docType}» — ${item.applicantName}`, status === 'rejected' ? 'danger' : 'accent');
-    }
+  decideComplaint: async (id, status) => {
+    set({ complaints: get().complaints.filter((c) => c.id !== id) });
+    await decideComplaintApi(id, status as 'approved' | 'returned' | 'rejected');
+  },
+
+  decideDocument: async (id, status) => {
+    set({ documents: get().documents.filter((d) => d.id !== id) });
+    await decideDocumentApi(id, DOCUMENT_STATUS[status] ?? 'missing');
   },
 }));
-
-/** Convenience: current demo actor shorthand for audit logging from screens. */
-export function useCurrentActor() {
-  const member = useCurrentMember();
-  const role = useCurrentRole();
-  return { name: member.name, role: role.name };
-}

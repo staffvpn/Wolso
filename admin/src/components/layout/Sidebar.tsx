@@ -1,23 +1,17 @@
-import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Circle, ChevronsUpDown, Check } from 'lucide-react';
+import { Circle, LogOut } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { navForRole } from './nav';
-import { useCurrentMember, useCurrentRole, useSessionStore } from '@/store/useSessionStore';
+import { useCurrentRole, useSessionStore } from '@/store/useSessionStore';
 import { useModerationStore } from '@/store/useModerationStore';
 import { Avatar } from '../ui/Avatar';
-import { TEAM } from '@/data/team';
-import { roleById } from '@/data/permissions';
-import { useRolesStore } from '@/store/useRolesStore';
 
 export function Sidebar() {
-  const member = useCurrentMember();
+  const staff = useSessionStore((s) => s.staff);
+  const logout = useSessionStore((s) => s.logout);
   const role = useCurrentRole();
   const items = navForRole(role);
-  const moderationCount = useModerationStore((s) => s.vacancies.filter((v) => v.status === 'pending').length);
-  const setCurrentMember = useSessionStore((s) => s.setCurrentMember);
-  const roles = useRolesStore((s) => s.roles);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const moderationCount = useModerationStore((s) => s.vacancies.length);
 
   return (
     <aside className="w-[248px] shrink-0 bg-sidebar flex flex-col h-full">
@@ -54,46 +48,19 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="relative px-3 pb-4 pt-2 border-t border-white/8 mt-2">
+      <div className="flex items-center gap-2.5 px-3 pb-4 pt-2 border-t border-white/8 mt-2">
+        <Avatar name={staff?.name ?? '?'} size={32} />
+        <div className="min-w-0 text-left flex-1">
+          <p className="text-[13px] font-semibold text-sidebar-text truncate">{staff?.name?.split(' ')[0]}</p>
+          <p className="text-[12px] text-sidebar-text-muted truncate">{role.name}</p>
+        </div>
         <button
-          onClick={() => setSwitcherOpen((v) => !v)}
-          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-sidebar-hover transition-colors"
+          onClick={logout}
+          aria-label="Выйти"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-sidebar-text-muted hover:bg-sidebar-hover hover:text-sidebar-text transition-colors shrink-0"
         >
-          <Avatar name={member.name} size={32} />
-          <div className="min-w-0 text-left flex-1">
-            <p className="text-[13px] font-semibold text-sidebar-text truncate">{member.name.split(' ')[0]}</p>
-            <p className="text-[12px] text-sidebar-text-muted truncate">{role.name}</p>
-          </div>
-          <ChevronsUpDown size={14} className="text-sidebar-text-muted shrink-0" />
+          <LogOut size={15} />
         </button>
-
-        {switcherOpen && (
-          <div className="absolute bottom-[calc(100%+4px)] left-3 right-3 rounded-xl bg-[#1e2018] border border-white/10 shadow-2xl py-1.5 max-h-72 overflow-y-auto z-30">
-            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-text-muted">
-              Демо: сменить пользователя
-            </p>
-            {TEAM.map((m) => {
-              const r = roleById(m.roleId, roles);
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setCurrentMember(m.id);
-                    setSwitcherOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 text-left"
-                >
-                  <Avatar name={m.name} size={26} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] text-sidebar-text truncate">{m.name}</p>
-                    <p className="text-[11px] text-sidebar-text-muted truncate">{r.name}</p>
-                  </div>
-                  {m.id === member.id && <Check size={14} className="text-accent shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
     </aside>
   );

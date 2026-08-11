@@ -26,21 +26,18 @@ export interface RoleDef {
 
 export type UserStatus = 'active' | 'invited' | 'suspended' | 'pending_docs';
 
-export interface MemberAccess {
-  moderation: boolean;
-  finance: boolean;
-  team: boolean;
-}
-
 export interface TeamMember {
   id: string;
   name: string;
-  email: string;
+  /** Real staff accounts are Telegram-only — no email collection. Shown as
+   *  a contact string derived from their Telegram id. */
+  contact: string;
   roleId: string;
-  access?: MemberAccess;
   status: UserStatus;
-  lastActiveMinAgo: number;
   since: number; // year
+  /** No "last seen" tracking exists yet — this is time since the account
+   *  was created, shown under "Регистрация" rather than "Активность". */
+  createdMinAgo: number;
 }
 
 export type PlatformUserKind = 'seeker' | 'employer';
@@ -52,7 +49,8 @@ export interface PlatformUser {
   contact: string;
   status: UserStatus;
   statusLabel: string;
-  lastActiveMinAgo: number;
+  /** Time since registration — no "last seen" tracking exists yet. */
+  createdMinAgo: number;
   city: string;
   rating?: number;
   shiftsCompleted?: number;
@@ -81,6 +79,8 @@ export interface ModerationVacancy {
   regionalMinWage: number;
   durationHours: number;
   address: string;
+  /** Requirements the employer listed, joined for display — there's no
+   *  separate structured "experience requirement" field. */
   experienceReq: string;
   description: string;
   shiftsPosted: number;
@@ -152,8 +152,6 @@ export interface DashboardStats {
   closedSameDayDeltaPp: number;
   activeWorkers: number;
   activeWorkersDeltaPct: number;
-  payoutVolume: number;
-  platformCommission: number;
   weekly: DashboardDay[];
   topPositions: { label: string; count: number }[];
   attention: { label: string; count: number; tone: 'danger' | 'warning' | 'info' }[];

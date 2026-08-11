@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, UserPlus } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
@@ -7,19 +7,16 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Select } from '@/components/ui/Select';
-import { Toggle } from '@/components/ui/Toggle';
 import { Input, Label } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useRolesStore } from '@/store/useRolesStore';
-import { useCurrentActor } from '@/store/useModerationStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
-import { TOTAL_USERS_COUNT } from '@/data/users';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { MemberAccess, PlatformUser, TeamMember } from '@/types';
+import type { PlatformUser, TeamMember } from '@/types';
 
 type Tab = 'all' | 'seekers' | 'employers' | 'team';
 type Row = { kind: 'team'; member: TeamMember } | { kind: 'seeker' | 'employer'; user: PlatformUser };
@@ -32,13 +29,19 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export function Users() {
-  const { seekers, employers, team } = useUsersStore();
+  const { seekers, employers, team, load } = useUsersStore();
   const roles = useRolesStore((s) => s.roles);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const canManageTeam = useCan('manageTeam');
+  const totalUsers = team.length + seekers.length + employers.length;
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rows: Row[] = useMemo(() => {
     const teamRows: Row[] = team.map((member) => ({ kind: 'team', member }));
@@ -55,7 +58,7 @@ export function Users() {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       const name = r.kind === 'team' ? r.member.name : r.user.name;
-      const contact = r.kind === 'team' ? r.member.email : r.user.contact;
+      const contact = r.kind === 'team' ? r.member.contact : r.user.contact;
       return name.toLowerCase().includes(q) || contact.toLowerCase().includes(q);
     });
   }, [rows, query]);
@@ -76,7 +79,7 @@ export function Users() {
           value={tab}
           onChange={(v) => setTab(v as Tab)}
           options={[
-            { id: 'all', label: 'Все', count: TOTAL_USERS_COUNT },
+            { id: 'all', label: 'Все', count: totalUsers },
             { id: 'seekers', label: 'Соискатели' },
             { id: 'employers', label: 'Работодатели' },
             { id: 'team', label: 'Команда', count: team.length },
@@ -98,8 +101,8 @@ export function Users() {
           <div className="overflow-y-auto divide-y divide-border-soft">
             {filtered.map((r) => {
               const name = r.kind === 'team' ? r.member.name : r.user.name;
-              const contact = r.kind === 'team' ? r.member.email : r.user.contact;
-              const lastActive = r.kind === 'team' ? r.member.lastActiveMinAgo : r.user.lastActiveMinAgo;
+              const contact = r.kind === 'team' ? r.member.contact : r.user.contact;
+              const lastActive = r.kind === 'team' ? r.member.createdMinAgo : r.user.createdMinAgo;
               const roleLabel = r.kind === 'team' ? roleById(r.member.roleId, roles).name : r.kind === 'seeker' ? 'Соискатель' : 'Работодатель';
               const statusLabel = r.kind === 'team' ? (r.member.status === 'invited' ? 'Приглашён' : r.member.status === 'suspended' ? 'Доступ отозван' : 'Активен') : r.user.statusLabel;
               const statusKey = r.kind === 'team' ? r.member.status : r.user.status;
@@ -146,17 +149,10 @@ function TeamDetail({ member }: { member: TeamMember }) {
   const roles = useRolesStore((s) => s.roles);
   const setTeamRole = useUsersStore((s) => s.setTeamRole);
   const revokeAccess = useUsersStore((s) => s.revokeAccess);
-  const actor = useCurrentActor();
   const canManageTeam = useCan('manageTeam');
   const role = roleById(member.roleId, roles);
 
-  const defaultAccess: MemberAccess = {
-    moderation: role.permissions.approveVacancies !== 'no',
-    finance: role.permissions.refundsPayouts !== 'no',
-    team: role.permissions.manageTeam !== 'no',
-  };
   const [roleId, setRoleId] = useState(member.roleId);
-  const [access, setAccess] = useState<MemberAccess>(member.access ?? defaultAccess);
 
   return (
     <div>
@@ -169,41 +165,18 @@ function TeamDetail({ member }: { member: TeamMember }) {
       </div>
 
       <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mt-6 mb-2">Роль</p>
-      <Select
-        value={roleId}
-        disabled={!canManageTeam}
-        onChange={(e) => {
-          const next = roleById(e.target.value, roles);
-          setRoleId(next.id);
-          setAccess({
-            moderation: next.permissions.approveVacancies !== 'no',
-            finance: next.permissions.refundsPayouts !== 'no',
-            team: next.permissions.manageTeam !== 'no',
-          });
-        }}
-      >
+      <Select value={roleId} disabled={!canManageTeam} onChange={(e) => setRoleId(e.target.value)}>
         {roles.map((r) => (
           <option key={r.id} value={r.id}>{r.name}</option>
         ))}
       </Select>
       <p className="text-[13px] text-text-muted mt-2 leading-relaxed">{roleById(roleId, roles).description}</p>
 
-      <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mt-6 mb-3">Доступ</p>
-      <div className="space-y-3">
-        <AccessRow label="Модерация" checked={access.moderation} disabled={!canManageTeam} onChange={(v) => setAccess((a) => ({ ...a, moderation: v }))} />
-        <AccessRow label="Финансы и выплаты" checked={access.finance} disabled={!canManageTeam} onChange={(v) => setAccess((a) => ({ ...a, finance: v }))} />
-        <AccessRow label="Управление командой" checked={access.team} disabled={!canManageTeam} onChange={(v) => setAccess((a) => ({ ...a, team: v }))} />
-      </div>
-
       <div className="flex flex-col gap-2 mt-7">
-        <Button
-          variant="dark"
-          disabled={!canManageTeam}
-          onClick={() => setTeamRole(member.id, roleId, access, actor)}
-        >
+        <Button variant="dark" disabled={!canManageTeam} onClick={() => setTeamRole(member.id, roleId)}>
           Сохранить
         </Button>
-        <Button variant="outline" className="text-danger border-danger/30" disabled={!canManageTeam} onClick={() => revokeAccess(member.id, actor)}>
+        <Button variant="outline" className="text-danger border-danger/30" disabled={!canManageTeam} onClick={() => revokeAccess(member.id)}>
           Отозвать доступ
         </Button>
       </div>
@@ -211,18 +184,8 @@ function TeamDetail({ member }: { member: TeamMember }) {
   );
 }
 
-function AccessRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[14px] font-medium text-text">{label}</span>
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} />
-    </div>
-  );
-}
-
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
-  const actor = useCurrentActor();
   const canBlock = useCan('blockUsers');
   const blocked = user.status === 'suspended';
 
@@ -242,7 +205,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
         Профиль соискателя: документы, история откликов и отзывы заведений доступны в карточке пользователя на платформе.
       </div>
-      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker', actor)}>
+      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>
         {blocked ? 'Разблокировать' : 'Заблокировать'}
       </Button>
     </div>
@@ -251,7 +214,6 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
 
 function EmployerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
-  const actor = useCurrentActor();
   const canBlock = useCan('blockUsers');
   const blocked = user.status === 'suspended';
 
@@ -271,7 +233,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
         Профиль работодателя: опубликованные вакансии, история сотрудничества и отзывы соискателей доступны в карточке компании.
       </div>
-      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer', actor)}>
+      <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer')}>
         {blocked ? 'Разблокировать' : 'Заблокировать'}
       </Button>
     </div>
@@ -281,29 +243,41 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
 function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const roles = useRolesStore((s) => s.roles);
   const inviteMember = useUsersStore((s) => s.inviteMember);
-  const actor = useCurrentActor();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [telegramId, setTelegramId] = useState('');
   const [roleId, setRoleId] = useState('moderator');
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit() {
-    if (!name.trim() || !email.trim()) return;
-    inviteMember(name.trim(), email.trim(), roleId, actor);
-    setName('');
-    setEmail('');
-    onClose();
+  async function submit() {
+    const id = Number(telegramId);
+    if (!name.trim() || !id) return;
+    setSubmitting(true);
+    try {
+      await inviteMember(name.trim(), id, roleId);
+      setName('');
+      setTelegramId('');
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Пригласить в команду" description="Отправим приглашение на почту">
+    <Modal open={open} onClose={onClose} title="Пригласить в команду" description="Доступ открывается по входу через Telegram">
       <div className="space-y-4">
         <div>
           <Label>Имя</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Иван Петров" />
         </div>
         <div>
-          <Label>Email</Label>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ivan@stafftap.ru" type="email" />
+          <Label>Telegram ID</Label>
+          <Input
+            value={telegramId}
+            onChange={(e) => setTelegramId(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="Например, 123456789"
+            inputMode="numeric"
+          />
+          <p className="text-[12px] text-text-faint mt-1.5">Числовой ID из Telegram — его можно узнать у @userinfobot.</p>
         </div>
         <div>
           <Label>Роль</Label>
@@ -313,8 +287,8 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             ))}
           </Select>
         </div>
-        <Button variant="primary" className="w-full mt-2" onClick={submit}>
-          Отправить приглашение
+        <Button variant="primary" className="w-full mt-2" disabled={submitting} onClick={submit}>
+          {submitting ? 'Приглашаем…' : 'Пригласить'}
         </Button>
       </div>
     </Modal>

@@ -9,7 +9,15 @@ adminModerationRoutes.use('*', attachSession);
 adminModerationRoutes.get('/vacancies', requirePermission('approveVacancies'), async (c) => {
   const status = c.req.query('status') ?? 'pending_review';
   const { results } = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.status = ? ORDER BY s.created_at ASC`).bind(status).all<ShiftRow>();
-  return c.json({ vacancies: results.map(shiftToJson) });
+
+  const vacancies = [];
+  for (const row of results) {
+    const posted = await c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE company_id = ? AND status != 'pending_review'")
+      .bind(row.company_id)
+      .first<{ n: number }>();
+    vacancies.push({ ...shiftToJson(row), shiftsPosted: posted?.n ?? 0 });
+  }
+  return c.json({ vacancies });
 });
 
 const VACANCY_VERB: Record<string, string> = { active: 'одобрил(а)', pending_review: 'вернул(а) на правку', rejected: 'отклонил(а)' };

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -14,8 +14,14 @@ const TONE_DOT: Record<string, string> = { accent: 'bg-accent', danger: 'bg-dang
 
 export function AuditLog() {
   const entries = useAuditStore((s) => s.entries);
+  const load = useAuditStore((s) => s.load);
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('Все');
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {

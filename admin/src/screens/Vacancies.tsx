@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useVacanciesStore } from '@/store/useVacanciesStore';
-import { useCurrentActor } from '@/store/useModerationStore';
 import { useCan } from '@/store/useSessionStore';
 import { formatMoney, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -25,10 +24,15 @@ export function Vacancies() {
   const navigate = useNavigate();
   const vacancies = useVacanciesStore((s) => s.vacancies);
   const closeVacancy = useVacanciesStore((s) => s.closeVacancy);
-  const actor = useCurrentActor();
+  const load = useVacanciesStore((s) => s.load);
   const canManage = useCan('approveVacancies');
   const [status, setStatus] = useState<'all' | VacancyRecord['status']>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => (status === 'all' ? vacancies : vacancies.filter((v) => v.status === status)), [vacancies, status]);
   const selected = filtered.find((v) => v.id === selectedId) ?? null;
@@ -132,7 +136,7 @@ export function Vacancies() {
                 </Button>
               )}
               {selected.status === 'active' && (
-                <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id, actor)}>
+                <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id)}>
                   Закрыть вакансию
                 </Button>
               )}

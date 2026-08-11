@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, FileText } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
 import { BarChart } from '@/components/charts/BarChart';
 import { RankList } from '@/components/charts/RankList';
-import { DASHBOARD_STATS } from '@/data/dashboard';
+import { useDashboardStore } from '@/store/useDashboardStore';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -24,7 +25,16 @@ const TONE_DOT: Record<string, string> = {
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const s = DASHBOARD_STATS;
+  const stats = useDashboardStore((st) => st.stats);
+  const load = useDashboardStore((st) => st.load);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!stats) return null;
+  const s = stats;
   const weeklyResponses = s.weekly.reduce((sum, d) => sum + d.responses, 0);
 
   return (

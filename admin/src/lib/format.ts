@@ -31,6 +31,14 @@ export function formatMonthYear(date: Date) {
   return `${MONTHS_NOM[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/** Minutes elapsed since a server timestamp. D1's `datetime('now')` returns
+ *  `"YYYY-MM-DD HH:MM:SS"` (UTC, no timezone marker) — normalize that to a
+ *  properly-parseable ISO string first. */
+export function minutesSince(timestamp: string): number {
+  const iso = timestamp.includes('T') ? timestamp : `${timestamp.replace(' ', 'T')}Z`;
+  return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+}
+
 export function timeAgo(minutes: number) {
   if (minutes < 1) return 'сейчас';
   if (minutes < 60) return `${minutes} мин назад`;

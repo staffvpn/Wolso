@@ -12,23 +12,41 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
   const d30 = new Date(now.getTime() - 30 * 86400000).toISOString();
   const d60 = new Date(now.getTime() - 60 * 86400000).toISOString();
 
-  const [published30, published60to30, filled, activeShiftsOrLater, activeWorkers] = await Promise.all([
-    c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
-    c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ? AND created_at < ?').bind(d60, d30).first<{ n: number }>(),
-    c.env.DB.prepare(
-      `SELECT COUNT(DISTINCT s.id) as n FROM shifts s JOIN applications a ON a.shift_id = s.id
-       WHERE s.status != 'pending_review' AND a.status = 'accepted' AND s.created_at >= ?`,
-    )
-      .bind(d30)
-      .first<{ n: number }>(),
-    c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status != 'pending_review' AND created_at >= ?").bind(d30).first<{ n: number }>(),
-    c.env.DB.prepare('SELECT COUNT(DISTINCT worker_id) as n FROM applications WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
-  ]);
+  const [published30, published60to30, filled, activeShiftsOrLater, activeWorkers, filledPrev, activeShiftsOrLaterPrev, activeWorkersPrev] =
+    await Promise.all([
+      c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ? AND created_at < ?').bind(d60, d30).first<{ n: number }>(),
+      c.env.DB.prepare(
+        `SELECT COUNT(DISTINCT s.id) as n FROM shifts s JOIN applications a ON a.shift_id = s.id
+         WHERE s.status != 'pending_review' AND a.status = 'accepted' AND s.created_at >= ?`,
+      )
+        .bind(d30)
+        .first<{ n: number }>(),
+      c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status != 'pending_review' AND created_at >= ?").bind(d30).first<{ n: number }>(),
+      c.env.DB.prepare('SELECT COUNT(DISTINCT worker_id) as n FROM applications WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
+      c.env.DB.prepare(
+        `SELECT COUNT(DISTINCT s.id) as n FROM shifts s JOIN applications a ON a.shift_id = s.id
+         WHERE s.status != 'pending_review' AND a.status = 'accepted' AND s.created_at >= ? AND s.created_at < ?`,
+      )
+        .bind(d60, d30)
+        .first<{ n: number }>(),
+      c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status != 'pending_review' AND created_at >= ? AND created_at < ?")
+        .bind(d60, d30)
+        .first<{ n: number }>(),
+      c.env.DB.prepare('SELECT COUNT(DISTINCT worker_id) as n FROM applications WHERE created_at >= ? AND created_at < ?')
+        .bind(d60, d30)
+        .first<{ n: number }>(),
+    ]);
 
   const vacanciesPublished = published30?.n ?? 0;
   const prevPublished = published60to30?.n ?? 0;
   const vacanciesPublishedDeltaPct = prevPublished ? Math.round(((vacanciesPublished - prevPublished) / prevPublished) * 100) : 0;
   const closedSameDayPct = activeShiftsOrLater?.n ? Math.round(((filled?.n ?? 0) / activeShiftsOrLater.n) * 100) : 0;
+  const closedSameDayPctPrev = activeShiftsOrLaterPrev?.n ? Math.round(((filledPrev?.n ?? 0) / activeShiftsOrLaterPrev.n) * 100) : 0;
+  const closedSameDayDeltaPp = closedSameDayPct - closedSameDayPctPrev;
+  const activeWorkersDeltaPct = activeWorkersPrev?.n
+    ? Math.round((((activeWorkers?.n ?? 0) - activeWorkersPrev.n) / activeWorkersPrev.n) * 100)
+    : 0;
 
   const weekly: { day: string; shifts: number; responses: number }[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -58,7 +76,9 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
     vacanciesPublished,
     vacanciesPublishedDeltaPct,
     closedSameDayPct,
+    closedSameDayDeltaPp,
     activeWorkers: activeWorkers?.n ?? 0,
+    activeWorkersDeltaPct,
     weekly,
     topPositions,
     attention: [

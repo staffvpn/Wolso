@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Download, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useFinanceStore } from '@/store/useFinanceStore';
 import { useAuditStore } from '@/store/useAuditStore';
-import { useCurrentActor } from '@/store/useModerationStore';
+import { useCurrentActor } from '@/store/useSessionStore';
 import { useCan } from '@/store/useSessionStore';
 import { PLATFORM_COMMISSION_PCT } from '@/data/finance';
 import { formatMoney, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { FEATURES } from '@/lib/features';
 import type { Transaction } from '@/types';
 
 const STATUS_BADGE: Record<Transaction['status'], { label: string; tone: 'accent' | 'warning' | 'danger' }> = {
@@ -36,6 +37,8 @@ export function Finance() {
 
   const processingCount = useMemo(() => transactions.filter((t) => t.status === 'processing').length, [transactions]);
   const disputeCount = useMemo(() => transactions.filter((t) => t.status === 'dispute').length, [transactions]);
+
+  if (!FEATURES.payments) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="pb-10">
