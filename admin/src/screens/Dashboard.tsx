@@ -1,0 +1,94 @@
+import { useNavigate } from 'react-router-dom';
+import { Download, FileText } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { StatCard } from '@/components/ui/StatCard';
+import { BarChart } from '@/components/charts/BarChart';
+import { RankList } from '@/components/charts/RankList';
+import { DASHBOARD_STATS } from '@/data/dashboard';
+import { formatMoney, formatNumber } from '@/lib/format';
+import { cn } from '@/lib/cn';
+
+const ATTENTION_LINKS: Record<string, string> = {
+  'Вакансии на модерации': '/moderation',
+  'Жалобы на работодателей': '/moderation',
+  'Документы на проверку': '/moderation',
+};
+
+const TONE_DOT: Record<string, string> = {
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+};
+
+export function Dashboard() {
+  const navigate = useNavigate();
+  const s = DASHBOARD_STATS;
+
+  return (
+    <div className="pb-10">
+      <PageHeader
+        title="Дашборд"
+        subtitle="Москва · последние 30 дней"
+        right={
+          <>
+            <Button variant="outline">
+              <Download size={15} /> Экспорт CSV
+            </Button>
+            <Button variant="dark">
+              <FileText size={15} /> Отчёт
+            </Button>
+          </>
+        }
+      />
+
+      <div className="px-8 grid grid-cols-4 gap-4">
+        <StatCard label="Смен опубликовано" value={formatNumber(s.vacanciesPublished)} delta={`${s.vacanciesPublishedDeltaPct}% к июлю`} />
+        <StatCard label="Закрыто в тот же день" value={`${s.closedSameDayPct}%`} delta={`${s.closedSameDayDeltaPp} п.п.`} />
+        <StatCard label="Активных исполнителей" value={formatNumber(s.activeWorkers)} delta={`${s.activeWorkersDeltaPct}%`} />
+        <StatCard
+          label="Оборот выплат"
+          value={<span>{(s.payoutVolume / 1_000_000).toFixed(1)} млн ₽</span>}
+          footnote={`комиссия ${formatMoney(s.platformCommission)}`}
+          dark
+        />
+      </div>
+
+      <div className="px-8 mt-4 grid grid-cols-3 gap-4">
+        <Card className="col-span-2 p-6">
+          <p className="font-bold text-[15px] mb-5">Смены и отклики по дням</p>
+          <BarChart data={s.weekly} />
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="p-6">
+            <p className="font-bold text-[15px] mb-4">Топ должностей</p>
+            <RankList items={s.topPositions} />
+          </Card>
+        </div>
+      </div>
+
+      <div className="px-8 mt-4">
+        <Card className="p-6">
+          <p className="font-bold text-[15px] mb-2">Требует внимания</p>
+          <div className="divide-y divide-border-soft">
+            {s.attention.map((a) => (
+              <button
+                key={a.label}
+                onClick={() => navigate(ATTENTION_LINKS[a.label] ?? '/moderation')}
+                className="w-full flex items-center justify-between py-3 text-left group"
+              >
+                <span className="flex items-center gap-2.5 text-[14px] font-medium text-text">
+                  <span className={cn('h-2 w-2 rounded-full', TONE_DOT[a.tone])} />
+                  {a.label}
+                </span>
+                <span className="text-[14px] font-bold text-text-muted group-hover:text-text transition-colors">{a.count}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
