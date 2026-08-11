@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand */
+  --color-accent: #34d17c;
+  --color-accent-dim: #1f8f56;
+  --color-accent-soft: rgba(52, 209, 124, 0.14);
+  --color-accent-fg: #06170e;
+
+  /* Surfaces (dark-first — this product ships dark only, like the reference) */
+  --color-bg: #0a0b0a;
+  --color-bg-elevated: #111312;
+  --color-surface: #161918;
+  --color-surface-2: #1d201f;
+  --color-surface-hover: #23271f;
+  --color-border: #262a27;
+  --color-border-soft: #1c1f1d;
+
+  /* Text */
+  --color-text: #f4f6f4;
+  --color-text-muted: #9aa39c;
+  --color-text-faint: #6c756e;
+
+  /* Semantic */
+  --color-danger: #ef4d5e;
+  --color-danger-soft: rgba(239, 77, 94, 0.14);
+  --color-warning: #e8b23f;
+  --color-warning-soft: rgba(232, 178, 63, 0.14);
+
+  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --radius-card: 1.25rem;
+  --radius-sheet: 1.5rem;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#root {
+  max-width: 560px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.wolso-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  outline: none;
+}
+.wolso-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  border: none;
+}
+.wolso-slider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  border: none;
+}
+.wolso-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-2) 37%, var(--color-surface) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
