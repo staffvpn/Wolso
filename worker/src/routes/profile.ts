@@ -59,7 +59,9 @@ profileRoutes.post('/positions', async (c) => {
 });
 
 /** Document upload — raw file bytes in the body, doc type in the URL.
- *  Stored in R2, status flips to 'pending' for a human moderator to review. */
+ *  Stored directly in D1 (no R2 — that needs a billing subscription even
+ *  on the free tier, which not every operator can add), status flips to
+ *  'pending' for a human moderator to review. */
 profileRoutes.post('/documents/:docType/upload', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -73,13 +75,13 @@ profileRoutes.post('/documents/:docType/upload', async (c) => {
   const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
   const bytes = await c.req.arrayBuffer();
   if (bytes.byteLength === 0) return c.json({ error: 'empty_upload' }, 400);
-  if (bytes.byteLength > 8 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413);
+  // D1 caps a row at 2MB total — leave headroom for the rest of the row.
+  if (bytes.byteLength > 1.5 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413);
 
-  const key = `workers/${session.workerId}/${docType}-${Date.now()}`;
-  await c.env.DOCS.put(key, bytes, { httpMetadata: { contentType } });
-
-  await c.env.DB.prepare("UPDATE worker_documents SET status = 'pending', file_key = ?, note = 'На проверке', updated_at = datetime('now') WHERE id = ?")
-    .bind(key, doc.id)
+  await c.env.DB.prepare(
+    "UPDATE worker_documents SET status = 'pending', file_data = ?, content_type = ?, note = 'На проверке', updated_at = datetime('now') WHERE id = ?",
+  )
+    .bind(bytes, contentType, doc.id)
     .run();
 
   return c.json({ ok: true });

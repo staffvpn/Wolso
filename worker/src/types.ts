@@ -1,6 +1,5 @@
 export interface Env {
   DB: D1Database;
-  DOCS: R2Bucket;
   ADMIN_ORIGIN: string;
   APP_ORIGIN: string;
   BOT_TOKEN: string;

@@ -16,10 +16,9 @@ binding = "DB"
 database_name = "wolso"
 database_id = "3bd49b64-c1ac-494a-a747-b5a02d421b59"
 
-# Created with: wrangler r2 bucket create wolso-documents
-[[r2_buckets]]
-binding = "DOCS"
-bucket_name = "wolso-documents"
+# No R2 bucket — worker documents are stored directly in D1 (see
+# migrations/0005_document_blob_storage.sql). R2 needs a billing
+# subscription even on the free tier, which isn't available everywhere.
 
 # Secrets (never put these here — set with `wrangler secret put <NAME>`):
 #   BOT_TOKEN          — the Telegram bot token from @BotFather

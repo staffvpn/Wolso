@@ -20,7 +20,7 @@ npm install
 npx wrangler login
 ```
 
-## 2. Создать D1 и R2
+## 2. Создать D1
 
 ```bash
 npx wrangler d1 create wolso
@@ -29,12 +29,9 @@ npx wrangler d1 create wolso
 Скопируйте `database_id` из вывода команды в `wrangler.toml`
 (`[[d1_databases]] database_id = "..."`).
 
-```bash
-npx wrangler r2 bucket create wolso-documents
-```
-
-Название бакета (`wolso-documents`) уже прописано в `wrangler.toml` —
-менять не нужно, если не переименовывали бакет.
+R2 не нужен — документы работников хранятся прямо в D1 (см.
+`migrations/0005_document_blob_storage.sql`), потому что R2 требует
+подключить биллинг даже на бесплатном тарифе, а это доступно не всем.
 
 ## 3. Прогнать миграции
 

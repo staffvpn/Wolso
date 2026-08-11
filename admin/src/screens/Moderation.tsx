@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useModerationStore } from '@/store/useModerationStore';
 import { useCan } from '@/store/useSessionStore';
+import { fetchDocumentFileUrl } from '@/services/moderationApi';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { ComplaintItem, DocumentReview, ModerationVacancy } from '@/types';
@@ -248,10 +249,25 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
   const decide = useModerationStore((s) => s.decideDocument);
   const canVerify = useCan('verifyDocuments');
   const selected = useMemo(() => items.find((d) => d.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selected && items[0]) setSelectedId(items[0].id);
   }, [items, selected]);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    setFileUrl(null);
+    if (selected) {
+      fetchDocumentFileUrl(selected.id).then((url) => {
+        objectUrl = url;
+        setFileUrl(url);
+      });
+    }
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selected?.id]);
 
   function act(status: 'approved' | 'returned' | 'rejected') {
     if (!selected) return;
@@ -294,15 +310,19 @@ function DocumentQueue({ items }: { items: DocumentReview[] }) {
           </div>
 
           <Badge tone="info" className="mb-3">{selected.docType}</Badge>
-          <div
-            className="w-full h-64 rounded-2xl border border-border-soft flex items-center justify-center text-text-faint text-[13px] mb-6"
-            style={{
-              background:
-                'repeating-linear-gradient(135deg, var(--color-surface-2) 0px, var(--color-surface-2) 10px, #fff 10px, #fff 20px)',
-            }}
-          >
-            изображение документа
-          </div>
+          {fileUrl ? (
+            <img src={fileUrl} alt={selected.docType} className="w-full h-64 object-contain rounded-2xl border border-border-soft mb-6 bg-surface-2" />
+          ) : (
+            <div
+              className="w-full h-64 rounded-2xl border border-border-soft flex items-center justify-center text-text-faint text-[13px] mb-6"
+              style={{
+                background:
+                  'repeating-linear-gradient(135deg, var(--color-surface-2) 0px, var(--color-surface-2) 10px, #fff 10px, #fff 20px)',
+              }}
+            >
+              загрузка…
+            </div>
+          )}
 
           <div className="flex items-center gap-2.5">
             <Button variant="primary" className="flex-1" disabled={!canVerify} onClick={() => act('approved')}>

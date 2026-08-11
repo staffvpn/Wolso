@@ -66,6 +66,18 @@ adminModerationRoutes.post('/complaints/:id/decide', requirePermission('blockUse
   return c.json({ ok: true });
 });
 
+/** Serves the raw uploaded file so a moderator can actually look at it.
+ *  Bearer-token auth means an <img src> can't hit this directly — the
+ *  client fetches it manually and turns the response into an object URL. */
+adminModerationRoutes.get('/documents/:id/file', requirePermission('verifyDocuments'), async (c) => {
+  const id = c.req.param('id');
+  const doc = await c.env.DB.prepare('SELECT file_data, content_type FROM worker_documents WHERE id = ?')
+    .bind(id)
+    .first<{ file_data: ArrayBuffer | null; content_type: string | null }>();
+  if (!doc || !doc.file_data) return c.json({ error: 'not_found' }, 404);
+  return new Response(doc.file_data, { headers: { 'Content-Type': doc.content_type ?? 'application/octet-stream' } });
+});
+
 adminModerationRoutes.get('/documents', requirePermission('verifyDocuments'), async (c) => {
   const status = c.req.query('status') ?? 'pending';
   const { results } = await c.env.DB.prepare(

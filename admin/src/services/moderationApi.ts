@@ -1,6 +1,9 @@
 import { apiFetch } from '@/lib/apiClient';
 import { minutesSince } from '@/lib/format';
+import { useSessionStore } from '@/store/useSessionStore';
 import type { ComplaintItem, DocumentReview, ModerationVacancy } from '@/types';
+
+const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
 /** The backend flags vacancies below this hourly rate at creation time —
  *  mirrored here only for display; the real check happens server-side. */
@@ -111,4 +114,18 @@ export async function fetchPendingDocuments(): Promise<DocumentReview[]> {
 
 export async function decideDocument(id: string, status: 'verified' | 'missing'): Promise<void> {
   await apiFetch(`/admin/moderation/documents/${id}/decide`, { method: 'POST', body: { status } });
+}
+
+/** Bearer-token auth means an <img src> can't hit the API directly — fetch
+ *  the file manually and hand back a blob URL to render. Caller owns
+ *  revoking it (`URL.revokeObjectURL`) once done. */
+export async function fetchDocumentFileUrl(id: string): Promise<string | null> {
+  if (!API_URL) return null;
+  const token = useSessionStore.getState().token;
+  const res = await fetch(`${API_URL}/admin/moderation/documents/${id}/file`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
