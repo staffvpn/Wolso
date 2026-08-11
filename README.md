@@ -14,14 +14,18 @@
 - **React Router (Hash Router)** — хэш-роутинг, чтобы приложение работало на любом статическом хостинге без серверных rewrite-правил
 - **lucide-react** — иконки
 
-## Данные
+## Бэкенд
 
-Бэкенда пока нет — весь `src/data` заполнен детерминированными моками
-(сиды через `mulberry32`, см. `src/data/rng.ts`), а `src/services/*Api.ts` —
-тонкая асинхронная обёртка над ними (`await delay()` вместо `fetch`).
-Экраны и сторы дергают только `services/*`, поэтому подключить реальный
-бэкенд позже — это переписать содержимое `services/*.ts`, не трогая
-компоненты.
+Реальный API — Cloudflare Workers + D1 + R2, лежит в `../worker` (общий
+для этого приложения и `../admin`). Инструкция по деплою — в
+`../worker/README.md`. Локально нужен `.env` с `VITE_API_URL` (см.
+`.env.example`), указывающим на поднятый воркер (`wrangler dev` или
+задеплоенный).
+
+`src/services/*Api.ts` — тонкий слой поверх `src/lib/apiClient.ts`
+(fetch + Bearer-токен сессии), экраны и сторы работают только через него.
+`src/store/useAuthStore.ts` обменивает Telegram `initData` на токены при
+старте (`AuthGate` блокирует рендер приложения до этого момента).
 
 ## Telegram Mini App
 
@@ -65,8 +69,9 @@ npm run lint      # oxlint
 src/
   components/    UI-кит, свайп-дек, шторки, нав-бар
   screens/       экраны по ролям: onboarding / worker / employer / shared
-  store/         zustand-сторы
-  services/      асинхронный слой поверх моков (будущий API)
-  data/          моковые данные и генераторы
-  lib/           telegram.ts, форматирование, cn()
+  store/         zustand-сторы, дергают services/*
+  services/      обёртки над apiClient.ts (реальные запросы к воркеру)
+  data/          позиции/цвета логотипов и т.п. — статические справочники,
+                 не бизнес-данные
+  lib/           telegram.ts, apiClient.ts, features.ts, форматирование, cn()
 ```
