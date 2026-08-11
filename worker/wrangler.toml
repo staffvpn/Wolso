@@ -14,7 +14,7 @@ APP_ORIGIN = "https://wolso.pages.dev"
 [[d1_databases]]
 binding = "DB"
 database_name = "wolso"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "3bd49b64-c1ac-494a-a747-b5a02d421b59"
 
 # Created with: wrangler r2 bucket create wolso-documents
 [[r2_buckets]]
