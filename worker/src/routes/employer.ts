@@ -3,6 +3,7 @@ import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
+import { sendTelegramMessage } from '../lib/telegramBot';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -210,8 +211,47 @@ employerRoutes.post('/vacancies', async (c) => {
     .first<{ id: number }>();
 
   const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
+  // Runs after the response is sent (waitUntil) — an employer posting a
+  // shift shouldn't sit waiting on however many Telegram API calls this
+  // turns into.
+  c.executionCtx.waitUntil(notifyMatchingWorkers(c.env, row!));
   return c.json({ shift: shiftToJson(row!) });
 });
+
+/** Pings, via the bot itself (not just the in-app notifications list),
+ *  every worker who has this position in their experience — the same
+ *  match a worker would get by filtering the feed for it. Deliberately
+ *  narrow: broadcasting every new shift to every worker regardless of
+ *  what they do would just train people to ignore the bot. */
+async function notifyMatchingWorkers(env: Env, shift: ShiftRow): Promise<void> {
+  const { results: matches } = await env.DB.prepare(
+    `SELECT DISTINCT w.id, w.telegram_id FROM workers w
+     JOIN worker_positions wp ON wp.worker_id = w.id
+     LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+     WHERE wp.position = ? AND w.status != 'suspended' AND (t.active_role = 'worker' OR t.active_role IS NULL)`,
+  )
+    .bind(shift.position)
+    .all<{ id: number; telegram_id: number }>();
+  if (matches.length === 0) return;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const title = `Новая смена: ${shift.position_label}`;
+  const subtitle = `${shift.company_name ?? 'Компания'} · ${shift.company_city ?? ''} · ${shift.hourly_rate} ₽/ч`;
+  const text = [
+    `🆕 ${title}`,
+    subtitle,
+    `${shift.date}, ${pad(shift.start_hour)}:${pad(shift.start_min)}–${pad(shift.end_hour)}:${pad(shift.end_min)}`,
+  ].join('\n');
+
+  await Promise.allSettled(
+    matches.map(async (m) => {
+      await env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+        .bind(m.id, 'new_shifts', title, subtitle)
+        .run();
+      await sendTelegramMessage(env, m.telegram_id, text);
+    }),
+  );
+}
 
 /** Worker columns joined into both candidate queries below — enough for
  *  the swipe card to show a real profile (avatar, bio, skills, age)
