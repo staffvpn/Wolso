@@ -235,12 +235,16 @@ async function notifyMatchingWorkers(env: Env, shift: ShiftRow): Promise<void> {
   if (matches.length === 0) return;
 
   const pad = (n: number) => String(n).padStart(2, '0');
+  // shift.date is stored as ISO (YYYY-MM-DD) — the bot message shows the
+  // ru-RU-familiar dd.mm.yyyy instead.
+  const [year, month, day] = shift.date.split('-');
+  const dateLabel = `${day}.${month}.${year}`;
   const title = `Новая смена: ${shift.position_label}`;
   const subtitle = `${shift.company_name ?? 'Компания'} · ${shift.company_city ?? ''} · ${shift.hourly_rate} ₽/ч`;
   const text = [
     `🆕 ${title}`,
     subtitle,
-    `${shift.date}, ${pad(shift.start_hour)}:${pad(shift.start_min)}–${pad(shift.end_hour)}:${pad(shift.end_min)}`,
+    `${dateLabel}, ${pad(shift.start_hour)}:${pad(shift.start_min)}–${pad(shift.end_hour)}:${pad(shift.end_min)}`,
   ].join('\n');
 
   await Promise.allSettled(
