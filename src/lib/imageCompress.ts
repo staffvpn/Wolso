@@ -3,24 +3,21 @@
  *  this. Downscales to a sane max dimension and re-encodes as JPEG.
  *  Non-image files (PDFs) pass through untouched. */
 
-/** Formats every browser can already render in a plain <img> — if
- *  compression fails on one of these, the original is still safe to
- *  upload as-is. Anything else (HEIC/HEIF from an iPhone camera roll,
- *  most often) that fails to decode gets rejected instead of silently
- *  uploaded, since it would just show up as a broken-image icon for
- *  whoever's on the other end. */
-const WEB_SAFE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-
 export class UnsupportedImageError extends Error {}
 
 export async function compressImageFile(file: File, maxDim = 1440, quality = 0.82): Promise<File> {
   if (!file.type.startsWith('image/')) return file;
 
+  // Don't trust `file.type` as proof the browser can actually render it —
+  // Telegram's own media picker has been seen labeling a still-HEIC file
+  // as image/jpeg. If the browser itself can't decode it into a bitmap,
+  // no <img> anywhere will ever be able to show it either, so this always
+  // rejects on a decode failure rather than uploading bytes that would
+  // just come out as a broken-image icon on the other end.
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    if (WEB_SAFE_TYPES.has(file.type)) return file;
     throw new UnsupportedImageError(
       'Этот формат фото не открывается в приложении (часто так с HEIC на iPhone). Попробуйте другое фото или включите в настройках камеры «Наиболее совместимые» форматы.',
     );
