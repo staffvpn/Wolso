@@ -14,6 +14,7 @@ export interface Company {
   id: string;
   name: string;
   address: string;
+  city?: string;
   logoInitial: string;
   logoColor: string;
   rating: number;

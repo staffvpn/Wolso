@@ -11,6 +11,8 @@ employerRoutes.use('*', attachSession);
 interface CompanyRow {
   id: number;
   name: string;
+  address: string | null;
+  city: string;
   description: string;
   founded_year: number | null;
   avatar_data: ArrayBuffer | null;
@@ -27,7 +29,7 @@ function companyIsComplete(company: CompanyRow) {
 }
 
 async function loadCompanyProfile(env: Env, companyId: number) {
-  const company = await env.DB.prepare('SELECT id, name, description, founded_year, avatar_data FROM companies WHERE id = ?')
+  const company = await env.DB.prepare('SELECT id, name, address, city, description, founded_year, avatar_data FROM companies WHERE id = ?')
     .bind(companyId)
     .first<CompanyRow>();
   if (!company) return null;

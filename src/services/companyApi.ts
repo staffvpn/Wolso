@@ -31,6 +31,7 @@ export function fromApiCompanyRow(c: CompanyApiRow): Company {
     id: String(c.id),
     name: c.name,
     address: c.address ?? '',
+    city: c.city,
     logoInitial: c.logo_initial,
     logoColor: c.logo_color,
     rating: c.rating,

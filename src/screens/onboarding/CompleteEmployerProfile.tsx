@@ -45,6 +45,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
     if (!company) return;
     setName(company.name);
     setAddress(company.address ?? '');
+    setCity(company.city ?? '');
     setDescription(company.description ?? '');
     setFoundedYear(company.foundedYear ? String(company.foundedYear) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
