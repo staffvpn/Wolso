@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock } from 'lucide-react';
+import { Lock, Plus, X } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Slider } from '@/components/ui/Slider';
@@ -10,10 +10,10 @@ import { Badge } from '@/components/ui/Badge';
 import { SectionLabel } from '@/components/ui/Card';
 import { POSITIONS, MARKET_AVG_RATE } from '@/data/positions';
 import { useEmployerStore } from '@/store/useEmployerStore';
+import { formatDayMonth } from '@/lib/format';
 import type { Position } from '@/types';
 
 const KEY_POSITIONS = POSITIONS.slice(0, 8);
-const DATE_OPTIONS = ['Сегодня', 'Завтра', 'Выбрать дату'] as const;
 const REQUIREMENT_POOL = ['Опыт от 1 года', 'Медкнижка', 'Без опыта', 'Своя форма'];
 
 function isoDate(daysFromNow: number) {
@@ -25,13 +25,22 @@ function isoDate(daysFromNow: number) {
 const TODAY = isoDate(0);
 const TOMORROW = isoDate(1);
 
+/** Genitive plural for "N смена/смены/смен". */
+function shiftsWord(n: number) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'смена';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'смены';
+  return 'смен';
+}
+
 export function NewVacancy() {
   const navigate = useNavigate();
   const createVacancy = useEmployerStore((s) => s.createVacancy);
 
   const [position, setPosition] = useState<Position>('barista');
-  const [dateOption, setDateOption] = useState<(typeof DATE_OPTIONS)[number]>('Сегодня');
-  const [customDate, setCustomDate] = useState('');
+  const [selectedDates, setSelectedDates] = useState<string[]>([TODAY]);
+  const [pickerDate, setPickerDate] = useState('');
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(19);
   const [rate, setRate] = useState(450);
@@ -42,31 +51,51 @@ export function NewVacancy() {
   const marketAvg = MARKET_AVG_RATE[position];
   const positionLabel = POSITIONS.find((p) => p.id === position)!.label;
 
-  const resolvedDate = dateOption === 'Сегодня' ? TODAY : dateOption === 'Завтра' ? TOMORROW : customDate;
-  const canPublish = Boolean(resolvedDate);
+  const canPublish = selectedDates.length > 0;
 
   function toggleRequirement(r: string) {
     setRequirements((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
   }
 
+  function toggleQuickDate(date: string) {
+    setSelectedDates((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date].sort()));
+  }
+
+  function addPickedDate() {
+    if (!pickerDate) return;
+    setSelectedDates((prev) => (prev.includes(pickerDate) ? prev : [...prev, pickerDate].sort()));
+    setPickerDate('');
+  }
+
+  function removeDate(date: string) {
+    setSelectedDates((prev) => prev.filter((d) => d !== date));
+  }
+
+  /** The calendar only marks which day(s) work is needed — publishing
+   *  happens immediately regardless of the date. Picking several days
+   *  posts one shift per day, all live right away. */
   async function publish() {
     if (!canPublish) return;
     setPublishing(true);
-    const vac = await createVacancy({
-      position,
-      positionLabel,
-      date: resolvedDate,
-      startHour,
-      startMin: 0,
-      endHour,
-      endMin: 0,
-      hourlyRate: rate,
-      requirements,
-      description: description.trim(),
-      urgent: false, // paid feature — locked for now, see the toggle below
-    });
+    let firstId: string | null = null;
+    for (const date of selectedDates) {
+      const vac = await createVacancy({
+        position,
+        positionLabel,
+        date,
+        startHour,
+        startMin: 0,
+        endHour,
+        endMin: 0,
+        hourlyRate: rate,
+        requirements,
+        description: description.trim(),
+        urgent: false, // paid feature — locked for now, see the toggle below
+      });
+      firstId ??= vac.id;
+    }
     setPublishing(false);
-    navigate(`/e/vacancies/${vac.id}`, { replace: true });
+    navigate(selectedDates.length === 1 && firstId ? `/e/vacancies/${firstId}` : '/e/vacancies', { replace: true });
   }
 
   return (
@@ -87,21 +116,48 @@ export function NewVacancy() {
 
         <div>
           <SectionLabel>Когда</SectionLabel>
+          <p className="text-[13px] text-text-muted mb-3 leading-relaxed">
+            Отметьте один или несколько дней — смена публикуется сразу, дата в карточке просто показывает, на какой день ищете человека
+          </p>
           <div className="flex flex-wrap gap-2 mb-3">
-            {DATE_OPTIONS.map((d) => (
-              <Chip key={d} tone="dark" selected={dateOption === d} onClick={() => setDateOption(d)}>
-                {d}
-              </Chip>
-            ))}
+            <Chip tone="dark" selected={selectedDates.includes(TODAY)} onClick={() => toggleQuickDate(TODAY)}>
+              Сегодня
+            </Chip>
+            <Chip tone="dark" selected={selectedDates.includes(TOMORROW)} onClick={() => toggleQuickDate(TOMORROW)}>
+              Завтра
+            </Chip>
           </div>
-          {dateOption === 'Выбрать дату' && (
+          <div className="flex items-center gap-2 mb-3">
             <input
               type="date"
               min={TODAY}
-              value={customDate}
-              onChange={(e) => setCustomDate(e.target.value)}
-              className="w-full rounded-2xl bg-surface border border-border px-3.5 py-3 text-[15px] font-semibold outline-none focus:border-accent mb-3"
+              value={pickerDate}
+              onChange={(e) => setPickerDate(e.target.value)}
+              className="flex-1 rounded-2xl bg-surface border border-border px-3.5 py-3 text-[15px] font-semibold outline-none focus:border-accent"
             />
+            <button
+              onClick={addPickedDate}
+              disabled={!pickerDate}
+              aria-label="Добавить дату"
+              className="h-[46px] w-[46px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 disabled:opacity-40"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+          {selectedDates.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {selectedDates.map((d) => (
+                <span
+                  key={d}
+                  className="flex items-center gap-1.5 h-9 pl-3.5 pr-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold"
+                >
+                  {formatDayMonth(new Date(d))}
+                  <button onClick={() => removeDate(d)} aria-label="Убрать дату" className="h-5 w-5 rounded-full flex items-center justify-center text-text-faint">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
           )}
           <div className="flex items-center gap-3">
             <div className="flex-1 rounded-2xl bg-surface border border-border px-3.5 py-3">
@@ -179,7 +235,13 @@ export function NewVacancy() {
 
       <div className="px-5 pb-5 pt-2 shrink-0">
         <Button fullWidth disabled={publishing || !canPublish} onClick={publish}>
-          {publishing ? 'Публикуем…' : !canPublish ? 'Выберите дату' : 'Опубликовать'}
+          {publishing
+            ? 'Публикуем…'
+            : !canPublish
+              ? 'Выберите дату'
+              : selectedDates.length > 1
+                ? `Опубликовать · ${selectedDates.length} ${shiftsWord(selectedDates.length)}`
+                : 'Опубликовать'}
         </Button>
       </div>
     </div>
