@@ -5,6 +5,7 @@ import {
   fetchVacancies,
   fetchVacancyCandidates,
   decideCandidate as decideCandidateApi,
+  closeShift as closeShiftApi,
   createVacancy as createVacancyApi,
 } from '@/services/employerApi';
 import { haptic, hapticNotify } from '@/lib/telegram';
@@ -17,6 +18,7 @@ interface EmployerState {
   loadVacancyCandidates: (vacancyId: string, positionLabel?: string) => Promise<void>;
   pendingCandidates: () => Candidate[];
   decideCandidate: (vacancyId: string, candidateId: string, decision: 'accepted' | 'declined') => Promise<void>;
+  closeShift: (vacancyId: string, candidateId: string, rating: number, tags: string[], comment: string) => Promise<void>;
   createVacancy: (input: {
     position: Position;
     positionLabel: string;
@@ -67,6 +69,16 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
       const candidates = await fetchCandidates();
       set({ candidates });
     }
+  },
+
+  closeShift: async (vacancyId, candidateId, rating, tags, comment) => {
+    await closeShiftApi(vacancyId, candidateId, rating, tags, comment);
+    hapticNotify('success');
+    set((s) => ({
+      candidates: s.candidates.map((c) =>
+        c.id === candidateId ? { ...c, workStage: 'employer_closed', closedByEmployerAt: new Date().toISOString() } : c,
+      ),
+    }));
   },
 
   createVacancy: async (input) => {

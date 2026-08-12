@@ -13,7 +13,7 @@ interface AppRow {
   status: string;
   work_stage: string;
   check_in_at: string | null;
-  check_out_at: string | null;
+  closed_by_employer_at: string | null;
   rating: number | null;
   review_tags: string | null;
   review_comment: string | null;
@@ -27,7 +27,7 @@ function appToJson(a: AppRow, shift?: ReturnType<typeof shiftToJson>) {
     status: a.status,
     workStage: a.work_stage,
     checkInAt: a.check_in_at,
-    checkOutAt: a.check_out_at,
+    closedByEmployerAt: a.closed_by_employer_at,
     rating: a.rating,
     reviewTags: a.review_tags ? JSON.parse(a.review_tags) : [],
     reviewComment: a.review_comment,
@@ -97,32 +97,41 @@ applicationRoutes.post('/:id/check-in', async (c) => {
   return c.json({ ok: true });
 });
 
-applicationRoutes.post('/:id/check-out', async (c) => {
-  const session = requireWorker(c as never);
-  if (!session) return c.json({ error: 'auth_required' }, 401);
-  const app = await ownedApplication(c.env, c.req.param('id'), session.workerId);
-  if (!app) return c.json({ error: 'not_found' }, 404);
-
-  await c.env.DB.prepare("UPDATE applications SET work_stage = 'completed', check_out_at = datetime('now') WHERE id = ?")
-    .bind(app.id)
-    .run();
-  return c.json({ ok: true });
-});
-
+/** The worker's review of the shift/employer — mandatory, and only once
+ *  the employer has actually closed the shift (see employer.ts's
+ *  /vacancies/:id/candidates/:id/close). That's the real "this happened"
+ *  signal now, not worker self-checkout. */
 applicationRoutes.post('/:id/review', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const app = await ownedApplication(c.env, c.req.param('id'), session.workerId);
   if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.work_stage !== 'employer_closed') return c.json({ error: 'not_ready' }, 400);
 
   const { rating, tags, comment } = await c.req.json<{ rating: number; tags: string[]; comment: string }>();
-  await c.env.DB.prepare(
-    "UPDATE applications SET work_stage = 'reviewed', rating = ?, review_tags = ?, review_comment = ? WHERE id = ?",
-  )
+  if (!rating || rating < 1 || rating > 5) return c.json({ error: 'rating_required' }, 400);
+
+  const shift = await c.env.DB.prepare('SELECT company_id FROM shifts WHERE id = ?').bind(app.shift_id).first<{ company_id: number }>();
+
+  await c.env.DB.prepare("UPDATE applications SET work_stage = 'reviewed', rating = ?, review_tags = ?, review_comment = ? WHERE id = ?")
     .bind(rating, JSON.stringify(tags ?? []), comment ?? '', app.id)
     .run();
 
   await c.env.DB.prepare('UPDATE workers SET shifts_completed = shifts_completed + 1 WHERE id = ?').bind(session.workerId).run();
+
+  if (shift) {
+    // Real average from every review the company has actually gotten,
+    // recomputed rather than incrementally nudged — cheap enough at this
+    // scale and never drifts out of sync.
+    await c.env.DB.prepare(
+      `UPDATE companies SET
+         rating = (SELECT AVG(a.rating) FROM applications a JOIN shifts s ON s.id = a.shift_id WHERE s.company_id = ? AND a.rating IS NOT NULL),
+         reviews_count = (SELECT COUNT(*) FROM applications a JOIN shifts s ON s.id = a.shift_id WHERE s.company_id = ? AND a.rating IS NOT NULL)
+       WHERE id = ?`,
+    )
+      .bind(shift.company_id, shift.company_id, shift.company_id)
+      .run();
+  }
 
   return c.json({ ok: true });
 });

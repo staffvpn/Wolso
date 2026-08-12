@@ -48,6 +48,8 @@ interface CandidateApiResponse {
   shift_id: number;
   worker_id: number;
   status: string;
+  work_stage?: string;
+  closed_by_employer_at?: string | null;
   worker_name: string;
   worker_rating: number;
   worker_shifts_completed: number;
@@ -73,6 +75,8 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     shiftsCompleted: c.worker_shifts_completed,
     city: c.worker_city,
     status: c.status as Candidate['status'],
+    workStage: c.work_stage as Candidate['workStage'],
+    closedByEmployerAt: c.closed_by_employer_at ?? undefined,
     bio: c.worker_bio ?? undefined,
     skills: c.worker_skills ?? undefined,
     age: ageFrom(c.worker_birthdate),
@@ -92,6 +96,23 @@ export async function fetchVacancyCandidates(vacancyId: string, positionLabel?: 
     as: 'company',
   });
   return candidates.map((c) => fromApiCandidate(c, positionLabel));
+}
+
+/** Confirms a hire's shift actually happened (only once the date's past)
+ *  and submits the employer's own review of the worker in the same call —
+ *  mandatory, there's no "close without reviewing" path. */
+export async function closeShift(
+  vacancyId: string,
+  applicationId: string,
+  rating: number,
+  tags: string[],
+  comment: string,
+): Promise<void> {
+  await apiFetch(`/employer/vacancies/${vacancyId}/candidates/${applicationId}/close`, {
+    method: 'POST',
+    body: { rating, tags, comment },
+    as: 'company',
+  });
 }
 
 interface WorkerListingApiResponse {

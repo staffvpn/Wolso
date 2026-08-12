@@ -4,11 +4,13 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useCompanyStore } from '@/store/useCompanyStore';
+import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { Button } from './ui/Button';
 import { Logo } from './ui/Logo';
 import { Welcome } from '@/screens/onboarding/Welcome';
 import { CompleteWorkerProfile } from '@/screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from '@/screens/onboarding/CompleteEmployerProfile';
+import { ShiftCheckout } from '@/screens/worker/ShiftCheckout';
 
 function Spinner({ label }: { label: string }) {
   return (
@@ -46,6 +48,23 @@ function WorkerProfileGate({ children }: { children: ReactNode }) {
 
   if (!loaded) return <Spinner label="Загружаем профиль…" />;
   if (!complete) return <CompleteWorkerProfile gate />;
+  return <PendingReviewGate>{children}</PendingReviewGate>;
+}
+
+/** Once an employer closes a shift, the worker owes a review before doing
+ *  anything else — same blocking treatment as an incomplete profile,
+ *  just checked one layer in since it needs a complete profile first. */
+function PendingReviewGate({ children }: { children: ReactNode }) {
+  const loaded = useApplicationsStore((s) => s.loaded);
+  const owesReview = useApplicationsStore((s) => s.applications.some((a) => a.workStage === 'employer_closed'));
+  const load = useApplicationsStore((s) => s.load);
+
+  useEffect(() => {
+    if (!loaded) load();
+  }, [loaded, load]);
+
+  if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (owesReview) return <ShiftCheckout gate />;
   return <>{children}</>;
 }
 

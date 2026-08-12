@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
@@ -23,11 +22,9 @@ function timeUntil(shift: Shift): string | null {
 }
 
 export function Shifts() {
-  const navigate = useNavigate();
   const applications = useApplicationsStore((s) => s.applications);
   const load = useApplicationsStore((s) => s.load);
   const checkIn = useApplicationsStore((s) => s.checkIn);
-  const checkOut = useApplicationsStore((s) => s.checkOut);
 
   useEffect(() => {
     load();
@@ -35,11 +32,11 @@ export function Shifts() {
   }, []);
 
   const confirmed = useMemo(
-    () => applications.filter((a) => a.status === 'accepted' && a.workStage !== 'reviewed'),
+    () => applications.filter((a) => a.status === 'accepted' && a.workStage !== 'employer_closed' && a.workStage !== 'reviewed'),
     [applications],
   );
   const shiftsCompletedCount = useMemo(
-    () => applications.filter((a) => a.workStage === 'completed' || a.workStage === 'reviewed').length,
+    () => applications.filter((a) => a.workStage === 'employer_closed' || a.workStage === 'reviewed').length,
     [applications],
   );
 
@@ -118,15 +115,9 @@ export function Shifts() {
                         </Button>
                       )}
                       {app.workStage === 'checked_in' && (
-                        <Button
-                          className="flex-1"
-                          onClick={async () => {
-                            await checkOut(app.id);
-                            navigate(`/w/checkout/${app.id}`);
-                          }}
-                        >
-                          Завершить смену
-                        </Button>
+                        <Badge tone="neutral" className="flex-1 justify-center py-2.5">
+                          Ждём, когда работодатель закроет смену
+                        </Badge>
                       )}
                       <Button variant="dark" size="icon" aria-label="Написать">
                         <Mail size={17} />

@@ -9,7 +9,7 @@ interface ApiApplication {
   status: Application['status'];
   workStage: Application['workStage'];
   checkInAt: string | null;
-  checkOutAt: string | null;
+  closedByEmployerAt: string | null;
   rating: number | null;
   reviewTags: string[];
   reviewComment: string | null;
@@ -42,7 +42,7 @@ function fromApi(a: ApiApplication): Application {
     status: a.status,
     workStage: a.workStage,
     checkInAt: a.checkInAt ?? undefined,
-    checkOutAt: a.checkOutAt ?? undefined,
+    closedByEmployerAt: a.closedByEmployerAt ?? undefined,
     createdAt: a.createdAt,
     shift: a.shift
       ? {
@@ -74,23 +74,23 @@ function fromApi(a: ApiApplication): Application {
 interface ApplicationsState {
   applications: Application[];
   loading: boolean;
+  loaded: boolean;
   load: () => Promise<void>;
   apply: (shiftId: string) => Promise<void>;
   checkIn: (applicationId: string) => Promise<void>;
-  checkOut: (applicationId: string) => Promise<void>;
   submitReview: (applicationId: string, rating: number, tags: string[], comment: string) => Promise<void>;
-  skipReview: (applicationId: string) => Promise<void>;
 }
 
-export const useApplicationsStore = create<ApplicationsState>((set, get) => ({
+export const useApplicationsStore = create<ApplicationsState>((set) => ({
   applications: [],
   loading: false,
+  loaded: false,
 
   load: async () => {
     set({ loading: true });
     try {
       const { applications } = await apiFetch<{ applications: ApiApplication[] }>('/applications');
-      set({ applications: applications.map(fromApi), loading: false });
+      set({ applications: applications.map(fromApi), loading: false, loaded: true });
     } catch {
       set({ loading: false });
     }
@@ -111,13 +111,6 @@ export const useApplicationsStore = create<ApplicationsState>((set, get) => ({
     }));
   },
 
-  checkOut: async (applicationId) => {
-    await apiFetch(`/applications/${applicationId}/check-out`, { method: 'POST' });
-    set((s) => ({
-      applications: s.applications.map((a) => (a.id === applicationId ? { ...a, workStage: 'completed' } : a)),
-    }));
-  },
-
   submitReview: async (applicationId, rating, tags, comment) => {
     await apiFetch(`/applications/${applicationId}/review`, { method: 'POST', body: { rating, tags, comment } });
     set((s) => ({
@@ -128,9 +121,5 @@ export const useApplicationsStore = create<ApplicationsState>((set, get) => ({
       title: 'Смена засчитана',
       subtitle: 'Спасибо за отзыв — до встречи на следующей смене',
     });
-  },
-
-  skipReview: async (applicationId) => {
-    await get().submitReview(applicationId, 0, [], '');
   },
 }));

@@ -59,7 +59,12 @@ export interface Shift {
 }
 
 export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
-export type WorkStage = 'upcoming' | 'checked_in' | 'completed' | 'reviewed';
+/** 'employer_closed' is the real "this shift happened" signal now — set
+ *  when the employer confirms it, not by worker self-checkout. Both
+ *  sides' review becomes mandatory from that point ('reviewed' once the
+ *  worker has submitted theirs; the employer's is bundled into the close
+ *  action itself, see employer.ts). */
+export type WorkStage = 'upcoming' | 'checked_in' | 'employer_closed' | 'reviewed';
 
 export interface Application {
   id: string;
@@ -71,7 +76,7 @@ export interface Application {
   createdAt: string; // ISO datetime
   workStage?: WorkStage;
   checkInAt?: string;
-  checkOutAt?: string;
+  closedByEmployerAt?: string;
   tipAmount?: number;
 }
 
@@ -161,6 +166,8 @@ export interface Candidate extends CandidateProfile {
   /** The shift (vacancy) this application is for. */
   vacancyId: string;
   status: 'pending' | 'accepted' | 'declined';
+  workStage?: WorkStage;
+  closedByEmployerAt?: string;
 }
 
 /** A worker the employer is browsing directly (not tied to any one
@@ -186,7 +193,7 @@ export interface Vacancy {
 
 export interface AppNotification {
   id: string;
-  kind: 'accepted' | 'new_shifts' | 'message' | 'payout';
+  kind: 'accepted' | 'new_shifts' | 'message' | 'payout' | 'shift_closed';
   title: string;
   subtitle: string;
   minutesAgo: number;

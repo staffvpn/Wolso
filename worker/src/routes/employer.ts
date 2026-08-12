@@ -286,8 +286,11 @@ function withWorkerPhotos<T extends CandidateWorkerRow>(row: T) {
   return { ...row, worker_avatar_url: avatarUrl, worker_photos: photoIds.map((id) => `/media/workers/${row.worker_id}/photos/${id}`) };
 }
 
-/** All pending applicants across every vacancy this company owns — feeds
- *  the employer's swipe deck without an N+1 fetch per vacancy. */
+/** Pending applicants and current hires across every vacancy this company
+ *  owns — feeds both the employer's swipe deck (client-side filtered to
+ *  'pending') and the Vacancies list's "pора закрыть смену" badge (needs
+ *  'accepted' ones too), without an N+1 fetch per vacancy. Declined
+ *  applicants aren't included — nothing reads those. */
 employerRoutes.get('/candidates', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -298,7 +301,7 @@ employerRoutes.get('/candidates', async (c) => {
      FROM applications a
      JOIN shifts s ON s.id = a.shift_id
      JOIN workers w ON w.id = a.worker_id
-     WHERE s.company_id = ? AND a.status = 'pending'
+     WHERE s.company_id = ? AND a.status IN ('pending', 'accepted')
      ORDER BY a.created_at ASC`,
   )
     .bind(session.companyId)
@@ -362,6 +365,66 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
     await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
       .bind(app.worker_id, 'accepted', `${company?.name ?? 'Работодатель'} взял вас на смену`, company?.address ?? '')
       .run();
+  }
+
+  return c.json({ ok: true });
+});
+
+/** The employer confirms a specific hire's shift actually happened — the
+ *  day has to have passed, and the employer's own review of the worker is
+ *  bundled into the same request (mandatory: closing without rating them
+ *  isn't an option). This is also the signal that unlocks the worker's
+ *  own mandatory review — see applications.ts's /:id/review, which
+ *  refuses to run until work_stage is 'employer_closed'. */
+employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const { shiftId, appId } = c.req.param();
+  const { rating, tags, comment } = await c.req.json<{ rating: number; tags: string[]; comment: string }>();
+  if (!rating || rating < 1 || rating > 5) return c.json({ error: 'rating_required' }, 400);
+
+  const shift = await c.env.DB.prepare('SELECT id, date, position_label FROM shifts WHERE id = ? AND company_id = ?')
+    .bind(shiftId, session.companyId)
+    .first<{ id: number; date: string; position_label: string }>();
+  if (!shift) return c.json({ error: 'not_found' }, 404);
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (shift.date >= today) return c.json({ error: 'too_early' }, 400);
+
+  const app = await c.env.DB.prepare('SELECT id, worker_id, status, closed_by_employer_at FROM applications WHERE id = ? AND shift_id = ?')
+    .bind(appId, shiftId)
+    .first<{ id: number; worker_id: number; status: string; closed_by_employer_at: string | null }>();
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.status !== 'accepted') return c.json({ error: 'not_accepted' }, 400);
+  if (app.closed_by_employer_at) return c.json({ error: 'already_closed' }, 409);
+
+  await c.env.DB.prepare(
+    `UPDATE applications SET work_stage = 'employer_closed', closed_by_employer_at = datetime('now'),
+       employer_rating = ?, employer_review_tags = ?, employer_review_comment = ? WHERE id = ?`,
+  )
+    .bind(rating, JSON.stringify(tags ?? []), comment ?? '', appId)
+    .run();
+
+  // Same "recompute from every real review" approach as the company side
+  // (see applications.ts's /review) — cheap at this scale, never drifts.
+  await c.env.DB.prepare(
+    `UPDATE workers SET rating = (SELECT AVG(employer_rating) FROM applications WHERE worker_id = ? AND employer_rating IS NOT NULL)
+     WHERE id = ?`,
+  )
+    .bind(app.worker_id, app.worker_id)
+    .run();
+
+  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
+  const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
+
+  const title = `${company?.name ?? 'Работодатель'} закрыл(а) смену`;
+  const subtitle = `«${shift.position_label}» — оставьте отзыв о том, как всё прошло`;
+  await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+    .bind(app.worker_id, 'shift_closed', title, subtitle)
+    .run();
+
+  if (worker) {
+    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `✅ ${title}\n${subtitle}`));
   }
 
   return c.json({ ok: true });

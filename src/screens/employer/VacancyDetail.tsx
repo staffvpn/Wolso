@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Mail, X } from 'lucide-react';
+import { Check, Mail, X } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay';
+import { CloseShiftSheet } from '@/components/CloseShiftSheet';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
 import { timeAgoSince } from '@/lib/format';
@@ -38,6 +40,8 @@ export function VacancyDetail() {
 
   const [ratingOnly, setRatingOnly] = useState(false);
   const [selected, setSelected] = useState<Candidate | null>(null);
+  const [closing, setClosing] = useState<Candidate | null>(null);
+  const closeShift = useEmployerStore((s) => s.closeShift);
 
   useEffect(() => {
     if (!vacanciesLoaded) loadAll();
@@ -51,12 +55,17 @@ export function VacancyDetail() {
 
   const candidates = useMemo(() => allCandidates.filter((c) => c.vacancyId === vacancyId), [allCandidates, vacancyId]);
   const pending = useMemo(() => candidates.filter((c) => c.status === 'pending'), [candidates]);
+  const accepted = useMemo(() => candidates.filter((c) => c.status === 'accepted'), [candidates]);
   const filtered = useMemo(() => pending.filter((c) => !ratingOnly || c.rating >= 4.5), [pending, ratingOnly]);
 
   if (!vacancy) {
     if (vacanciesLoaded) navigate('/e/vacancies', { replace: true });
     return null;
   }
+
+  // "Этот день прошёл" — closing (and the mandatory review that comes with
+  // it) only makes sense once the shift has actually happened.
+  const shiftIsPast = vacancy.date < new Date().toISOString().slice(0, 10);
 
   const [top, ...rest] = filtered;
 
@@ -75,6 +84,31 @@ export function VacancyDetail() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4">
+        {accepted.length > 0 && (
+          <div className="space-y-2.5 mb-5">
+            {accepted.map((c) => (
+              <Card key={c.id} className="p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar name={c.name} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-[14px] truncate">{c.name}</p>
+                    <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
+                  </div>
+                  {c.workStage === 'employer_closed' || c.workStage === 'reviewed' ? (
+                    <Badge tone="accent">Смена закрыта</Badge>
+                  ) : shiftIsPast ? (
+                    <Button size="md" onClick={() => setClosing(c)}>
+                      <Check size={14} /> Закрыть смену
+                    </Button>
+                  ) : (
+                    <Badge tone="neutral">Смена ещё впереди</Badge>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <EmptyState title="Никого не осталось" description="Измените фильтры или подождите новых откликов." />
         ) : (
@@ -158,6 +192,15 @@ export function VacancyDetail() {
           />
         )}
       </AnimatePresence>
+
+      {closing && (
+        <CloseShiftSheet
+          open
+          onClose={() => setClosing(null)}
+          workerName={closing.name}
+          onSubmit={(rating, tags, comment) => closeShift(vacancy.id, closing.id, rating, tags, comment)}
+        />
+      )}
     </div>
   );
 }
