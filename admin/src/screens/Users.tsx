@@ -52,8 +52,32 @@ export function Users() {
 
   useEffect(() => {
     load();
+    // People edit their own name/photo from the mobile app, in their own
+    // session — nothing here tells this screen that happened, so poll
+    // instead of only ever refreshing on navigation.
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the open detail panel pointed at the live object after a poll (or
+  // a block/role-switch/revoke) refreshes the list — otherwise it'd keep
+  // showing whatever was selected at the moment you opened it. If the row
+  // is gone from its own list (e.g. it just got switched to the other
+  // role), close the panel rather than guess — a seeker id and an employer
+  // id can coincidentally collide since they're separate tables.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev) return prev;
+      if (prev.kind === 'team') {
+        const fresh = team.find((m) => m.id === prev.member.id);
+        return fresh ? (fresh !== prev.member ? { kind: 'team', member: fresh } : prev) : null;
+      }
+      const list = prev.kind === 'seeker' ? seekers : employers;
+      const fresh = list.find((u) => u.id === prev.user.id);
+      return fresh ? (fresh !== prev.user ? ({ kind: prev.kind, user: fresh } as Row) : prev) : null;
+    });
+  }, [seekers, employers, team]);
 
   const rows: Row[] = useMemo(() => {
     const teamRows: Row[] = team.map((member) => ({ kind: 'team', member }));
@@ -258,7 +282,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         {user.rating !== undefined && <Badge tone="neutral">★ {user.rating} · {user.shiftsCompleted} смен</Badge>}
       </div>
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
-        Профиль соискателя: документы, история откликов и отзывы заведений доступны в карточке пользователя на платформе.
+        Профиль соискателя: история откликов и отзывы заведений доступны в карточке пользователя на платформе.
       </div>
       <div className="flex flex-col gap-2">
         <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>

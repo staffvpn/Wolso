@@ -28,11 +28,22 @@ adminUserRoutes.get('/team', requireStaffMiddleware, async (c) => {
   return c.json({ team: results });
 });
 
+/** Only the role a Telegram id is *currently* active as — a person who got
+ *  switched to the other role by staff still has a dormant row here (so
+ *  switching back doesn't lose their old profile), but it shouldn't show
+ *  up as a live seeker anymore. Without this filter, switching someone's
+ *  role looked like it "created a new user": the old row never left this
+ *  list, so the person appeared twice. */
 adminUserRoutes.get('/seekers', requireStaffMiddleware, async (c) => {
   const search = c.req.query('q');
+  // LEFT JOIN, not JOIN: a handful of accounts predate the telegram_accounts
+  // table and have never logged in since — those still belong in this list
+  // by default (only an explicit 'employer' lock hides them).
   const sql = search
-    ? 'SELECT * FROM workers WHERE name LIKE ? ORDER BY created_at DESC LIMIT 200'
-    : 'SELECT * FROM workers ORDER BY created_at DESC LIMIT 200';
+    ? `SELECT w.* FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+       WHERE (t.active_role = 'worker' OR t.active_role IS NULL) AND w.name LIKE ? ORDER BY w.created_at DESC LIMIT 200`
+    : `SELECT w.* FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+       WHERE t.active_role = 'worker' OR t.active_role IS NULL ORDER BY w.created_at DESC LIMIT 200`;
   const { results } = await (search ? c.env.DB.prepare(sql).bind(`%${search}%`) : c.env.DB.prepare(sql)).all();
   return c.json({ seekers: results });
 });
@@ -40,8 +51,10 @@ adminUserRoutes.get('/seekers', requireStaffMiddleware, async (c) => {
 adminUserRoutes.get('/employers', requireStaffMiddleware, async (c) => {
   const search = c.req.query('q');
   const sql = search
-    ? 'SELECT * FROM companies WHERE name LIKE ? ORDER BY created_at DESC LIMIT 200'
-    : 'SELECT * FROM companies ORDER BY created_at DESC LIMIT 200';
+    ? `SELECT co.* FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
+       WHERE (t.active_role = 'employer' OR t.active_role IS NULL) AND co.name LIKE ? ORDER BY co.created_at DESC LIMIT 200`
+    : `SELECT co.* FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
+       WHERE t.active_role = 'employer' OR t.active_role IS NULL ORDER BY co.created_at DESC LIMIT 200`;
   const { results } = await (search ? c.env.DB.prepare(sql).bind(`%${search}%`) : c.env.DB.prepare(sql)).all();
   return c.json({ employers: results });
 });

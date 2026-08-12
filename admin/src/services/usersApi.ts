@@ -49,7 +49,7 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
     name: w.name,
     contact: `Telegram ID ${w.telegram_id}`,
     status: w.status as UserStatus,
-    statusLabel: suspended ? 'Заблокирован' : 'Верифицирован',
+    statusLabel: suspended ? 'Заблокирован' : 'Активен',
     createdMinAgo: minutesSince(w.created_at),
     city: w.city,
     rating: w.rating,

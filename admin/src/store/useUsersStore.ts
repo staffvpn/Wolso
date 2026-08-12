@@ -42,7 +42,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
 
   toggleBlock: async (id, kind) => {
     const status = kind === 'seeker' ? await toggleBlockSeeker(id) : await toggleBlockEmployer(id);
-    const statusLabel = status === 'suspended' ? 'Заблокирован' : kind === 'seeker' ? 'Верифицирован' : 'Активен';
+    const statusLabel = status === 'suspended' ? 'Заблокирован' : 'Активен';
     const apply = (u: PlatformUser) => (u.id === id ? { ...u, status, statusLabel } : u);
     if (kind === 'seeker') set({ seekers: get().seekers.map(apply) });
     else set({ employers: get().employers.map(apply) });
