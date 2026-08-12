@@ -25,12 +25,27 @@ const NO_CACHE_HEADERS = { 'Cache-Control': 'no-store' };
 /** TEMPORARY — diagnosing why a stored avatar won't render anywhere,
  *  including opened directly outside the app. Reports what's actually in
  *  the row instead of guessing. Remove once that's root-caused. */
-function debugInfo(bytes: ArrayBuffer | null, contentType: string | null) {
-  if (!bytes) return { present: false };
-  const head = new Uint8Array(bytes.slice(0, 16));
-  const hex = [...head].map((b) => b.toString(16).padStart(2, '0')).join(' ');
-  const ascii = [...head].map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '.')).join('');
-  return { present: true, byteLength: bytes.byteLength, contentType, first16Hex: hex, first16Ascii: ascii };
+function toHex(bytes: Uint8Array) {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(' ');
+}
+
+function debugInfo(raw: unknown, contentType: string | null) {
+  if (raw === null || raw === undefined) return { present: false, rawType: typeof raw };
+  // Not fully trusting this is an ArrayBuffer — coerce explicitly so a
+  // Node-style Buffer or something else D1 might hand back still works.
+  const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw instanceof Uint8Array ? raw : new Uint8Array(raw as ArrayBufferLike);
+  const len = bytes.byteLength;
+  const head = bytes.slice(0, 16);
+  const tail = bytes.slice(Math.max(0, len - 8), len);
+  return {
+    present: true,
+    rawConstructorName: (raw as { constructor?: { name?: string } })?.constructor?.name ?? typeof raw,
+    byteLength: len,
+    contentType,
+    first16Hex: toHex(head),
+    last8Hex: toHex(tail),
+    looksLikeCompleteJpeg: len > 4 && tail[tail.length - 2] === 0xff && tail[tail.length - 1] === 0xd9,
+  };
 }
 
 mediaRoutes.get('/workers/:id/avatar', async (c) => {
