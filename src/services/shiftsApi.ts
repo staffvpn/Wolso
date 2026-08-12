@@ -10,7 +10,6 @@ function buildQuery(filters: Filters): string {
   if (filters.employmentType) params.set('employmentType', filters.employmentType);
   if (filters.when) params.set('when', filters.when);
   if (filters.timeOfDay.length) params.set('timeOfDay', filters.timeOfDay.join(','));
-  if (filters.verifiedOnly) params.set('verifiedOnly', 'true');
   return params.toString();
 }
 
@@ -44,8 +43,6 @@ interface ShiftApiResponse {
     logoColor?: string;
     rating?: number;
     reviewsCount?: number;
-    verified: boolean;
-    inn?: string;
   };
 }
 
@@ -81,8 +78,6 @@ function fromApi(s: ShiftApiResponse): Shift {
           logoColor: s.company.logoColor ?? '#999',
           rating: s.company.rating ?? 0,
           reviewsCount: s.company.reviewsCount ?? 0,
-          verified: s.company.verified,
-          inn: s.company.inn,
         }
       : undefined,
   };

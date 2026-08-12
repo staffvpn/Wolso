@@ -1,7 +1,6 @@
 export type PermissionKey =
   | 'approveVacancies'
   | 'blockUsers'
-  | 'verifyDocuments'
   | 'viewSupportChats'
   | 'refundsPayouts'
   | 'changeCommission'
@@ -25,7 +24,7 @@ export interface RoleDef {
   permissions: Record<PermissionKey, PermissionValue>;
 }
 
-export type UserStatus = 'active' | 'invited' | 'suspended' | 'pending_docs';
+export type UserStatus = 'active' | 'invited' | 'suspended';
 
 export interface TeamMember {
   id: string;
@@ -55,8 +54,6 @@ export interface PlatformUser {
   city: string;
   rating?: number;
   shiftsCompleted?: number;
-  companyInn?: string;
-  verified?: boolean;
 }
 
 export type ModerationStatus = 'pending' | 'approved' | 'returned' | 'rejected';
@@ -70,7 +67,6 @@ export interface ModerationVacancy {
   id: string;
   position: string;
   companyName: string;
-  companyInn: string;
   companyRating: number;
   city: string;
   submittedMinAgo: number;
@@ -94,25 +90,6 @@ export interface ComplaintItem {
   reporterName: string;
   reason: string;
   text: string;
-  submittedMinAgo: number;
-  status: ModerationStatus;
-}
-
-export interface DocumentReview {
-  id: string;
-  applicantName: string;
-  docType: string;
-  applicantCity: string;
-  applicantRating: number;
-  submittedMinAgo: number;
-  status: ModerationStatus;
-}
-
-export interface EmployerReview {
-  id: string;
-  companyName: string;
-  city: string;
-  inn?: string;
   submittedMinAgo: number;
   status: ModerationStatus;
 }

@@ -14,7 +14,6 @@ import { cn } from '@/lib/cn';
 const ATTENTION_LINKS: Record<string, string> = {
   'Вакансии на модерации': '/moderation',
   'Жалобы на работодателей': '/moderation',
-  'Документы на проверку': '/moderation',
 };
 
 const TONE_DOT: Record<string, string> = {

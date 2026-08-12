@@ -33,7 +33,6 @@ export function VacancyDetail() {
   const loadVacancyCandidates = useEmployerStore((s) => s.loadVacancyCandidates);
   const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
 
-  const [medBookOnly, setMedBookOnly] = useState(false);
   const [ratingOnly, setRatingOnly] = useState(false);
 
   useEffect(() => {
@@ -48,10 +47,7 @@ export function VacancyDetail() {
 
   const candidates = useMemo(() => allCandidates.filter((c) => c.vacancyId === vacancyId), [allCandidates, vacancyId]);
   const pending = useMemo(() => candidates.filter((c) => c.status === 'pending'), [candidates]);
-  const filtered = useMemo(
-    () => pending.filter((c) => (!medBookOnly || c.medBook) && (!ratingOnly || c.rating >= 4.5)),
-    [pending, medBookOnly, ratingOnly],
-  );
+  const filtered = useMemo(() => pending.filter((c) => !ratingOnly || c.rating >= 4.5), [pending, ratingOnly]);
 
   if (!vacancy) {
     if (vacanciesLoaded) navigate('/e/vacancies', { replace: true });
@@ -71,7 +67,6 @@ export function VacancyDetail() {
 
       <div className="flex gap-2 px-5 pb-3 shrink-0">
         <Chip tone="dark" selected>Отклики · {pending.length}</Chip>
-        <Chip tone="dark" selected={medBookOnly} onClick={() => setMedBookOnly((v) => !v)}>С медкнижкой</Chip>
         <Chip tone="dark" selected={ratingOnly} onClick={() => setRatingOnly((v) => !v)}>★4.5+</Chip>
       </div>
 
@@ -88,9 +83,6 @@ export function VacancyDetail() {
                     <p className="font-bold text-[17px]">{top.name}</p>
                     <p className="text-[13px] text-text-muted">★ {top.rating.toFixed(1)} · {top.shiftsCompleted} смен</p>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {top.medBook && <Badge tone="accent">Медкнижка</Badge>}
                 </div>
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>

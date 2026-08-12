@@ -66,11 +66,9 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
     .bind(d30)
     .all<{ label: string; count: number }>();
 
-  const [pendingVacancies, pendingComplaints, pendingDocuments, pendingEmployers] = await Promise.all([
+  const [pendingVacancies, pendingComplaints] = await Promise.all([
     c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status = 'pending_review'").first<{ n: number }>(),
     c.env.DB.prepare("SELECT COUNT(*) as n FROM complaints WHERE status = 'pending'").first<{ n: number }>(),
-    c.env.DB.prepare("SELECT COUNT(*) as n FROM worker_documents WHERE status = 'pending'").first<{ n: number }>(),
-    c.env.DB.prepare("SELECT COUNT(*) as n FROM companies WHERE verification_status = 'pending_review'").first<{ n: number }>(),
   ]);
 
   return c.json({
@@ -84,9 +82,7 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
     topPositions,
     attention: [
       { label: 'Вакансии на модерации', count: pendingVacancies?.n ?? 0, tone: 'warning' },
-      { label: 'Новые работодатели на проверку', count: pendingEmployers?.n ?? 0, tone: 'warning' },
       { label: 'Жалобы на работодателей', count: pendingComplaints?.n ?? 0, tone: 'danger' },
-      { label: 'Документы на проверку', count: pendingDocuments?.n ?? 0, tone: 'info' },
     ],
   });
 });

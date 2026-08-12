@@ -1,5 +1,5 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
-import type { Position, WorkerDocument, WorkerExperience, WorkerProfile } from '@/types';
+import type { Position, WorkerExperience, WorkerProfile } from '@/types';
 
 interface WorkerApiRow {
   id: number;
@@ -20,7 +20,6 @@ interface WorkerApiRow {
 interface MeResponse {
   worker: WorkerApiRow;
   positions: { position: string; position_label: string; years: number }[];
-  documents: { doc_type: string; label: string; status: string; note: string | null }[];
   photos: { id: number; url: string }[];
 }
 
@@ -39,12 +38,6 @@ function fromApi(r: MeResponse): WorkerProfile {
     age: r.worker.age ?? undefined,
     avatarUrl: resolveMediaUrl(r.worker.avatarUrl),
     positions: r.positions.map((p) => ({ position: p.position as Position, positionLabel: p.position_label, years: p.years })),
-    documents: r.documents.map((d) => ({
-      id: d.doc_type,
-      label: d.label,
-      status: d.status as WorkerDocument['status'],
-      note: d.note ?? undefined,
-    })),
     reviews: [],
     photos: r.photos.map((p) => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
   };
@@ -74,15 +67,6 @@ export async function addExperience(exp: WorkerExperience): Promise<WorkerProfil
     body: { position: exp.position, positionLabel: exp.positionLabel, years: exp.years },
   });
   return fromApi(data);
-}
-
-export async function uploadDocument(docType: string, file: File): Promise<void> {
-  const body = await file.arrayBuffer();
-  await apiFetch(`/me/documents/${docType}/upload`, {
-    method: 'POST',
-    body,
-    raw: { contentType: file.type || 'application/octet-stream' },
-  });
 }
 
 export async function uploadAvatar(file: File): Promise<WorkerProfile> {

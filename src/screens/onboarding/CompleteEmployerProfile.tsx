@@ -112,7 +112,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
           <div className="mt-2 mb-5">
             <h1 className="text-[22px] font-extrabold leading-tight">Расскажите о заведении</h1>
             <p className="text-[14px] text-text-muted mt-1 leading-relaxed">
-              Соискатели видят это в карточке смены. После заполнения профиль уходит на проверку команде Wolso.
+              Соискатели видят это в карточке смены.
             </p>
           </div>
         )}
@@ -204,7 +204,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
 
       <div className="px-5 pb-5 pt-2 shrink-0">
         <Button fullWidth disabled={saving} onClick={save}>
-          {saving ? 'Сохраняем…' : gate ? 'Отправить на проверку' : 'Сохранить'}
+          {saving ? 'Сохраняем…' : gate ? 'Готово' : 'Сохранить'}
         </Button>
       </div>
     </div>

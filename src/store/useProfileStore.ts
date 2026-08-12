@@ -1,10 +1,9 @@
 import { create } from 'zustand';
-import type { WorkerDocument, WorkerExperience } from '@/types';
+import type { WorkerExperience } from '@/types';
 import {
   fetchMyProfile,
   updateMyProfile,
   addExperience,
-  uploadDocument as uploadDocumentApi,
   uploadAvatar as uploadAvatarApi,
   uploadPortfolioPhoto as uploadPortfolioPhotoApi,
   deletePortfolioPhoto as deletePortfolioPhotoApi,
@@ -26,7 +25,6 @@ interface ProfileState {
   age?: number;
   avatarUrl?: string;
   positions: WorkerExperience[];
-  documents: WorkerDocument[];
   photos: { id: string; url: string }[];
   loading: boolean;
   loaded: boolean;
@@ -36,7 +34,6 @@ interface ProfileState {
   uploadAvatar: (file: File) => Promise<void>;
   uploadPhoto: (file: File) => Promise<void>;
   deletePhoto: (id: string) => Promise<void>;
-  uploadDocument: (docId: string, file: File) => Promise<void>;
 }
 
 export const useProfileStore = create<ProfileState>((set) => ({
@@ -50,7 +47,6 @@ export const useProfileStore = create<ProfileState>((set) => ({
   bio: '',
   skills: '',
   positions: [],
-  documents: [],
   photos: [],
   loading: false,
   loaded: false,
@@ -91,19 +87,5 @@ export const useProfileStore = create<ProfileState>((set) => ({
   deletePhoto: async (id) => {
     const profile = await deletePortfolioPhotoApi(id);
     set({ ...profile, loaded: true });
-  },
-
-  uploadDocument: async (docId, file) => {
-    set((s) => ({ documents: s.documents.map((d) => (d.id === docId ? { ...d, status: 'pending', note: 'Загружаем…' } : d)) }));
-    try {
-      await uploadDocumentApi(docId, file);
-      set((s) => ({ documents: s.documents.map((d) => (d.id === docId ? { ...d, status: 'pending', note: 'На проверке' } : d)) }));
-      hapticNotify('success');
-    } catch {
-      // Roll back to what the server last confirmed.
-      const profile = await fetchMyProfile().catch(() => null);
-      if (profile) set({ documents: profile.documents });
-      else set((s) => ({ documents: s.documents.map((d) => (d.id === docId ? { ...d, status: 'missing', note: undefined } : d)) }));
-    }
   },
 }));

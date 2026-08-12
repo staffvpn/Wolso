@@ -52,7 +52,6 @@ interface CandidateApiResponse {
   worker_rating: number;
   worker_shifts_completed: number;
   worker_city: string;
-  worker_med_book: number;
   worker_bio: string | null;
   worker_skills: string | null;
   worker_birthdate: string | null;
@@ -73,7 +72,6 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     rating: c.worker_rating,
     shiftsCompleted: c.worker_shifts_completed,
     city: c.worker_city,
-    medBook: !!c.worker_med_book,
     status: c.status as Candidate['status'],
     bio: c.worker_bio ?? undefined,
     skills: c.worker_skills ?? undefined,

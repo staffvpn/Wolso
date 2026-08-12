@@ -10,7 +10,6 @@ export interface Env {
 export type PermissionKey =
   | 'approveVacancies'
   | 'blockUsers'
-  | 'verifyDocuments'
   | 'viewSupportChats'
   | 'refundsPayouts'
   | 'changeCommission'

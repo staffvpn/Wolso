@@ -9,7 +9,6 @@ const DEFAULT_FILTERS: Filters = {
   employmentType: 'shift',
   when: 'today',
   timeOfDay: [],
-  verifiedOnly: false,
 };
 
 interface FiltersState {
@@ -21,7 +20,6 @@ interface FiltersState {
   setEmploymentType: (t: Filters['employmentType']) => void;
   setWhen: (w: Filters['when']) => void;
   toggleTimeOfDay: (t: Filters['timeOfDay'][number]) => void;
-  setVerifiedOnly: (v: boolean) => void;
   reset: () => void;
 }
 
@@ -50,6 +48,5 @@ export const useFiltersStore = create<FiltersState>((set) => ({
           : [...s.filters.timeOfDay, t],
       },
     })),
-  setVerifiedOnly: (v) => set((s) => ({ filters: { ...s.filters, verifiedOnly: v } })),
   reset: () => set({ filters: DEFAULT_FILTERS }),
 }));

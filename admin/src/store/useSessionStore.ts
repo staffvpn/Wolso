@@ -76,7 +76,6 @@ const FALLBACK_ROLE: RoleDef = {
   permissions: {
     approveVacancies: 'no',
     blockUsers: 'no',
-    verifyDocuments: 'no',
     viewSupportChats: 'no',
     refundsPayouts: 'no',
     changeCommission: 'no',

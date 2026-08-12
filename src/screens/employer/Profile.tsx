@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Clock, Pencil, XCircle } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -36,7 +36,6 @@ export function EmployerProfileScreen() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h1 className="text-[20px] font-extrabold truncate">{company.name}</h1>
-            {company.verified && <ShieldCheck size={16} className="text-accent shrink-0" />}
           </div>
           <p className="text-[13px] text-text-muted">
             {company.address}
@@ -63,29 +62,6 @@ export function EmployerProfileScreen() {
         </div>
       )}
 
-      {company.verificationStatus === 'pending_review' && (
-        <div className="flex items-start gap-3 rounded-card bg-warning-soft text-warning px-4 py-3 mt-5">
-          <Clock size={17} className="shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-[14px]">Профиль на проверке</p>
-            <p className="text-[13px] leading-relaxed mt-0.5">
-              Команда Wolso проверяет заведение — обычно это занимает до суток. Публиковать вакансии можно будет после одобрения.
-            </p>
-          </div>
-        </div>
-      )}
-      {company.verificationStatus === 'rejected' && (
-        <div className="flex items-start gap-3 rounded-card bg-danger-soft text-danger px-4 py-3 mt-5">
-          <XCircle size={17} className="shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-[14px]">Проверка не пройдена</p>
-            <p className="text-[13px] leading-relaxed mt-0.5">
-              Напишите в поддержку, чтобы узнать причину и как это исправить.
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="flex gap-3 mt-6">
         <Card className="flex-1 p-4">
           <p className="text-[22px] font-extrabold">{vacancies.length}</p>
@@ -97,19 +73,16 @@ export function EmployerProfileScreen() {
         </Card>
       </div>
 
-      <div className="mt-6">
-        <SectionLabel>Аккаунт</SectionLabel>
-        <Card className="divide-y divide-border-soft px-1">
-          <div className="px-3">
-            <ListRow label="Реквизиты и ИНН" value={company.inn} />
-          </div>
-          {FEATURES.payments && (
+      {FEATURES.payments && (
+        <div className="mt-6">
+          <SectionLabel>Аккаунт</SectionLabel>
+          <Card className="divide-y divide-border-soft px-1">
             <div className="px-3">
               <ListRow label="Карта для оплаты откликов" value="···4120" />
             </div>
-          )}
-        </Card>
-      </div>
+          </Card>
+        </div>
+      )}
 
       <div className="mt-6">
         <SectionLabel>Поддержка</SectionLabel>

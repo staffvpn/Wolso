@@ -36,7 +36,7 @@ const RADIUS_OPTIONS: { id: number | 'city'; label: string }[] = [
 ];
 
 export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
-  const { filters, togglePosition, setRateFrom, setRadius, setUrgentOnly, setEmploymentType, setWhen, toggleTimeOfDay, setVerifiedOnly, reset } =
+  const { filters, togglePosition, setRateFrom, setRadius, setUrgentOnly, setEmploymentType, setWhen, toggleTimeOfDay, reset } =
     useFiltersStore();
   const [showAllPositions, setShowAllPositions] = useState(false);
   const [matchCount, setMatchCount] = useState<number | null>(null);
@@ -150,14 +150,6 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
             <p className="text-[13px] text-text-muted">Смены, которые начинаются сегодня</p>
           </div>
           <Toggle checked={filters.urgentOnly} onChange={setUrgentOnly} />
-        </label>
-
-        <label className="flex items-center justify-between gap-3 py-1">
-          <div>
-            <p className="font-semibold text-[15px]">Только проверенные заведения</p>
-            <p className="text-[13px] text-text-muted">С подтверждённым ИНН</p>
-          </div>
-          <Toggle checked={filters.verifiedOnly} onChange={setVerifiedOnly} />
         </label>
       </div>
 

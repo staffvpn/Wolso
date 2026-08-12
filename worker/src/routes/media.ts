@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 
 /** Public, unauthenticated blob serving for profile photos (worker/company
- *  avatars + portfolio galleries). Unlike worker_documents, these are meant
- *  to be seen by whoever's swiping on the other side — no session, so a
- *  plain <img src> works. IDs are opaque autoincrement integers; nothing
- *  here is more sensitive than a normal public avatar URL. */
+ *  avatars + portfolio galleries) — these are meant to be seen by whoever's
+ *  swiping on the other side, no session, so a plain <img src> works. IDs
+ *  are opaque autoincrement integers; nothing here is more sensitive than
+ *  a normal public avatar URL. */
 export const mediaRoutes = new Hono<{ Bindings: Env }>();
 
 const CACHE_HEADERS = { 'Cache-Control': 'public, max-age=3600' };

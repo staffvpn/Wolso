@@ -10,9 +10,6 @@ interface CompanyApiRow {
   logo_color: string;
   rating: number;
   reviews_count: number;
-  verified: number;
-  inn: string | null;
-  verification_status: Company['verificationStatus'];
   description: string;
   founded_year: number | null;
   avatarUrl: string | null;
@@ -35,9 +32,6 @@ function fromApi(r: CompanyResponse): Company {
     logoColor: c.logo_color,
     rating: c.rating,
     reviewsCount: c.reviews_count,
-    verified: !!c.verified,
-    inn: c.inn ?? undefined,
-    verificationStatus: c.verification_status,
     description: c.description ?? '',
     foundedYear: c.founded_year ?? undefined,
     avatarUrl: resolveMediaUrl(c.avatarUrl),

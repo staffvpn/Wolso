@@ -20,7 +20,6 @@ feedRoutes.get('/', async (c) => {
   const employmentType = q.employmentType || undefined;
   const when = q.when || 'today';
   const timeOfDay = q.timeOfDay ? q.timeOfDay.split(',').filter(Boolean) : [];
-  const verifiedOnly = q.verifiedOnly === 'true';
 
   const clauses = ["s.status = 'active'"];
   const binds: unknown[] = [];
@@ -42,7 +41,6 @@ feedRoutes.get('/', async (c) => {
     clauses.push(`s.time_of_day IN (${timeOfDay.map(() => '?').join(',')})`);
     binds.push(...timeOfDay);
   }
-  if (verifiedOnly) clauses.push('c.verified = 1');
   if (when !== 'custom') {
     const target = new Date();
     if (when === 'tomorrow') target.setDate(target.getDate() + 1);

@@ -18,14 +18,6 @@ export interface Company {
   logoColor: string;
   rating: number;
   reviewsCount: number;
-  verified: boolean;
-  inn?: string;
-  /** Moderation gate — a company must be `approved` before it can publish
-   *  vacancies. Only present on the owner's own `/employer/me` response.
-   *  `incomplete` means the mandatory profile fields (avatar, description,
-   *  founded year) aren't filled in yet — the account moves itself into
-   *  `pending_review` automatically the moment they are. */
-  verificationStatus?: 'incomplete' | 'pending_review' | 'approved' | 'rejected';
   /** Uploaded main photo — undefined until the employer uploads one, in
    *  which case UI falls back to the colored logoInitial badge. */
   avatarUrl?: string;
@@ -109,13 +101,6 @@ export interface WorkerExperience {
   years: number;
 }
 
-export interface WorkerDocument {
-  id: string;
-  label: string;
-  status: 'verified' | 'missing' | 'pending';
-  note?: string;
-}
-
 export interface WorkerReview {
   companyName: string;
   rating: number;
@@ -130,7 +115,6 @@ export interface WorkerProfile {
   profileCompletion: number;
   profileComplete: boolean;
   positions: WorkerExperience[];
-  documents: WorkerDocument[];
   reviews: WorkerReview[];
   referralCode: string;
   bio: string;
@@ -163,7 +147,6 @@ export interface Candidate {
   rating: number;
   shiftsCompleted: number;
   city: string;
-  medBook: boolean;
   status: 'pending' | 'accepted' | 'declined';
   bio?: string;
   skills?: string;
@@ -207,5 +190,4 @@ export interface Filters {
   employmentType: 'shift' | 'permanent' | 'internship';
   when: 'today' | 'tomorrow' | 'custom';
   timeOfDay: ('morning' | 'day' | 'evening' | 'night')[];
-  verifiedOnly: boolean;
 }

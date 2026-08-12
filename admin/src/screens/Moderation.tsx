@@ -9,19 +9,16 @@ import { Avatar } from '@/components/ui/Avatar';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useModerationStore } from '@/store/useModerationStore';
 import { useCan } from '@/store/useSessionStore';
-import { fetchDocumentFileUrl } from '@/services/moderationApi';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { ComplaintItem, DocumentReview, EmployerReview, ModerationVacancy } from '@/types';
+import type { ComplaintItem, ModerationVacancy } from '@/types';
 
 const FLAG_TONE_MAP = { danger: 'danger', warning: 'warning', info: 'info', neutral: 'neutral' } as const;
 
 export function Moderation() {
-  const [tab, setTab] = useState<'vacancies' | 'employers' | 'complaints' | 'documents'>('vacancies');
+  const [tab, setTab] = useState<'vacancies' | 'complaints'>('vacancies');
   const vacancies = useModerationStore((s) => s.vacancies);
-  const employers = useModerationStore((s) => s.employers);
   const complaints = useModerationStore((s) => s.complaints);
-  const documents = useModerationStore((s) => s.documents);
   const load = useModerationStore((s) => s.load);
 
   useEffect(() => {
@@ -41,18 +38,14 @@ export function Moderation() {
           onChange={(v) => setTab(v as typeof tab)}
           options={[
             { id: 'vacancies', label: 'Новые', count: vacancies.length },
-            { id: 'employers', label: 'Работодатели', count: employers.length },
             { id: 'complaints', label: 'Жалобы', count: complaints.length },
-            { id: 'documents', label: 'Документы', count: documents.length },
           ]}
         />
       </div>
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8">
         {tab === 'vacancies' && <VacancyQueue items={vacancies} />}
-        {tab === 'employers' && <EmployerQueue items={employers} />}
         {tab === 'complaints' && <ComplaintQueue items={complaints} />}
-        {tab === 'documents' && <DocumentQueue items={documents} />}
       </div>
     </div>
   );
@@ -108,7 +101,7 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
               <div>
                 <p className="font-bold text-[18px] leading-tight">{selected.position}</p>
                 <p className="text-[13px] text-text-muted mt-0.5">
-                  {selected.companyName} · ИНН {selected.companyInn} · {selected.shiftsPosted} смен опубликовано · ★ {selected.companyRating}
+                  {selected.companyName} · {selected.shiftsPosted} смен опубликовано · ★ {selected.companyRating}
                 </p>
               </div>
             </div>
@@ -222,171 +215,6 @@ function ComplaintQueue({ items }: { items: ComplaintItem[] }) {
             </Button>
             <Button variant="danger" className="flex-1" disabled={!canModerate} onClick={() => act('approved')}>
               Заблокировать
-            </Button>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function DocumentQueue({ items }: { items: DocumentReview[] }) {
-  const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
-  const decide = useModerationStore((s) => s.decideDocument);
-  const canVerify = useCan('verifyDocuments');
-  const selected = useMemo(() => items.find((d) => d.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selected && items[0]) setSelectedId(items[0].id);
-  }, [items, selected]);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    setFileUrl(null);
-    if (selected) {
-      fetchDocumentFileUrl(selected.id).then((url) => {
-        objectUrl = url;
-        setFileUrl(url);
-      });
-    }
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [selected?.id]);
-
-  function act(status: 'approved' | 'returned' | 'rejected') {
-    if (!selected) return;
-    const idx = items.findIndex((d) => d.id === selected.id);
-    decide(selected.id, status);
-    setSelectedId((items[idx + 1] ?? items[idx - 1])?.id ?? null);
-  }
-
-  if (items.length === 0) return <EmptyPanel title="Документов на проверке нет" description="Все загруженные документы рассмотрены." />;
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 lg:h-full lg:min-h-0 pb-6 lg:pb-0">
-      <div className="lg:overflow-y-auto pr-1 space-y-2.5 pb-6">
-        {items.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => setSelectedId(d.id)}
-            className={cn(
-              'w-full text-left rounded-card border p-4 transition-colors',
-              d.id === selected?.id ? 'border-text bg-white' : 'border-border-soft bg-white hover:border-border',
-            )}
-          >
-            <p className="font-bold text-[15px] mb-1">{d.applicantName}</p>
-            <p className="text-[13px] text-text-muted mb-1">{d.docType}</p>
-            <p className="text-[12px] text-text-faint">{timeAgo(d.submittedMinAgo)} · {d.applicantCity}</p>
-          </button>
-        ))}
-      </div>
-
-      {selected && (
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
-          <div className="flex items-center gap-3 mb-5">
-            <Avatar name={selected.applicantName} size={44} />
-            <div>
-              <p className="font-bold text-[18px] leading-tight">{selected.applicantName}</p>
-              <p className="text-[13px] text-text-muted mt-0.5">
-                {selected.applicantCity} · ★ {selected.applicantRating}
-              </p>
-            </div>
-          </div>
-
-          <Badge tone="info" className="mb-3">{selected.docType}</Badge>
-          {fileUrl ? (
-            <img src={fileUrl} alt={selected.docType} className="w-full h-64 object-contain rounded-2xl border border-border-soft mb-6 bg-surface-2" />
-          ) : (
-            <div
-              className="w-full h-64 rounded-2xl border border-border-soft flex items-center justify-center text-text-faint text-[13px] mb-6"
-              style={{
-                background:
-                  'repeating-linear-gradient(135deg, var(--color-surface-2) 0px, var(--color-surface-2) 10px, #fff 10px, #fff 20px)',
-              }}
-            >
-              загрузка…
-            </div>
-          )}
-
-          <div className="flex items-center gap-2.5">
-            <Button variant="primary" className="flex-1" disabled={!canVerify} onClick={() => act('approved')}>
-              <Check size={16} /> Одобрить
-            </Button>
-            <Button variant="outline" className="flex-1" disabled={!canVerify} onClick={() => act('returned')}>
-              <Undo2 size={16} /> Запросить другое
-            </Button>
-            <Button variant="danger" className="flex-1" disabled={!canVerify} onClick={() => act('rejected')}>
-              <X size={16} /> Отклонить
-            </Button>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function EmployerQueue({ items }: { items: EmployerReview[] }) {
-  const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
-  const decide = useModerationStore((s) => s.decideEmployer);
-  const canApprove = useCan('approveVacancies');
-  const selected = useMemo(() => items.find((e) => e.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
-
-  useEffect(() => {
-    if (!selected && items[0]) setSelectedId(items[0].id);
-  }, [items, selected]);
-
-  function act(status: 'approved' | 'rejected') {
-    if (!selected) return;
-    const idx = items.findIndex((e) => e.id === selected.id);
-    decide(selected.id, status);
-    setSelectedId((items[idx + 1] ?? items[idx - 1])?.id ?? null);
-  }
-
-  if (items.length === 0) return <EmptyPanel title="Новых работодателей нет" description="Все зарегистрированные заведения проверены." />;
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 lg:h-full lg:min-h-0 pb-6 lg:pb-0">
-      <div className="lg:overflow-y-auto pr-1 space-y-2.5 pb-6">
-        {items.map((e) => (
-          <button
-            key={e.id}
-            onClick={() => setSelectedId(e.id)}
-            className={cn(
-              'w-full text-left rounded-card border p-4 transition-colors',
-              e.id === selected?.id ? 'border-text bg-white' : 'border-border-soft bg-white hover:border-border',
-            )}
-          >
-            <p className="font-bold text-[15px] mb-1">{e.companyName}</p>
-            <p className="text-[12px] text-text-faint">{timeAgo(e.submittedMinAgo)} · {e.city}</p>
-          </button>
-        ))}
-      </div>
-
-      {selected && (
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
-          <div className="flex items-center gap-3 mb-5">
-            <Avatar name={selected.companyName} size={44} square />
-            <div>
-              <p className="font-bold text-[18px] leading-tight">{selected.companyName}</p>
-              <p className="text-[13px] text-text-muted mt-0.5">{selected.city}</p>
-            </div>
-          </div>
-
-          <Badge tone="warning" className="mb-6">Новая регистрация</Badge>
-
-          <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
-            {selected.inn ? `ИНН: ${selected.inn}` : 'ИНН не указан.'} Проверьте реквизиты и адрес заведения перед одобрением — после этого
-            заведение сможет публиковать вакансии.
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Button variant="primary" className="flex-1" disabled={!canApprove} onClick={() => act('approved')}>
-              <Check size={16} /> Одобрить
-            </Button>
-            <Button variant="danger" className="flex-1" disabled={!canApprove} onClick={() => act('rejected')}>
-              <X size={16} /> Отклонить
             </Button>
           </div>
         </Card>

@@ -68,8 +68,6 @@ interface EmployerApiRow {
   owner_telegram_id: number;
   name: string;
   city: string;
-  inn: string | null;
-  verified: number;
   status: string;
   created_at: string;
 }
@@ -85,8 +83,6 @@ function fromApiEmployer(c: EmployerApiRow): PlatformUser {
     statusLabel: suspended ? 'Заблокирован' : 'Активен',
     createdMinAgo: minutesSince(c.created_at),
     city: c.city,
-    companyInn: c.inn ?? undefined,
-    verified: !!c.verified,
   };
 }
 

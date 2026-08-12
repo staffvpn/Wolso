@@ -3,7 +3,6 @@ import type { PermissionInfo, RoleDef } from '@/types';
 export const PERMISSIONS: PermissionInfo[] = [
   { key: 'approveVacancies', label: 'Одобрять и отклонять вакансии' },
   { key: 'blockUsers', label: 'Блокировать пользователей' },
-  { key: 'verifyDocuments', label: 'Проверять документы и медкнижки' },
   { key: 'viewSupportChats', label: 'Видеть переписки в поддержке' },
   { key: 'refundsPayouts', label: 'Возвраты и выплаты' },
   { key: 'changeCommission', label: 'Менять комиссию платформы' },

@@ -15,20 +15,22 @@ interface CompanyRow {
   description: string;
   founded_year: number | null;
   avatar_data: ArrayBuffer | null;
-  verification_status: string;
 }
 
 /** Every field on this list must be present before a company profile counts
  *  as "complete" — see ProfileGate on the client. There's no Telegram photo
  *  fallback for companies (unlike workers), so the avatar has to be
- *  uploaded here. */
+ *  uploaded here. No moderation gate beyond this — filling the profile in
+ *  is the only thing standing between an employer and publishing. */
 function companyIsComplete(company: CompanyRow) {
   const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data];
   return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
 }
 
 async function loadCompanyProfile(env: Env, companyId: number) {
-  const company = await env.DB.prepare('SELECT * FROM companies WHERE id = ?').bind(companyId).first<CompanyRow>();
+  const company = await env.DB.prepare('SELECT id, name, description, founded_year, avatar_data FROM companies WHERE id = ?')
+    .bind(companyId)
+    .first<CompanyRow>();
   if (!company) return null;
 
   const { results: photoRows } = await env.DB.prepare('SELECT id FROM company_photos WHERE company_id = ? ORDER BY position ASC')
@@ -36,12 +38,6 @@ async function loadCompanyProfile(env: Env, companyId: number) {
     .all<{ id: number }>();
 
   const { complete, percent } = companyIsComplete(company);
-  // A freshly-created company has nothing worth reviewing yet — once the
-  // profile is filled in, it moves itself into the moderation queue.
-  if (complete && company.verification_status === 'incomplete') {
-    await env.DB.prepare("UPDATE companies SET verification_status = 'pending_review' WHERE id = ?").bind(companyId).run();
-    company.verification_status = 'pending_review';
-  }
 
   return {
     company: {
@@ -170,13 +166,6 @@ employerRoutes.post('/vacancies', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
-  const company = await c.env.DB.prepare('SELECT verification_status FROM companies WHERE id = ?')
-    .bind(session.companyId)
-    .first<{ verification_status: string }>();
-  if (company?.verification_status !== 'approved') {
-    return c.json({ error: 'company_not_verified' }, 403);
-  }
-
   const body = await c.req.json<{
     position: string;
     positionLabel: string;
@@ -247,7 +236,6 @@ const CANDIDATE_WORKER_FIELDS = `
   w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
   w.bio as worker_bio, w.skills as worker_skills, w.birthdate as worker_birthdate,
   (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
-  EXISTS(SELECT 1 FROM worker_documents d WHERE d.worker_id = w.id AND d.doc_type = 'med_book' AND d.status = 'verified') as worker_med_book,
   (SELECT json_group_array(id) FROM worker_photos wp WHERE wp.worker_id = w.id) as worker_photo_ids
 `;
 

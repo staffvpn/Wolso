@@ -3,7 +3,7 @@ import { resolveCompany } from '@/data/companies';
 import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { formatDistance, formatMoney, relativeDay, timeRange } from '@/lib/format';
-import { ShieldCheck, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
@@ -30,11 +30,6 @@ export function ShiftCard({ shift }: { shift: Shift }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {company.verified && (
-            <Badge tone="accent">
-              <ShieldCheck size={12} /> Проверено
-            </Badge>
-          )}
           <button
             onClick={() => {
               hapticSelect();

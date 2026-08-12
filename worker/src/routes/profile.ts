@@ -50,7 +50,6 @@ async function loadProfile(env: Env, workerId: number) {
   const { results: positions } = await env.DB.prepare('SELECT position, position_label, years FROM worker_positions WHERE worker_id = ?')
     .bind(workerId)
     .all();
-  const { results: documents } = await env.DB.prepare('SELECT * FROM worker_documents WHERE worker_id = ?').bind(workerId).all();
   const { results: photoRows } = await env.DB.prepare('SELECT id FROM worker_photos WHERE worker_id = ? ORDER BY position ASC')
     .bind(workerId)
     .all<{ id: number }>();
@@ -68,7 +67,6 @@ async function loadProfile(env: Env, workerId: number) {
       profileCompletion: percent,
     },
     positions,
-    documents,
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${workerId}/photos/${p.id}` })),
   };
 }
@@ -166,32 +164,4 @@ profileRoutes.delete('/photos/:id', async (c) => {
   await deleteGalleryPhoto(c.env, 'worker_photos', 'worker_id', session.workerId, c.req.param('id'));
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
-});
-
-/** Document upload — raw file bytes in the body, doc type in the URL.
- *  Stored directly in D1 (no R2 — that needs a billing subscription even
- *  on the free tier, which not every operator can add), status flips to
- *  'pending' for a human moderator to review. */
-profileRoutes.post('/documents/:docType/upload', async (c) => {
-  const session = requireWorker(c as never);
-  if (!session) return c.json({ error: 'auth_required' }, 401);
-  const docType = c.req.param('docType');
-
-  const doc = await c.env.DB.prepare('SELECT id FROM worker_documents WHERE worker_id = ? AND doc_type = ?')
-    .bind(session.workerId, docType)
-    .first<{ id: number }>();
-  if (!doc) return c.json({ error: 'unknown_document_type' }, 404);
-
-  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
-  const bytes = await c.req.arrayBuffer();
-  const check = readUpload(bytes);
-  if (!check.ok) return c.json({ error: check.error }, check.status);
-
-  await c.env.DB.prepare(
-    "UPDATE worker_documents SET status = 'pending', file_data = ?, content_type = ?, note = 'На проверке', updated_at = datetime('now') WHERE id = ?",
-  )
-    .bind(bytes, contentType, doc.id)
-    .run();
-
-  return c.json({ ok: true });
 });

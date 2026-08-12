@@ -1,11 +1,9 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronRight, Pencil, Plus } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Pencil, Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Card, SectionLabel } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
 import { FEATURES } from '@/lib/features';
@@ -13,8 +11,7 @@ import { FEATURES } from '@/lib/features';
 export function WorkerProfileScreen() {
   const navigate = useNavigate();
   const profile = useProfileStore();
-  const { documents, positions, loaded, load } = profile;
-  const verifiedCount = documents.filter((d) => d.status === 'verified').length;
+  const { positions, loaded, load } = profile;
 
   useEffect(() => {
     if (!loaded) load();
@@ -64,25 +61,6 @@ export function WorkerProfileScreen() {
         </div>
       )}
 
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={() => navigate('/w/documents')}
-        className="w-full text-left mt-5"
-      >
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-5 w-5 rounded-full bg-accent flex items-center justify-center shrink-0">
-              <Check size={11} className="text-accent-fg" strokeWidth={3} />
-            </div>
-            <span className="font-semibold text-[14px]">Профиль заполнен на {profile.profileCompletion}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden mb-2">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${profile.profileCompletion}%` }} />
-          </div>
-          <p className="text-[12px] text-text-muted">Добавьте медкнижку — откликов станет больше</p>
-        </Card>
-      </motion.button>
-
       <div className="mt-6">
         <SectionLabel>Должности</SectionLabel>
         <div className="flex flex-wrap gap-2">
@@ -91,35 +69,13 @@ export function WorkerProfileScreen() {
               {p.positionLabel} · {p.years} {p.years === 1 ? 'год' : 'года'}
             </Chip>
           ))}
-          <button className="h-10 w-10 rounded-full border border-dashed border-border flex items-center justify-center text-text-faint">
+          <button
+            onClick={() => navigate('/w/profile/edit')}
+            className="h-10 w-10 rounded-full border border-dashed border-border flex items-center justify-center text-text-faint"
+          >
             <Plus size={16} />
           </button>
         </div>
-      </div>
-
-      <div className="mt-6">
-        <div className="flex items-center justify-between mb-2.5">
-          <SectionLabel className="mb-0">Документы</SectionLabel>
-          <button onClick={() => navigate('/w/documents')} className="text-[12px] font-semibold text-accent">
-            {verifiedCount}/{documents.length}
-          </button>
-        </div>
-        <button onClick={() => navigate('/w/documents')} className="w-full">
-          <Card className="divide-y divide-border-soft">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between px-4 py-3">
-                <span className="text-[14px] font-medium">{doc.label}</span>
-                {doc.status === 'verified' ? (
-                  <Badge tone="accent">Проверен</Badge>
-                ) : (
-                  <span className="flex items-center gap-1 text-[13px] text-accent font-semibold">
-                    Добавить <ChevronRight size={14} />
-                  </span>
-                )}
-              </div>
-            ))}
-          </Card>
-        </button>
       </div>
 
       <div className="mt-6">

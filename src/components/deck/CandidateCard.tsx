@@ -58,7 +58,6 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Badge tone="accent">★ {candidate.rating.toFixed(1)} · {candidate.shiftsCompleted} смен</Badge>
-          {candidate.medBook && <Badge tone="dark">Медкнижка</Badge>}
         </div>
 
         {candidate.bio && <p className="text-[14px] text-text leading-relaxed">{candidate.bio}</p>}

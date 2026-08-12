@@ -38,7 +38,6 @@ const STATUS_COLOR: Record<string, string> = {
   active: 'text-accent',
   invited: 'text-info',
   suspended: 'text-danger',
-  pending_docs: 'text-warning',
 };
 
 export function Users() {
@@ -86,7 +85,7 @@ export function Users() {
       <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap shrink-0">
         <div className="relative w-full sm:w-[260px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" />
-          <Input placeholder="Имя, телефон, ИНН" className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input placeholder="Имя, телефон" className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <Tabs
           value={tab}
@@ -291,7 +290,6 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
       </div>
       <div className="flex items-center gap-2 mb-5">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
-        {user.verified && <Badge tone="info">ИНН проверен</Badge>}
       </div>
       <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
         Профиль работодателя: опубликованные вакансии, история сотрудничества и отзывы соискателей доступны в карточке компании.
