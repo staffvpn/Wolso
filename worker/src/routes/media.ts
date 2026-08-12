@@ -22,10 +22,22 @@ const GALLERY_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=31536000, immu
 // hour even after a good re-upload. Never cache it.
 const NO_CACHE_HEADERS = { 'Cache-Control': 'no-store' };
 
+/** TEMPORARY — diagnosing why a stored avatar won't render anywhere,
+ *  including opened directly outside the app. Reports what's actually in
+ *  the row instead of guessing. Remove once that's root-caused. */
+function debugInfo(bytes: ArrayBuffer | null, contentType: string | null) {
+  if (!bytes) return { present: false };
+  const head = new Uint8Array(bytes.slice(0, 16));
+  const hex = [...head].map((b) => b.toString(16).padStart(2, '0')).join(' ');
+  const ascii = [...head].map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '.')).join('');
+  return { present: true, byteLength: bytes.byteLength, contentType, first16Hex: hex, first16Ascii: ascii };
+}
+
 mediaRoutes.get('/workers/:id/avatar', async (c) => {
   const row = await c.env.DB.prepare('SELECT avatar_data, avatar_content_type FROM workers WHERE id = ?')
     .bind(c.req.param('id'))
     .first<{ avatar_data: ArrayBuffer | null; avatar_content_type: string | null }>();
+  if (c.req.query('debug') === '1') return c.json(debugInfo(row?.avatar_data ?? null, row?.avatar_content_type ?? null));
   if (!row?.avatar_data) return c.notFound();
   return new Response(row.avatar_data, { headers: { 'Content-Type': row.avatar_content_type ?? 'application/octet-stream', ...NO_CACHE_HEADERS } });
 });
