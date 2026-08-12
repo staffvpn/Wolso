@@ -7,6 +7,8 @@ import { TopBar } from '@/components/ui/TopBar';
 import { SectionLabel } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
 import { useCompanyStore } from '@/store/useCompanyStore';
+import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
+import { compressImageFile } from '@/lib/imageCompress';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -58,13 +60,23 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) uploadAvatar(file).catch(() => setError('Не получилось загрузить фото'));
+    if (!file) return;
+    try {
+      await uploadAvatar(await compressImageFile(file));
+    } catch {
+      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    }
   }
 
   async function onPhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) uploadPhoto(file).catch(() => setError('Не получилось загрузить фото'));
+    if (!file) return;
+    try {
+      await uploadPhoto(await compressImageFile(file));
+    } catch {
+      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    }
   }
 
   async function save() {
@@ -106,7 +118,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
         )}
 
         <div className="flex flex-col items-center gap-2 mb-6">
-          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
+          <input ref={avatarInputRef} type="file" accept="image/*" style={VISUALLY_HIDDEN_FILE_INPUT} onChange={onAvatarChosen} />
           <button onClick={() => avatarInputRef.current?.click()} className="relative">
             <Avatar name={name || '?'} src={company.avatarUrl} size={88} />
             <span className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-accent text-accent-fg flex items-center justify-center border-2 border-bg">
@@ -161,7 +173,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
               <SectionLabel className="mb-0">Дополнительные фото</SectionLabel>
               <span className="text-[12px] text-text-faint">{(company.photos ?? []).length}/6 · необязательно</span>
             </div>
-            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoChosen} />
+            <input ref={photoInputRef} type="file" accept="image/*" style={VISUALLY_HIDDEN_FILE_INPUT} onChange={onPhotoChosen} />
             <div className="flex flex-wrap gap-2.5">
               {(company.photos ?? []).map((p) => (
                 <div key={p.id} className="relative h-20 w-20 rounded-2xl overflow-hidden shrink-0">

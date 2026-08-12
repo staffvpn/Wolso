@@ -5,6 +5,8 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Button } from '@/components/ui/Button';
 import { useProfileStore } from '@/store/useProfileStore';
 import { cn } from '@/lib/cn';
+import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
+import { compressImageFile } from '@/lib/imageCompress';
 
 export function Documents() {
   const navigate = useNavigate();
@@ -27,17 +29,18 @@ export function Documents() {
     fileInputRef.current?.click();
   }
 
-  function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    const docId = activeDocId;
     e.target.value = '';
-    if (file && activeDocId) uploadDocument(activeDocId, file);
     setActiveDocId(null);
+    if (file && docId) uploadDocument(docId, await compressImageFile(file));
   }
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <TopBar title="Документы" onBack={() => navigate(-1)} />
-      <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={onFileChosen} />
+      <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={VISUALLY_HIDDEN_FILE_INPUT} onChange={onFileChosen} />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
         <h1 className="text-[24px] font-extrabold leading-tight mb-2">

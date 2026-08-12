@@ -9,6 +9,8 @@ import { SectionLabel } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
 import { useProfileStore } from '@/store/useProfileStore';
 import { POSITIONS } from '@/data/positions';
+import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
+import { compressImageFile } from '@/lib/imageCompress';
 import type { Position, YesNo } from '@/types';
 
 const FIELD_CLASS =
@@ -68,13 +70,23 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) uploadAvatar(file).catch(() => setError('Не получилось загрузить фото'));
+    if (!file) return;
+    try {
+      await uploadAvatar(await compressImageFile(file));
+    } catch {
+      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    }
   }
 
   async function onPhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) uploadPhoto(file).catch(() => setError('Не получилось загрузить фото'));
+    if (!file) return;
+    try {
+      await uploadPhoto(await compressImageFile(file));
+    } catch {
+      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    }
   }
 
   async function addExperienceRow() {
@@ -124,7 +136,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
         )}
 
         <div className="flex flex-col items-center gap-2 mb-6">
-          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
+          <input ref={avatarInputRef} type="file" accept="image/*" style={VISUALLY_HIDDEN_FILE_INPUT} onChange={onAvatarChosen} />
           <button onClick={() => avatarInputRef.current?.click()} className="relative">
             <Avatar name={name || '?'} src={profile.avatarUrl} size={88} />
             <span className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-accent text-accent-fg flex items-center justify-center border-2 border-bg">
@@ -240,7 +252,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
               <SectionLabel className="mb-0">Портфолио</SectionLabel>
               <span className="text-[12px] text-text-faint">{profile.photos.length}/6 · необязательно</span>
             </div>
-            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoChosen} />
+            <input ref={photoInputRef} type="file" accept="image/*" style={VISUALLY_HIDDEN_FILE_INPUT} onChange={onPhotoChosen} />
             <div className="flex flex-wrap gap-2.5">
               {profile.photos.map((p) => (
                 <div key={p.id} className="relative h-20 w-20 rounded-2xl overflow-hidden shrink-0">
