@@ -77,22 +77,6 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
     setSelectedId(next?.id ?? null);
   }
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!canApprove || !selected) return;
-      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-      if (e.key.toLowerCase() === 'a') act('approved');
-      if (e.key.toLowerCase() === 'd') act('rejected');
-      if (e.key === 'ArrowRight') {
-        const idx = items.findIndex((v) => v.id === selected.id);
-        setSelectedId(items[idx + 1]?.id ?? items[0]?.id ?? null);
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, items, canApprove]);
-
   if (items.length === 0) return <EmptyPanel title="Очередь пуста" description="Новых вакансий на проверку нет." />;
 
   return (
@@ -170,7 +154,6 @@ function VacancyQueue({ items }: { items: ModerationVacancy[] }) {
               <X size={16} /> Отклонить
             </Button>
           </div>
-          <p className="text-center text-[12px] text-text-faint">A — одобрить · D — отклонить · → следующая</p>
         </Card>
       )}
     </div>

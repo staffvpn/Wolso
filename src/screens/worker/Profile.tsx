@@ -56,13 +56,6 @@ export function WorkerProfileScreen() {
         </div>
       )}
 
-      {(profile.smoking || profile.alcohol) && (
-        <div className="flex flex-wrap gap-2 mt-3">
-          {profile.smoking && <Badge tone="neutral">{profile.smoking === 'yes' ? 'Курит' : 'Не курит'}</Badge>}
-          {profile.alcohol && <Badge tone="neutral">{profile.alcohol === 'yes' ? 'Употребляет алкоголь' : 'Не употребляет алкоголь'}</Badge>}
-        </div>
-      )}
-
       {profile.photos.length > 0 && (
         <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">
           {profile.photos.map((p) => (

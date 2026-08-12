@@ -11,7 +11,7 @@ import { useProfileStore } from '@/store/useProfileStore';
 import { POSITIONS } from '@/data/positions';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile } from '@/lib/imageCompress';
-import type { Position, YesNo } from '@/types';
+import type { Position } from '@/types';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -28,8 +28,6 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   const [bio, setBio] = useState('');
   const [skills, setSkills] = useState('');
   const [birthdate, setBirthdate] = useState('');
-  const [smoking, setSmoking] = useState<YesNo | ''>('');
-  const [alcohol, setAlcohol] = useState<YesNo | ''>('');
   const [newPosition, setNewPosition] = useState<Position>('barista');
   const [newYears, setNewYears] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -49,8 +47,6 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     setBio(profile.bio);
     setSkills(profile.skills);
     setBirthdate(profile.birthdate ?? '');
-    setSmoking(profile.smoking ?? '');
-    setAlcohol(profile.alcohol ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
@@ -62,8 +58,6 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   if (!bio.trim()) missing.push('о себе');
   if (!skills.trim()) missing.push('навыки');
   if (!birthdate) missing.push('дата рождения');
-  if (!smoking) missing.push('курение');
-  if (!alcohol) missing.push('алкоголь');
   if (!profile.avatarUrl) missing.push('фото');
   if (profile.positions.length === 0) missing.push('опыт работы');
 
@@ -105,7 +99,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     }
     setSaving(true);
     try {
-      await updateProfile({ name: name.trim(), city: city.trim(), bio: bio.trim(), skills: skills.trim(), birthdate, smoking: smoking || undefined, alcohol: alcohol || undefined });
+      await updateProfile({ name: name.trim(), city: city.trim(), bio: bio.trim(), skills: skills.trim(), birthdate });
       if (!gate) navigate(-1);
     } catch {
       setError('Не получилось сохранить — попробуйте ещё раз');
@@ -219,31 +213,6 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
               <button onClick={addExperienceRow} className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
                 <Plus size={18} />
               </button>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <SectionLabel>Курите?</SectionLabel>
-              <div className="flex gap-2">
-                <Chip selected={smoking === 'no'} onClick={() => setSmoking('no')} className="flex-1">
-                  Нет
-                </Chip>
-                <Chip selected={smoking === 'yes'} onClick={() => setSmoking('yes')} className="flex-1">
-                  Да
-                </Chip>
-              </div>
-            </div>
-            <div className="flex-1">
-              <SectionLabel>Алкоголь?</SectionLabel>
-              <div className="flex gap-2">
-                <Chip selected={alcohol === 'no'} onClick={() => setAlcohol('no')} className="flex-1">
-                  Нет
-                </Chip>
-                <Chip selected={alcohol === 'yes'} onClick={() => setAlcohol('yes')} className="flex-1">
-                  Да
-                </Chip>
-              </div>
             </div>
           </div>
 

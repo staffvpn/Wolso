@@ -1,5 +1,5 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
-import type { Position, WorkerDocument, WorkerExperience, WorkerProfile, YesNo } from '@/types';
+import type { Position, WorkerDocument, WorkerExperience, WorkerProfile } from '@/types';
 
 interface WorkerApiRow {
   id: number;
@@ -11,8 +11,6 @@ interface WorkerApiRow {
   bio: string;
   skills: string;
   birthdate: string | null;
-  smoking: YesNo | null;
-  alcohol: YesNo | null;
   age: number | null;
   avatarUrl: string | null;
   profileCompletion: number;
@@ -39,8 +37,6 @@ function fromApi(r: MeResponse): WorkerProfile {
     skills: r.worker.skills ?? '',
     birthdate: r.worker.birthdate ?? undefined,
     age: r.worker.age ?? undefined,
-    smoking: r.worker.smoking ?? undefined,
-    alcohol: r.worker.alcohol ?? undefined,
     avatarUrl: resolveMediaUrl(r.worker.avatarUrl),
     positions: r.positions.map((p) => ({ position: p.position as Position, positionLabel: p.position_label, years: p.years })),
     documents: r.documents.map((d) => ({
@@ -65,8 +61,6 @@ export interface ProfileUpdate {
   bio?: string;
   birthdate?: string;
   skills?: string;
-  smoking?: YesNo;
-  alcohol?: YesNo;
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<WorkerProfile> {

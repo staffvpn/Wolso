@@ -122,8 +122,6 @@ export interface WorkerReview {
   text: string;
 }
 
-export type YesNo = 'yes' | 'no';
-
 export interface WorkerProfile {
   name: string;
   city: string;
@@ -139,8 +137,6 @@ export interface WorkerProfile {
   skills: string;
   birthdate?: string;
   age?: number;
-  smoking?: YesNo;
-  alcohol?: YesNo;
   avatarUrl?: string;
   photos: { id: string; url: string }[];
 }
@@ -172,8 +168,6 @@ export interface Candidate {
   bio?: string;
   skills?: string;
   age?: number;
-  smoking?: YesNo;
-  alcohol?: YesNo;
   /** Avatar first, then any portfolio photos — the card taps through this
    *  whole list left-to-right, Tinder-style. */
   photos: string[];

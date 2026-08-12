@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 
 /** Tinder-style card: tap the left/right edge of the photo to cycle through
  *  the avatar + portfolio photos, everything else scrolls for the rest of
- *  the anketa (bio, skills, alcohol/smoking). */
+ *  the anketa (bio, skills). */
 export function CandidateCard({ candidate }: { candidate: Candidate }) {
   const [index, setIndex] = useState(0);
   const photos = candidate.photos;
@@ -59,8 +59,6 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
         <div className="flex flex-wrap gap-2">
           <Badge tone="accent">★ {candidate.rating.toFixed(1)} · {candidate.shiftsCompleted} смен</Badge>
           {candidate.medBook && <Badge tone="dark">Медкнижка</Badge>}
-          {candidate.smoking && <Badge tone="neutral">{candidate.smoking === 'yes' ? 'Курит' : 'Не курит'}</Badge>}
-          {candidate.alcohol && <Badge tone="neutral">{candidate.alcohol === 'yes' ? 'Употребляет алкоголь' : 'Не употребляет алкоголь'}</Badge>}
         </div>
 
         {candidate.bio && <p className="text-[14px] text-text leading-relaxed">{candidate.bio}</p>}

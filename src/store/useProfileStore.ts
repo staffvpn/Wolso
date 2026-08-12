@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WorkerDocument, WorkerExperience, YesNo } from '@/types';
+import type { WorkerDocument, WorkerExperience } from '@/types';
 import {
   fetchMyProfile,
   updateMyProfile,
@@ -24,8 +24,6 @@ interface ProfileState {
   skills: string;
   birthdate?: string;
   age?: number;
-  smoking?: YesNo;
-  alcohol?: YesNo;
   avatarUrl?: string;
   positions: WorkerExperience[];
   documents: WorkerDocument[];

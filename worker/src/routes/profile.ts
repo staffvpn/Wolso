@@ -13,8 +13,6 @@ interface WorkerRow {
   bio: string;
   birthdate: string | null;
   skills: string;
-  smoking: string | null;
-  alcohol: string | null;
   photo_url: string | null;
   avatar_data: ArrayBuffer | null;
 }
@@ -39,8 +37,6 @@ function isComplete(worker: WorkerRow, hasExperience: boolean) {
     !!worker.bio,
     !!worker.skills,
     !!worker.birthdate,
-    !!worker.smoking,
-    !!worker.alcohol,
     !!(worker.avatar_data || worker.photo_url),
     hasExperience,
   ];
@@ -95,13 +91,11 @@ profileRoutes.patch('/', async (c) => {
     bio?: string;
     birthdate?: string;
     skills?: string;
-    smoking?: 'yes' | 'no';
-    alcohol?: 'yes' | 'no';
   }>();
 
   const fields: string[] = [];
   const binds: unknown[] = [];
-  for (const key of ['city', 'name', 'bio', 'birthdate', 'skills', 'smoking', 'alcohol'] as const) {
+  for (const key of ['city', 'name', 'bio', 'birthdate', 'skills'] as const) {
     if (body[key] !== undefined) {
       fields.push(`${key} = ?`);
       binds.push(body[key]);

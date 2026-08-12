@@ -1,4 +1,4 @@
-import type { Candidate, Position, Vacancy, YesNo } from '@/types';
+import type { Candidate, Position, Vacancy } from '@/types';
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { ageFrom } from '@/lib/format';
 
@@ -56,8 +56,6 @@ interface CandidateApiResponse {
   worker_bio: string | null;
   worker_skills: string | null;
   worker_birthdate: string | null;
-  worker_smoking: YesNo | null;
-  worker_alcohol: YesNo | null;
   worker_avatar_url: string | null;
   worker_photos: string[];
   shift_position_label?: string;
@@ -80,8 +78,6 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     bio: c.worker_bio ?? undefined,
     skills: c.worker_skills ?? undefined,
     age: ageFrom(c.worker_birthdate),
-    smoking: c.worker_smoking ?? undefined,
-    alcohol: c.worker_alcohol ?? undefined,
     photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }

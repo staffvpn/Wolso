@@ -241,12 +241,11 @@ employerRoutes.post('/vacancies', async (c) => {
 });
 
 /** Worker columns joined into both candidate queries below — enough for
- *  the swipe card to show a real profile (avatar, bio, skills, age,
- *  alcohol/smoking) instead of just a name and a rating. */
+ *  the swipe card to show a real profile (avatar, bio, skills, age)
+ *  instead of just a name and a rating. */
 const CANDIDATE_WORKER_FIELDS = `
   w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
   w.bio as worker_bio, w.skills as worker_skills, w.birthdate as worker_birthdate,
-  w.smoking as worker_smoking, w.alcohol as worker_alcohol,
   (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
   EXISTS(SELECT 1 FROM worker_documents d WHERE d.worker_id = w.id AND d.doc_type = 'med_book' AND d.status = 'verified') as worker_med_book,
   (SELECT json_group_array(id) FROM worker_photos wp WHERE wp.worker_id = w.id) as worker_photo_ids
