@@ -4,7 +4,6 @@ import { RequireNavAccess } from './components/layout/RequireNavAccess';
 import { AuthGate } from './components/AuthGate';
 
 import { Dashboard } from './screens/Dashboard';
-import { Moderation } from './screens/Moderation';
 import { Users } from './screens/Users';
 import { Vacancies } from './screens/Vacancies';
 import { Finance } from './screens/Finance';
@@ -22,7 +21,6 @@ export default function App() {
             <Route element={<RequireNavAccess />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/moderation" element={<Moderation />} />
               <Route path="/users" element={<Users />} />
               <Route path="/vacancies" element={<Vacancies />} />
               <Route path="/support" element={<Support />} />

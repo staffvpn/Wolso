@@ -21,8 +21,6 @@ export interface ShiftRow {
   time_of_day: string;
   requirements: string;
   status: string;
-  moderation_flag_label: string | null;
-  moderation_flag_tone: string | null;
   created_at: string;
   // joined
   company_name?: string;
@@ -56,7 +54,6 @@ export function shiftToJson(r: ShiftRow) {
     timeOfDay: r.time_of_day,
     requirements: JSON.parse(r.requirements || '[]'),
     status: r.status,
-    moderationFlag: r.moderation_flag_label ? { label: r.moderation_flag_label, tone: r.moderation_flag_tone } : null,
     createdAt: r.created_at,
     company: r.company_name
       ? {

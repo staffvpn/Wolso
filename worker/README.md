@@ -127,7 +127,7 @@ src/
     db.ts             общие SQL-хелперы (JOIN смены+компания и т.д.)
   middleware/auth.ts  attachSession, requireWorker/Company/Staff, requirePermission
   routes/             API для мобильного приложения (смены, отклики, чаты, ...)
-  admin/              API для админки (модерация, пользователи, роли, аудит-лог, дашборд)
+  admin/              API для админки (пользователи, вакансии, роли, аудит-лог, дашборд)
 migrations/           схема D1, по порядку
 ```
 

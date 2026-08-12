@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Card } from '@/components/ui/Card';
@@ -15,13 +14,11 @@ import type { VacancyRecord } from '@/types';
 
 const STATUS_BADGE: Record<VacancyRecord['status'], { label: string; tone: 'accent' | 'warning' | 'neutral' | 'danger' }> = {
   active: { label: 'Активна', tone: 'accent' },
-  moderation: { label: 'На модерации', tone: 'warning' },
   closed: { label: 'Закрыта', tone: 'neutral' },
   rejected: { label: 'Отклонена', tone: 'danger' },
 };
 
 export function Vacancies() {
-  const navigate = useNavigate();
   const vacancies = useVacanciesStore((s) => s.vacancies);
   const closeVacancy = useVacanciesStore((s) => s.closeVacancy);
   const load = useVacanciesStore((s) => s.load);
@@ -41,7 +38,6 @@ export function Vacancies() {
     () => ({
       all: vacancies.length,
       active: vacancies.filter((v) => v.status === 'active').length,
-      moderation: vacancies.filter((v) => v.status === 'moderation').length,
       closed: vacancies.filter((v) => v.status === 'closed').length,
       rejected: vacancies.filter((v) => v.status === 'rejected').length,
     }),
@@ -59,7 +55,6 @@ export function Vacancies() {
           options={[
             { id: 'all', label: 'Все', count: counts.all },
             { id: 'active', label: 'Активные', count: counts.active },
-            { id: 'moderation', label: 'На модерации', count: counts.moderation },
             { id: 'closed', label: 'Закрытые', count: counts.closed },
             { id: 'rejected', label: 'Отклонённые', count: counts.rejected },
           ]}
@@ -130,11 +125,6 @@ export function Vacancies() {
                 </div>
               </div>
 
-              {selected.status === 'moderation' && (
-                <Button variant="outline" className="w-full" onClick={() => navigate('/moderation')}>
-                  Открыть в модерации
-                </Button>
-              )}
               {selected.status === 'active' && (
                 <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id)}>
                   Закрыть вакансию

@@ -32,7 +32,6 @@ interface ShiftApiResponse {
   timeOfDay: string;
   requirements: string[];
   status: string;
-  moderationFlag: { label: string; tone: string } | null;
   createdAt: string;
   company?: {
     id: number;

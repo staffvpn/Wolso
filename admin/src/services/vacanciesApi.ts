@@ -14,7 +14,6 @@ interface VacancyApiRow {
 
 const STATUS_MAP: Record<string, VacancyRecord['status']> = {
   active: 'active',
-  pending_review: 'moderation',
   rejected: 'rejected',
   closed: 'closed',
 };
@@ -26,7 +25,7 @@ function fromApi(v: VacancyApiRow): VacancyRecord {
     companyName: v.company?.name ?? 'Компания',
     city: v.company?.city ?? '',
     hourlyRate: v.hourlyRate,
-    status: STATUS_MAP[v.status] ?? 'moderation',
+    status: STATUS_MAP[v.status] ?? 'active',
     responses: v.responseCount,
     publishedMinAgo: minutesSince(v.createdAt),
   };

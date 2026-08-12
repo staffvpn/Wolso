@@ -18,19 +18,19 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
       c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ? AND created_at < ?').bind(d60, d30).first<{ n: number }>(),
       c.env.DB.prepare(
         `SELECT COUNT(DISTINCT s.id) as n FROM shifts s JOIN applications a ON a.shift_id = s.id
-         WHERE s.status != 'pending_review' AND a.status = 'accepted' AND s.created_at >= ?`,
+         WHERE a.status = 'accepted' AND s.created_at >= ?`,
       )
         .bind(d30)
         .first<{ n: number }>(),
-      c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status != 'pending_review' AND created_at >= ?").bind(d30).first<{ n: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
       c.env.DB.prepare('SELECT COUNT(DISTINCT worker_id) as n FROM applications WHERE created_at >= ?').bind(d30).first<{ n: number }>(),
       c.env.DB.prepare(
         `SELECT COUNT(DISTINCT s.id) as n FROM shifts s JOIN applications a ON a.shift_id = s.id
-         WHERE s.status != 'pending_review' AND a.status = 'accepted' AND s.created_at >= ? AND s.created_at < ?`,
+         WHERE a.status = 'accepted' AND s.created_at >= ? AND s.created_at < ?`,
       )
         .bind(d60, d30)
         .first<{ n: number }>(),
-      c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status != 'pending_review' AND created_at >= ? AND created_at < ?")
+      c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE created_at >= ? AND created_at < ?')
         .bind(d60, d30)
         .first<{ n: number }>(),
       c.env.DB.prepare('SELECT COUNT(DISTINCT worker_id) as n FROM applications WHERE created_at >= ? AND created_at < ?')
@@ -66,11 +66,6 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
     .bind(d30)
     .all<{ label: string; count: number }>();
 
-  const [pendingVacancies, pendingComplaints] = await Promise.all([
-    c.env.DB.prepare("SELECT COUNT(*) as n FROM shifts WHERE status = 'pending_review'").first<{ n: number }>(),
-    c.env.DB.prepare("SELECT COUNT(*) as n FROM complaints WHERE status = 'pending'").first<{ n: number }>(),
-  ]);
-
   return c.json({
     vacanciesPublished,
     vacanciesPublishedDeltaPct,
@@ -80,9 +75,5 @@ adminDashboardRoutes.get('/', requireStaffMiddleware, async (c) => {
     activeWorkersDeltaPct,
     weekly,
     topPositions,
-    attention: [
-      { label: 'Вакансии на модерации', count: pendingVacancies?.n ?? 0, tone: 'warning' },
-      { label: 'Жалобы на работодателей', count: pendingComplaints?.n ?? 0, tone: 'danger' },
-    ],
   });
 });

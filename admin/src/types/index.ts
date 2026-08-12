@@ -56,44 +56,6 @@ export interface PlatformUser {
   shiftsCompleted?: number;
 }
 
-export type ModerationStatus = 'pending' | 'approved' | 'returned' | 'rejected';
-
-export interface ModerationFlag {
-  label: string;
-  tone: 'danger' | 'warning' | 'info' | 'neutral';
-}
-
-export interface ModerationVacancy {
-  id: string;
-  position: string;
-  companyName: string;
-  companyRating: number;
-  city: string;
-  submittedMinAgo: number;
-  flag: ModerationFlag | null;
-  status: ModerationStatus;
-  hourlyRate: number;
-  regionalMinWage: number;
-  durationHours: number;
-  address: string;
-  /** Requirements the employer listed, joined for display — there's no
-   *  separate structured "experience requirement" field. */
-  experienceReq: string;
-  description: string;
-  shiftsPosted: number;
-}
-
-export interface ComplaintItem {
-  id: string;
-  targetName: string;
-  targetType: 'worker' | 'employer';
-  reporterName: string;
-  reason: string;
-  text: string;
-  submittedMinAgo: number;
-  status: ModerationStatus;
-}
-
 export type PayoutStatus = 'paid' | 'processing' | 'dispute';
 
 export interface Transaction {
@@ -121,7 +83,7 @@ export interface VacancyRecord {
   companyName: string;
   city: string;
   hourlyRate: number;
-  status: 'active' | 'moderation' | 'closed' | 'rejected';
+  status: 'active' | 'closed' | 'rejected';
   responses: number;
   publishedMinAgo: number;
 }
@@ -141,5 +103,4 @@ export interface DashboardStats {
   activeWorkersDeltaPct: number;
   weekly: DashboardDay[];
   topPositions: { label: string; count: number }[];
-  attention: { label: string; count: number; tone: 'danger' | 'warning' | 'info' }[];
 }

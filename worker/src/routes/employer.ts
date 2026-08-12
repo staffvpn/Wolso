@@ -7,8 +7,6 @@ import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../l
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
 
-const REGIONAL_MIN_WAGE = 280;
-
 interface CompanyRow {
   id: number;
   name: string;
@@ -186,22 +184,10 @@ employerRoutes.post('/vacancies', async (c) => {
   const durationHours = body.endHour - body.startHour;
   const totalPay = Math.max(0, Math.round(durationHours * body.hourlyRate));
 
-  const priorShifts = await c.env.DB.prepare('SELECT COUNT(*) as n FROM shifts WHERE company_id = ?').bind(session.companyId).first<{ n: number }>();
-  let flagLabel: string | null = null;
-  let flagTone: string | null = null;
-  if (body.hourlyRate < REGIONAL_MIN_WAGE) {
-    flagLabel = 'Ставка ниже МРОТ';
-    flagTone = 'danger';
-  } else if ((priorShifts?.n ?? 0) === 0) {
-    flagLabel = 'Новый работодатель';
-    flagTone = 'info';
-  }
-
   const inserted = await c.env.DB.prepare(
     `INSERT INTO shifts (company_id, position, position_label, date, start_hour, start_min, end_hour, end_min,
-       hourly_rate, total_pay, description, meal, urgency, employment_type, time_of_day, requirements,
-       status, moderation_flag_label, moderation_flag_tone)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?) RETURNING id`,
+       hourly_rate, total_pay, description, meal, urgency, employment_type, time_of_day, requirements, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') RETURNING id`,
   )
     .bind(
       session.companyId,
@@ -220,8 +206,6 @@ employerRoutes.post('/vacancies', async (c) => {
       body.employmentType ?? 'shift',
       body.timeOfDay ?? 'day',
       JSON.stringify(body.requirements ?? []),
-      flagLabel,
-      flagTone,
     )
     .first<{ id: number }>();
 

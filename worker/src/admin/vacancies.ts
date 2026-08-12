@@ -6,9 +6,8 @@ import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
 export const adminVacancyRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminVacancyRoutes.use('*', attachSession);
 
-/** Every shift ever posted, any status — the full "Вакансии и смены" table,
- *  as opposed to /admin/moderation/vacancies which only shows the pending
- *  queue. Adds a response count per row so the list doesn't need N+1 calls. */
+/** Every shift ever posted, any status — the full "Вакансии и смены" table.
+ *  Adds a response count per row so the list doesn't need N+1 calls. */
 adminVacancyRoutes.get('/', requireStaffMiddleware, async (c) => {
   const { results } = await c.env.DB.prepare(`${SHIFT_SELECT} ORDER BY s.created_at DESC LIMIT 500`).all<ShiftRow>();
 

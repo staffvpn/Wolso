@@ -1,4 +1,4 @@
-import { LayoutDashboard, Flag, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy } from 'lucide-react';
 import type { RoleDef } from '@/types';
 import { FEATURES } from '@/lib/features';
 
@@ -13,7 +13,6 @@ const yes = (role: RoleDef, key: keyof RoleDef['permissions']) => role.permissio
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Дашборд', icon: LayoutDashboard, visible: (r) => yes(r, 'changeCommission') || yes(r, 'refundsPayouts') },
-  { to: '/moderation', label: 'Модерация', icon: Flag, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/users', label: 'Пользователи', icon: Users, visible: () => true },
   { to: '/vacancies', label: 'Вакансии и смены', icon: Briefcase, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/support', label: 'Поддержка', icon: LifeBuoy, visible: (r) => yes(r, 'viewSupportChats') },

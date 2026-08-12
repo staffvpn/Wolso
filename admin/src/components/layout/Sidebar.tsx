@@ -3,7 +3,6 @@ import { LogOut, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { navForRole } from './nav';
 import { useCurrentRole, useSessionStore } from '@/store/useSessionStore';
-import { useModerationStore } from '@/store/useModerationStore';
 import { Avatar } from '../ui/Avatar';
 import { Logo } from '../ui/Logo';
 
@@ -19,7 +18,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const logout = useSessionStore((s) => s.logout);
   const role = useCurrentRole();
   const items = navForRole(role);
-  const moderationCount = useModerationStore((s) => s.vacancies.length + s.complaints.length);
 
   return (
     <>
@@ -62,11 +60,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             >
               <item.icon size={17} strokeWidth={2} className="shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
-              {item.to === '/moderation' && moderationCount > 0 && (
-                <span className="h-5 min-w-5 px-1 rounded-full bg-danger text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                  {moderationCount}
-                </span>
-              )}
             </NavLink>
           ))}
         </nav>

@@ -77,13 +77,6 @@ export function Settings() {
           <SectionLabel className="mb-4">Уведомления администраторам</SectionLabel>
           <div className="divide-y divide-border-soft">
             <NotifyRow
-              label="Всплеск жалоб"
-              description="Уведомлять, если жалоб на одного работодателя больше 3 за неделю"
-              checked={s.notifyOnComplaintSpike}
-              disabled={!canEdit}
-              onChange={(v) => s.set('notifyOnComplaintSpike', v)}
-            />
-            <NotifyRow
               label="Ставка ниже МРОТ"
               description="Уведомлять при публикации вакансии с оплатой ниже регионального минимума"
               checked={s.notifyOnBelowMinWage}

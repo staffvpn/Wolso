@@ -6,7 +6,6 @@ interface SettingsState {
   defaultCity: string;
   defaultCommissionPct: number;
   payoutSchedule: 'instant' | 'daily' | 'weekly';
-  notifyOnComplaintSpike: boolean;
   notifyOnBelowMinWage: boolean;
   notifyOnNewEmployer: boolean;
   set: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void;
@@ -18,7 +17,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   defaultCity: 'Москва',
   defaultCommissionPct: 7,
   payoutSchedule: 'instant',
-  notifyOnComplaintSpike: true,
   notifyOnBelowMinWage: true,
   notifyOnNewEmployer: false,
   set: (key, value) => set({ [key]: value } as Pick<SettingsState, typeof key>),
