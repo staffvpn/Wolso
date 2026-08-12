@@ -1,10 +1,25 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
-import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware } from '../middleware/auth';
+import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware, staffHasPermission } from '../middleware/auth';
 import { provisionWorker, provisionCompany } from '../routes/auth';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
+
+/** manageTeam (which `admin` has) is deliberately weaker than
+ *  transferOwnership (only `owner` has) — anything that would install or
+ *  remove an Owner has to check this separately, on top of the route's
+ *  own manageTeam gate. Without it, an `admin` could invite themselves as
+ *  a second Owner, demote the real Owner out of the role, or revoke the
+ *  Owner's access outright, all with a plain "manage team" permission. */
+async function canTouchOwnerRole(env: Env, session: Extract<SessionPayload, { kind: 'staff' }>): Promise<boolean> {
+  return (await staffHasPermission(env, session.roleId, 'transferOwnership')) === 'yes';
+}
+
+async function activeOwnerCount(env: Env): Promise<number> {
+  const row = await env.DB.prepare("SELECT COUNT(*) as n FROM staff WHERE role_id = 'owner' AND status = 'active'").first<{ n: number }>();
+  return row?.n ?? 0;
+}
 
 adminUserRoutes.get('/team', requireStaffMiddleware, async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -113,6 +128,9 @@ adminUserRoutes.post('/team/invite', requirePermission('manageTeam'), async (c) 
 
   const role = await c.env.DB.prepare('SELECT id FROM roles WHERE id = ?').bind(roleId).first();
   if (!role) return c.json({ error: 'unknown_role' }, 400);
+  if (roleId === 'owner' && !(await canTouchOwnerRole(c.env, session))) {
+    return c.json({ error: 'owner_transfer_requires_permission' }, 403);
+  }
 
   const existing = await c.env.DB.prepare('SELECT id FROM staff WHERE telegram_id = ?').bind(telegramId).first();
   if (existing) return c.json({ error: 'already_invited' }, 409);
@@ -133,8 +151,18 @@ adminUserRoutes.patch('/team/:id', requirePermission('manageTeam'), async (c) =>
   const id = c.req.param('id');
   const { roleId } = await c.req.json<{ roleId: string }>();
 
-  const member = await c.env.DB.prepare('SELECT name FROM staff WHERE id = ?').bind(id).first<{ name: string }>();
+  const member = await c.env.DB.prepare('SELECT name, role_id FROM staff WHERE id = ?').bind(id).first<{ name: string; role_id: string }>();
   if (!member) return c.json({ error: 'not_found' }, 404);
+
+  // Touches the Owner role either way — promoting someone into it or
+  // moving the current Owner out of it — needs transferOwnership, not
+  // just manageTeam.
+  if ((roleId === 'owner' || member.role_id === 'owner') && !(await canTouchOwnerRole(c.env, session))) {
+    return c.json({ error: 'owner_transfer_requires_permission' }, 403);
+  }
+  if (member.role_id === 'owner' && roleId !== 'owner' && (await activeOwnerCount(c.env)) <= 1) {
+    return c.json({ error: 'must_keep_one_owner' }, 400);
+  }
 
   await c.env.DB.prepare('UPDATE staff SET role_id = ? WHERE id = ?').bind(roleId, id).run();
 
@@ -147,8 +175,13 @@ adminUserRoutes.post('/team/:id/revoke', requirePermission('manageTeam'), async 
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
 
-  const member = await c.env.DB.prepare('SELECT name FROM staff WHERE id = ?').bind(id).first<{ name: string }>();
+  const member = await c.env.DB.prepare('SELECT name, role_id FROM staff WHERE id = ?').bind(id).first<{ name: string; role_id: string }>();
   if (!member) return c.json({ error: 'not_found' }, 404);
+
+  if (member.role_id === 'owner') {
+    if (!(await canTouchOwnerRole(c.env, session))) return c.json({ error: 'owner_transfer_requires_permission' }, 403);
+    if ((await activeOwnerCount(c.env)) <= 1) return c.json({ error: 'must_keep_one_owner' }, 400);
+  }
 
   await c.env.DB.prepare("UPDATE staff SET status = 'suspended' WHERE id = ?").bind(id).run();
 

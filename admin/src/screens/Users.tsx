@@ -16,7 +16,20 @@ import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { ApiError } from '@/lib/apiClient';
 import type { PlatformUser, TeamMember } from '@/types';
+
+const ERROR_MESSAGES: Record<string, string> = {
+  owner_transfer_requires_permission: 'Передать или снять роль владельца может только сам владелец.',
+  must_keep_one_owner: 'Нельзя оставить платформу без единственного владельца.',
+  already_invited: 'Этот Telegram ID уже приглашён.',
+  unknown_role: 'Такой роли не существует.',
+};
+
+function friendlyError(err: unknown): string {
+  if (err instanceof ApiError && err.code && ERROR_MESSAGES[err.code]) return ERROR_MESSAGES[err.code];
+  return 'Не получилось выполнить действие — попробуйте ещё раз.';
+}
 
 type Tab = 'all' | 'seekers' | 'employers' | 'team';
 type Row = { kind: 'team'; member: TeamMember } | { kind: 'seeker' | 'employer'; user: PlatformUser };
@@ -150,9 +163,44 @@ function TeamDetail({ member }: { member: TeamMember }) {
   const setTeamRole = useUsersStore((s) => s.setTeamRole);
   const revokeAccess = useUsersStore((s) => s.revokeAccess);
   const canManageTeam = useCan('manageTeam');
+  const canTransferOwnership = useCan('transferOwnership');
   const role = roleById(member.roleId, roles);
 
+  // Installing or removing an Owner needs transferOwnership, not just
+  // manageTeam — the server enforces this too, this just keeps the UI
+  // from offering an action that would fail. Only owner is ever excluded;
+  // the built-in vs custom-role distinction isn't relevant here.
+  const isOwnerRow = member.roleId === 'owner';
+  const canEditThisMember = canManageTeam && (!isOwnerRow || canTransferOwnership);
+  const selectableRoles = canTransferOwnership ? roles : roles.filter((r) => r.id !== 'owner');
+
   const [roleId, setRoleId] = useState(member.roleId);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function saveRole() {
+    setError(null);
+    setBusy(true);
+    try {
+      await setTeamRole(member.id, roleId);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke() {
+    setError(null);
+    setBusy(true);
+    try {
+      await revokeAccess(member.id);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div>
@@ -165,18 +213,24 @@ function TeamDetail({ member }: { member: TeamMember }) {
       </div>
 
       <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mt-6 mb-2">Роль</p>
-      <Select value={roleId} disabled={!canManageTeam} onChange={(e) => setRoleId(e.target.value)}>
-        {roles.map((r) => (
+      <Select value={roleId} disabled={!canEditThisMember} onChange={(e) => setRoleId(e.target.value)}>
+        {selectableRoles.map((r) => (
           <option key={r.id} value={r.id}>{r.name}</option>
         ))}
       </Select>
       <p className="text-[13px] text-text-muted mt-2 leading-relaxed">{roleById(roleId, roles).description}</p>
+      {isOwnerRow && !canTransferOwnership && (
+        <p className="text-[12px] text-warning mt-2 leading-relaxed">
+          Передать или снять роль владельца может только сам владелец.
+        </p>
+      )}
+      {error && <p className="text-[12px] text-danger mt-2 leading-relaxed">{error}</p>}
 
       <div className="flex flex-col gap-2 mt-7">
-        <Button variant="dark" disabled={!canManageTeam} onClick={() => setTeamRole(member.id, roleId)}>
+        <Button variant="dark" disabled={!canEditThisMember || busy} onClick={saveRole}>
           Сохранить
         </Button>
-        <Button variant="outline" className="text-danger border-danger/30" disabled={!canManageTeam} onClick={() => revokeAccess(member.id)}>
+        <Button variant="outline" className="text-danger border-danger/30" disabled={!canEditThisMember || busy} onClick={revoke}>
           Отозвать доступ
         </Button>
       </div>
@@ -257,20 +311,29 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
 function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const roles = useRolesStore((s) => s.roles);
   const inviteMember = useUsersStore((s) => s.inviteMember);
+  const canTransferOwnership = useCan('transferOwnership');
+  // There's already exactly one Owner (bootstrapped from OWNER_TELEGRAM_ID)
+  // — inviting a second one needs transferOwnership, so it's not offered
+  // here at all for anyone else.
+  const selectableRoles = canTransferOwnership ? roles : roles.filter((r) => r.id !== 'owner');
   const [name, setName] = useState('');
   const [telegramId, setTelegramId] = useState('');
   const [roleId, setRoleId] = useState('moderator');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     const id = Number(telegramId);
     if (!name.trim() || !id) return;
     setSubmitting(true);
+    setError(null);
     try {
       await inviteMember(name.trim(), id, roleId);
       setName('');
       setTelegramId('');
       onClose();
+    } catch (err) {
+      setError(friendlyError(err));
     } finally {
       setSubmitting(false);
     }
@@ -296,11 +359,12 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         <div>
           <Label>Роль</Label>
           <Select value={roleId} onChange={(e) => setRoleId(e.target.value)}>
-            {roles.map((r) => (
+            {selectableRoles.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </Select>
         </div>
+        {error && <p className="text-[12px] text-danger leading-relaxed">{error}</p>}
         <Button variant="primary" className="w-full mt-2" disabled={submitting} onClick={submit}>
           {submitting ? 'Приглашаем…' : 'Пригласить'}
         </Button>

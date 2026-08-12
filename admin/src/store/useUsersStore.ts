@@ -48,9 +48,14 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     else set({ employers: get().employers.map(apply) });
   },
 
+  // These two used to update the store optimistically before the request
+  // resolved — fine when the server never says no, but now that role
+  // changes touching Owner can legitimately be rejected (403/400), an
+  // optimistic update would show "success" in the UI for a call the
+  // server actually refused. Await first, apply state only on success.
   setTeamRole: async (memberId, roleId) => {
-    set({ team: get().team.map((m) => (m.id === memberId ? { ...m, roleId } : m)) });
     await setTeamMemberRole(memberId, roleId);
+    set({ team: get().team.map((m) => (m.id === memberId ? { ...m, roleId } : m)) });
   },
 
   inviteMember: async (name, telegramId, roleId) => {
@@ -60,8 +65,8 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   },
 
   revokeAccess: async (memberId) => {
-    set({ team: get().team.map((m) => (m.id === memberId ? { ...m, status: 'suspended' } : m)) });
     await revokeTeamAccess(memberId);
+    set({ team: get().team.map((m) => (m.id === memberId ? { ...m, status: 'suspended' } : m)) });
   },
 
   switchRole: async (id, kind) => {
