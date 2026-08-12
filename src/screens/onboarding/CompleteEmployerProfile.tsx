@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Plus, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { Button } from '@/components/ui/Button';
 import { TopBar } from '@/components/ui/TopBar';
 import { SectionLabel } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
 import { useCompanyStore } from '@/store/useCompanyStore';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
-import { compressImageFile } from '@/lib/imageCompress';
+import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -63,8 +64,8 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
     if (!file) return;
     try {
       await uploadAvatar(await compressImageFile(file));
-    } catch {
-      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    } catch (err) {
+      setError(err instanceof UnsupportedImageError ? err.message : 'Не получилось загрузить фото — попробуйте другое или ещё раз');
     }
   }
 
@@ -74,8 +75,8 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
     if (!file) return;
     try {
       await uploadPhoto(await compressImageFile(file));
-    } catch {
-      setError('Не получилось загрузить фото — попробуйте другое или ещё раз');
+    } catch (err) {
+      setError(err instanceof UnsupportedImageError ? err.message : 'Не получилось загрузить фото — попробуйте другое или ещё раз');
     }
   }
 
@@ -177,7 +178,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
             <div className="flex flex-wrap gap-2.5">
               {(company.photos ?? []).map((p) => (
                 <div key={p.id} className="relative h-20 w-20 rounded-2xl overflow-hidden shrink-0">
-                  <img src={p.url} alt="" className="h-full w-full object-cover" />
+                  <SafeImage src={p.url} alt="" className="h-full w-full object-cover" />
                   <button
                     onClick={() => deletePhoto(p.id)}
                     className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center"

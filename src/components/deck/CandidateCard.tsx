@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Candidate } from '@/types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
+import { SafeImage } from '../ui/SafeImage';
 import { cn } from '@/lib/cn';
 
 /** Tinder-style card: tap the left/right edge of the photo to cycle through
@@ -23,7 +24,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
     <div className="flex flex-col h-full">
       <div className="relative h-[42%] shrink-0 bg-surface-2 overflow-hidden">
         {hasPhotos ? (
-          <img src={photos[index]} alt={candidate.name} className="h-full w-full object-cover" />
+          <SafeImage key={photos[index]} src={photos[index]} alt={candidate.name} className="h-full w-full object-cover" />
         ) : (
           <div className="h-full w-full flex items-center justify-center">
             <Avatar name={candidate.name} size={72} />

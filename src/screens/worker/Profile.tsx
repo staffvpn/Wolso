@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
@@ -56,7 +57,7 @@ export function WorkerProfileScreen() {
       {profile.photos.length > 0 && (
         <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">
           {profile.photos.map((p) => (
-            <img key={p.id} src={p.url} alt="" className="h-24 w-24 rounded-2xl object-cover shrink-0" />
+            <SafeImage key={p.id} src={p.url} alt="" className="h-24 w-24 rounded-2xl object-cover shrink-0" />
           ))}
         </div>
       )}

@@ -2,11 +2,29 @@
  *  phone photo is routinely 3-10MB, so every upload would fail without
  *  this. Downscales to a sane max dimension and re-encodes as JPEG.
  *  Non-image files (PDFs) pass through untouched. */
+
+/** Formats every browser can already render in a plain <img> — if
+ *  compression fails on one of these, the original is still safe to
+ *  upload as-is. Anything else (HEIC/HEIF from an iPhone camera roll,
+ *  most often) that fails to decode gets rejected instead of silently
+ *  uploaded, since it would just show up as a broken-image icon for
+ *  whoever's on the other end. */
+const WEB_SAFE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+export class UnsupportedImageError extends Error {}
+
 export async function compressImageFile(file: File, maxDim = 1440, quality = 0.82): Promise<File> {
   if (!file.type.startsWith('image/')) return file;
 
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) return file;
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    if (WEB_SAFE_TYPES.has(file.type)) return file;
+    throw new UnsupportedImageError(
+      'Этот формат фото не открывается в приложении (часто так с HEIC на iPhone). Попробуйте другое фото или включите в настройках камеры «Наиболее совместимые» форматы.',
+    );
+  }
 
   const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
