@@ -371,7 +371,7 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
  *  minutes later doesn't just re-show everyone already passed on, short
  *  enough that someone's anketa (which can change — new photos, new
  *  positions) resurfaces on a realistic timescale. */
-const PASS_COOLDOWN_DAYS = 30;
+const PASS_COOLDOWN_DAYS = 1;
 
 /** Browse workers directly, not tied to any one vacancy — filtered by the
  *  positions the employer says they're hiring for, so "find staff" never
