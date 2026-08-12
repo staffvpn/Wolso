@@ -135,20 +135,18 @@ export interface Transaction {
   createdAt: string;
 }
 
-/** A pending applicant, as seen by the employer swiping candidates.
- *  Fields are limited to what the backend actually knows about a worker —
- *  no fabricated distance/online-presence/skills/reviews. */
-export interface Candidate {
+/** Shared by both "someone who applied to my shift" (Candidate) and
+ *  "someone I'm browsing directly" (WorkerListing) — CandidateCard only
+ *  ever needs this much. Fields are limited to what the backend actually
+ *  knows about a worker — no fabricated distance/online-presence/reviews. */
+export interface CandidateProfile {
   id: string;
-  /** The shift (vacancy) this application is for. */
-  vacancyId: string;
   workerId: string;
   name: string;
   positionLabel: string;
   rating: number;
   shiftsCompleted: number;
   city: string;
-  status: 'pending' | 'accepted' | 'declined';
   bio?: string;
   skills?: string;
   age?: number;
@@ -156,6 +154,17 @@ export interface Candidate {
    *  whole list left-to-right, Tinder-style. */
   photos: string[];
 }
+
+/** A pending applicant, as seen by the employer swiping candidates. */
+export interface Candidate extends CandidateProfile {
+  /** The shift (vacancy) this application is for. */
+  vacancyId: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
+/** A worker the employer is browsing directly (not tied to any one
+ *  vacancy) — the "find staff" deck, filtered by the positions they pick. */
+export type WorkerListing = CandidateProfile;
 
 export interface Vacancy {
   id: string;

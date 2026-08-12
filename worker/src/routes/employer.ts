@@ -364,3 +364,51 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
 
   return c.json({ ok: true });
 });
+
+/** Browse workers directly, not tied to any one vacancy — filtered by the
+ *  positions the employer says they're hiring for, so "find staff" never
+ *  shows a hostess to someone looking for waiters. Requires at least one
+ *  position (empty list = empty deck, not "show everyone"). Workers who
+ *  already have a chat with this company (invited from here, or hired off
+ *  an application) or who were explicitly passed on don't show up again. */
+employerRoutes.get('/workers', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const positions = (c.req.query('positions') ?? '').split(',').filter(Boolean);
+  if (positions.length === 0) return c.json({ workers: [] });
+
+  const placeholders = positions.map(() => '?').join(',');
+  const { results } = await c.env.DB.prepare(
+    `SELECT DISTINCT w.id as worker_id, ${CANDIDATE_WORKER_FIELDS},
+            (SELECT wp2.position_label FROM worker_positions wp2
+             WHERE wp2.worker_id = w.id AND wp2.position IN (${placeholders})
+             ORDER BY wp2.months DESC LIMIT 1) as matched_position_label
+     FROM workers w
+     JOIN worker_positions wp ON wp.worker_id = w.id
+     LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+     WHERE wp.position IN (${placeholders})
+       AND w.status != 'suspended'
+       AND (t.active_role = 'worker' OR t.active_role IS NULL)
+       AND w.id NOT IN (SELECT worker_id FROM company_worker_passes WHERE company_id = ?)
+       AND w.id NOT IN (SELECT worker_id FROM chats WHERE company_id = ?)
+     ORDER BY w.created_at DESC
+     LIMIT 100`,
+  )
+    .bind(...positions, ...positions, session.companyId, session.companyId)
+    .all<CandidateWorkerRow & { matched_position_label: string | null }>();
+
+  return c.json({ workers: results.map(withWorkerPhotos) });
+});
+
+/** Left swipe in "find staff" — remembered so this person doesn't reappear
+ *  the next time the employer opens the deck. */
+employerRoutes.post('/workers/:workerId/pass', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  await c.env.DB.prepare('INSERT OR IGNORE INTO company_worker_passes (company_id, worker_id) VALUES (?, ?)')
+    .bind(session.companyId, c.req.param('workerId'))
+    .run();
+  return c.json({ ok: true });
+});

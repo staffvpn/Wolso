@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Target, ListChecks, CalendarClock, MessageCircle, CircleUserRound, Users, Briefcase } from 'lucide-react';
+import { Target, ListChecks, CalendarClock, MessageCircle, CircleUserRound, Users, Briefcase, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
 import { useChatStore } from '@/store/useChatStore';
@@ -26,6 +26,7 @@ export function BottomNav() {
   ];
 
   const employerItems: NavItem[] = [
+    { to: '/e/find', label: 'Поиск', icon: Search },
     { to: '/e/candidates', label: 'Кандидаты', icon: Users },
     { to: '/e/vacancies', label: 'Вакансии', icon: Briefcase },
     { to: '/e/chats', label: 'Чаты', icon: MessageCircle, badge: unreadChats },

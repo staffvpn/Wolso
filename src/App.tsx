@@ -16,6 +16,7 @@ import { Settings } from './screens/worker/Settings';
 import { Favorites } from './screens/worker/Favorites';
 
 import { Candidates } from './screens/employer/Candidates';
+import { FindWorkers } from './screens/employer/FindWorkers';
 import { Vacancies } from './screens/employer/Vacancies';
 import { VacancyDetail } from './screens/employer/VacancyDetail';
 import { NewVacancy } from './screens/employer/NewVacancy';
@@ -64,6 +65,7 @@ export default function App() {
             {/* Employer tabs */}
             <Route path="/e" element={<TabShell />}>
               <Route index element={<Navigate to="candidates" replace />} />
+              <Route path="find" element={<FindWorkers />} />
               <Route path="candidates" element={<Candidates />} />
               <Route path="vacancies" element={<Vacancies />} />
               <Route path="chats" element={<ChatList />} />

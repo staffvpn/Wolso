@@ -1,4 +1,4 @@
-import type { Candidate, Position, Vacancy } from '@/types';
+import type { Candidate, Position, Vacancy, WorkerListing } from '@/types';
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { ageFrom } from '@/lib/format';
 
@@ -92,6 +92,52 @@ export async function fetchVacancyCandidates(vacancyId: string, positionLabel?: 
     as: 'company',
   });
   return candidates.map((c) => fromApiCandidate(c, positionLabel));
+}
+
+interface WorkerListingApiResponse {
+  worker_id: number;
+  worker_name: string;
+  worker_rating: number;
+  worker_shifts_completed: number;
+  worker_city: string;
+  worker_bio: string | null;
+  worker_skills: string | null;
+  worker_birthdate: string | null;
+  worker_avatar_url: string | null;
+  worker_photos: string[];
+  matched_position_label: string | null;
+}
+
+function fromApiWorkerListing(w: WorkerListingApiResponse): WorkerListing {
+  const avatar = resolveMediaUrl(w.worker_avatar_url);
+  const gallery = w.worker_photos.map((p) => resolveMediaUrl(p)!);
+  return {
+    id: String(w.worker_id),
+    workerId: String(w.worker_id),
+    name: w.worker_name,
+    positionLabel: w.matched_position_label ?? '',
+    rating: w.worker_rating,
+    shiftsCompleted: w.worker_shifts_completed,
+    city: w.worker_city,
+    bio: w.worker_bio ?? undefined,
+    skills: w.worker_skills ?? undefined,
+    age: ageFrom(w.worker_birthdate),
+    photos: avatar ? [avatar, ...gallery] : gallery,
+  };
+}
+
+/** "Find staff" — workers browsed directly rather than applicants to a
+ *  specific vacancy, filtered by position so an employer looking for
+ *  waiters never has to page past a hostess. */
+export async function fetchWorkerListings(positions: Position[]): Promise<WorkerListing[]> {
+  const qs = positions.length ? `?positions=${positions.join(',')}` : '';
+  const { workers } = await apiFetch<{ workers: WorkerListingApiResponse[] }>(`/employer/workers${qs}`, { as: 'company' });
+  return workers.map(fromApiWorkerListing);
+}
+
+/** Left swipe in "find staff" — this worker won't be offered again. */
+export async function passWorker(workerId: string): Promise<void> {
+  await apiFetch(`/employer/workers/${workerId}/pass`, { method: 'POST', as: 'company' });
 }
 
 export async function decideCandidate(vacancyId: string, applicationId: string, status: 'accepted' | 'declined'): Promise<void> {

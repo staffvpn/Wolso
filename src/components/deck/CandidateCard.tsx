@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Candidate } from '@/types';
+import type { CandidateProfile } from '@/types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
@@ -7,8 +7,9 @@ import { cn } from '@/lib/cn';
 
 /** Tinder-style card: tap the left/right edge of the photo to cycle through
  *  the avatar + portfolio photos, everything else scrolls for the rest of
- *  the anketa (bio, skills). */
-export function CandidateCard({ candidate }: { candidate: Candidate }) {
+ *  the anketa (bio, skills). Shared by the applicant queue (Candidate) and
+ *  the "find staff" browse deck (WorkerListing) — both are CandidateProfile. */
+export function CandidateCard({ candidate }: { candidate: CandidateProfile }) {
   const [index, setIndex] = useState(0);
   const photos = candidate.photos;
   const hasPhotos = photos.length > 0;
