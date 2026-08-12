@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Map as MapIcon, Rocket, X, Check } from 'lucide-react';
+import { Bell, Map as MapIcon, Rocket, X, Check, ChevronLeft, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
 import { Chip } from '@/components/ui/Chip';
+import { Badge } from '@/components/ui/Badge';
+import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
@@ -12,17 +14,21 @@ import { ShiftCard } from '@/components/deck/ShiftCard';
 import { FilterSheet } from '@/components/FilterSheet';
 import { useShiftsStore } from '@/store/useShiftsStore';
 import { useFiltersStore } from '@/store/useFiltersStore';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatMoney } from '@/lib/format';
+import { formatDistance, formatMoney, relativeDay, timeRange } from '@/lib/format';
 import { FEATURES } from '@/lib/features';
+import { hapticSelect } from '@/lib/telegram';
+import { cn } from '@/lib/cn';
 import type { Shift } from '@/types';
 
 export function Feed() {
   const navigate = useNavigate();
   const deckRef = useRef<SwipeDeckHandle>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { deck, index, loading, lastApplied, loadDeck, swipe, clearLastApplied } = useShiftsStore();
   const filters = useFiltersStore((s) => s.filters);
@@ -38,6 +44,12 @@ export function Feed() {
 
   const remaining = useMemo(() => deck.slice(index), [deck, index]);
   const current = remaining[0];
+
+  // The deck can empty out from under the detail view (last card
+  // skipped/applied) — fall back to the swipe view instead of showing it blank.
+  useEffect(() => {
+    if (detailOpen && !current) setDetailOpen(false);
+  }, [detailOpen, current]);
 
   const radiusLabel = filters.radiusKm === 'city' ? 'по всему городу' : `в радиусе ${filters.radiusKm} км`;
 
@@ -77,6 +89,7 @@ export function Feed() {
         loading={loading}
         renderCard={(shift) => <ShiftCard shift={shift} />}
         onSwiped={(_shift, direction) => swipe(direction)}
+        onCardTap={() => setDetailOpen(true)}
         empty={
           <EmptyState
             title="Смены закончились"
@@ -122,9 +135,121 @@ export function Feed() {
       <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} onApply={loadDeck} />
 
       <AnimatePresence>
+        {detailOpen && current && (
+          <ShiftDetailOverlay
+            shift={current}
+            onClose={() => setDetailOpen(false)}
+            onSkip={() => deckRef.current?.swipeLeft()}
+            onApply={() => {
+              // Closes right away so the success screen (below) takes over
+              // cleanly instead of flashing the next card first.
+              setDetailOpen(false);
+              deckRef.current?.swipeRight();
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {lastApplied && <ApplySuccessOverlay shift={lastApplied} onClose={clearLastApplied} />}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** Full-screen read of the card currently on top of the deck — opened by
+ *  tapping it. Stays open across "Пропустить" so you can keep paging
+ *  through the deck without dropping back to the swipe view each time;
+ *  "Откликнуться" closes it in favor of the existing apply-success screen. */
+function ShiftDetailOverlay({
+  shift,
+  onClose,
+  onSkip,
+  onApply,
+}: {
+  shift: Shift;
+  onClose: () => void;
+  onSkip: () => void;
+  onApply: () => void;
+}) {
+  const company = resolveCompany(shift);
+  const day = relativeDay(new Date(shift.date));
+  const durationH = shift.endHour - shift.startHour;
+  const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
+  const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 24 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 40 }}
+      className="absolute inset-0 z-[300] bg-bg flex flex-col safe-top safe-bottom"
+    >
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1 shrink-0">
+        <IconButton size={40} onClick={onClose} aria-label="Назад">
+          <ChevronLeft size={20} />
+        </IconButton>
+        <span className="flex-1" />
+        <IconButton
+          size={40}
+          onClick={() => {
+            hapticSelect();
+            toggleFavorite(shift.id);
+          }}
+          aria-label="В избранное"
+        >
+          <Heart size={18} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-text-faint')} />
+        </IconButton>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4">
+        <div className="flex items-center gap-3">
+          {company.avatarUrl ? (
+            <Avatar src={company.avatarUrl} name={company.name} size={44} className="rounded-2xl" />
+          ) : (
+            <LogoBadge initial={company.logoInitial} color={company.logoColor} size={44} />
+          )}
+          <div className="min-w-0">
+            <p className="font-bold text-[16px] truncate">{company.name}</p>
+            <p className="text-[13px] text-text-muted truncate">
+              {[company.address, shift.distanceKm !== undefined && formatDistance(shift.distanceKm), company.rating > 0 && `★ ${company.rating}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </div>
+        </div>
+
+        <h2 className="text-[26px] font-extrabold mt-5">{shift.positionLabel}</h2>
+
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Badge tone={shift.urgency === 'urgent' ? 'warning' : 'dark'}>
+            {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
+          </Badge>
+          <Badge tone="dark">{durationH} часов</Badge>
+          {shift.meal && <Badge tone="dark">Питание</Badge>}
+        </div>
+
+        <div className="mt-5">
+          <span className="text-[32px] font-extrabold leading-none">{formatMoney(shift.totalPay)}</span>
+          <span className="text-[14px] text-text-muted ml-2">за смену · {shift.hourlyRate} ₽/ч</span>
+        </div>
+
+        <p className="text-[14px] leading-relaxed text-text-muted mt-4">{shift.description}</p>
+        <p className="text-[12px] text-text-faint mt-2">
+          {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 px-5 py-4 shrink-0 border-t border-border-soft">
+        <IconButton size={56} onClick={onSkip} aria-label="Пропустить">
+          <X size={22} className="text-text-muted" />
+        </IconButton>
+        <Button size="lg" className="flex-1 max-w-[220px]" onClick={onApply}>
+          <Check size={18} /> Откликнуться
+        </Button>
+      </div>
+    </motion.div>
   );
 }
 

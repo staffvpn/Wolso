@@ -14,13 +14,15 @@ interface SwipeDeckProps<T> {
   keyOf: (item: T) => string;
   renderCard: (item: T) => ReactNode;
   onSwiped: (item: T, direction: 'left' | 'right') => void;
+  /** Tap on the top card — e.g. to open a full-screen detail view. */
+  onCardTap?: (item: T) => void;
   loading?: boolean;
   empty?: ReactNode;
   stackSize?: number;
 }
 
 function SwipeDeckInner<T>(props: SwipeDeckProps<T>, ref: Ref<SwipeDeckHandle>) {
-  const { items, keyOf, renderCard, onSwiped, loading, empty, stackSize = 2 } = props;
+  const { items, keyOf, renderCard, onSwiped, onCardTap, loading, empty, stackSize = 2 } = props;
   const cardRefs = useRef(new Map<string, DeckCardHandle>());
 
   useImperativeHandle(ref, () => ({
@@ -64,6 +66,7 @@ function SwipeDeckInner<T>(props: SwipeDeckProps<T>, ref: Ref<SwipeDeckHandle>) 
               index={i}
               active={i === 0}
               onSwiped={(direction) => onSwiped(item, direction)}
+              onTap={i === 0 ? () => onCardTap?.(item) : undefined}
             >
               {renderCard(item)}
             </DeckCard>

@@ -11,6 +11,9 @@ interface DeckCardProps {
   index: number;
   active: boolean;
   onSwiped: (direction: 'left' | 'right') => void;
+  /** Fires on a genuine tap (no meaningful drag) of the active card — not
+   *  wired for stacked-behind cards, tapping those doesn't make sense. */
+  onTap?: () => void;
   children: ReactNode;
 }
 
@@ -19,7 +22,7 @@ const VELOCITY_THRESHOLD = 600;
 const FLY_DISTANCE = 560;
 
 export const DeckCard = forwardRef<DeckCardHandle, DeckCardProps>(function DeckCard(
-  { index, active, onSwiped, children },
+  { index, active, onSwiped, onTap, children },
   ref,
 ) {
   const x = useMotionValue(0);
@@ -58,6 +61,7 @@ export const DeckCard = forwardRef<DeckCardHandle, DeckCardProps>(function DeckC
         drag={active ? 'x' : false}
         dragElastic={0.7}
         dragConstraints={{ left: 0, right: 0 }}
+        onTap={active ? onTap : undefined}
         onDragEnd={(_, info) => {
           const passedDistance = Math.abs(info.offset.x) > SWIPE_THRESHOLD;
           const passedVelocity = Math.abs(info.velocity.x) > VELOCITY_THRESHOLD;

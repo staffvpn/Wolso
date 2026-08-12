@@ -17,7 +17,7 @@ export function ShiftCard({ shift }: { shift: Shift }) {
 
   return (
     <div className="flex flex-col h-full p-5">
-      <div className="flex items-start justify-between gap-3 shrink-0">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {company.avatarUrl ? (
             <Avatar src={company.avatarUrl} name={company.name} size={44} className="rounded-2xl" />
@@ -35,7 +35,11 @@ export function ShiftCard({ shift }: { shift: Shift }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => {
+            onClick={(e) => {
+              // The card itself opens the full-screen detail on tap — this
+              // button sits on top of that tap area and needs its own click
+              // to not also count as "open the card".
+              e.stopPropagation();
               hapticSelect();
               toggleFavorite(shift.id);
             }}
@@ -46,9 +50,9 @@ export function ShiftCard({ shift }: { shift: Shift }) {
         </div>
       </div>
 
-      <h2 className="text-[26px] font-extrabold mt-5 shrink-0">{shift.positionLabel}</h2>
+      <h2 className="text-[26px] font-extrabold mt-5">{shift.positionLabel}</h2>
 
-      <div className="flex flex-wrap gap-2 mt-3 shrink-0">
+      <div className="flex flex-wrap gap-2 mt-3">
         <Badge tone={shift.urgency === 'urgent' ? 'warning' : 'dark'}>
           {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
         </Badge>
@@ -56,22 +60,22 @@ export function ShiftCard({ shift }: { shift: Shift }) {
         {shift.meal && <Badge tone="dark">Питание</Badge>}
       </div>
 
-      <div className="mt-5 shrink-0">
+      <div className="mt-5">
         <span className="text-[32px] font-extrabold leading-none">{formatMoney(shift.totalPay)}</span>
         <span className="text-[14px] text-text-muted ml-2">
           за смену · {shift.hourlyRate} ₽/ч
         </span>
       </div>
 
-      {/* Only this part scrolls — header above stays put, and when the
-       *  description is short this looks exactly like static content
-       *  (no scrollbar, nothing to drag) since there's nothing to overflow. */}
-      <div className="flex-1 min-h-0 overflow-y-auto mt-4">
-        <p className="text-[14px] leading-relaxed text-text-muted">{shift.description}</p>
-        <p className="text-[12px] text-text-faint mt-2 pb-1">
-          {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
-        </p>
-      </div>
+      {/* Card doesn't scroll — DeckCard clips it at the rounded corners, so
+       *  a long description just ends at the card edge. Tap the card to
+       *  read the rest in the full-screen detail view instead. */}
+      <p className="text-[14px] leading-relaxed text-text-muted mt-4">{shift.description}</p>
+      <p className="text-[12px] text-text-faint mt-2">
+        {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
+      </p>
+
+      <div className="flex-1" />
     </div>
   );
 }
