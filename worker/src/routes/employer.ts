@@ -365,12 +365,21 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
   return c.json({ ok: true });
 });
 
+/** A left swipe isn't "never again" — just "not for a while", same idea as
+ *  a job board not re-showing a listing you dismissed yesterday but not
+ *  hiding it forever. Long enough that re-browsing the same deck a few
+ *  minutes later doesn't just re-show everyone already passed on, short
+ *  enough that someone's anketa (which can change — new photos, new
+ *  positions) resurfaces on a realistic timescale. */
+const PASS_COOLDOWN_DAYS = 30;
+
 /** Browse workers directly, not tied to any one vacancy — filtered by the
  *  positions the employer says they're hiring for, so "find staff" never
  *  shows a hostess to someone looking for waiters. Requires at least one
  *  position (empty list = empty deck, not "show everyone"). Workers who
  *  already have a chat with this company (invited from here, or hired off
- *  an application) or who were explicitly passed on don't show up again. */
+ *  an application) don't show up again; a passed worker comes back after
+ *  PASS_COOLDOWN_DAYS. */
 employerRoutes.get('/workers', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -390,7 +399,10 @@ employerRoutes.get('/workers', async (c) => {
      WHERE wp.position IN (${placeholders})
        AND w.status != 'suspended'
        AND (t.active_role = 'worker' OR t.active_role IS NULL)
-       AND w.id NOT IN (SELECT worker_id FROM company_worker_passes WHERE company_id = ?)
+       AND w.id NOT IN (
+         SELECT worker_id FROM company_worker_passes
+         WHERE company_id = ? AND created_at >= datetime('now', '-${PASS_COOLDOWN_DAYS} days')
+       )
        AND w.id NOT IN (SELECT worker_id FROM chats WHERE company_id = ?)
      ORDER BY w.created_at DESC
      LIMIT 100`,
@@ -401,13 +413,17 @@ employerRoutes.get('/workers', async (c) => {
   return c.json({ workers: results.map(withWorkerPhotos) });
 });
 
-/** Left swipe in "find staff" — remembered so this person doesn't reappear
- *  the next time the employer opens the deck. */
+/** Left swipe in "find staff" — hidden for PASS_COOLDOWN_DAYS, not forever.
+ *  Passing the same person again (once they've resurfaced) restarts the
+ *  cooldown from that point rather than the original pass. */
 employerRoutes.post('/workers/:workerId/pass', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
-  await c.env.DB.prepare('INSERT OR IGNORE INTO company_worker_passes (company_id, worker_id) VALUES (?, ?)')
+  await c.env.DB.prepare(
+    `INSERT INTO company_worker_passes (company_id, worker_id) VALUES (?, ?)
+     ON CONFLICT (company_id, worker_id) DO UPDATE SET created_at = datetime('now')`,
+  )
     .bind(session.companyId, c.req.param('workerId'))
     .run();
   return c.json({ ok: true });
