@@ -87,9 +87,8 @@ export function Feed() {
         items={remaining}
         keyOf={(s) => s.id}
         loading={loading}
-        renderCard={(shift) => <ShiftCard shift={shift} />}
+        renderCard={(shift) => <ShiftCard shift={shift} onOpenDetail={() => setDetailOpen(true)} />}
         onSwiped={(_shift, direction) => swipe(direction)}
-        onCardTap={() => setDetailOpen(true)}
         empty={
           <EmptyState
             title="Смены закончились"

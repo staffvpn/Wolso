@@ -3,12 +3,12 @@ import { resolveCompany } from '@/data/companies';
 import { Avatar, LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { formatDistance, formatMoney, relativeDay, timeRange } from '@/lib/format';
-import { Heart } from 'lucide-react';
+import { ChevronRight, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
 
-export function ShiftCard({ shift }: { shift: Shift }) {
+export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?: () => void }) {
   const company = resolveCompany(shift);
   const day = relativeDay(new Date(shift.date));
   const durationH = shift.endHour - shift.startHour;
@@ -16,7 +16,7 @@ export function ShiftCard({ shift }: { shift: Shift }) {
   const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
 
   return (
-    <div className="flex flex-col h-full p-5">
+    <div className="flex flex-col h-full p-5 relative">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {company.avatarUrl ? (
@@ -35,11 +35,7 @@ export function ShiftCard({ shift }: { shift: Shift }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={(e) => {
-              // The card itself opens the full-screen detail on tap — this
-              // button sits on top of that tap area and needs its own click
-              // to not also count as "open the card".
-              e.stopPropagation();
+            onClick={() => {
               hapticSelect();
               toggleFavorite(shift.id);
             }}
@@ -68,14 +64,24 @@ export function ShiftCard({ shift }: { shift: Shift }) {
       </div>
 
       {/* Card doesn't scroll — DeckCard clips it at the rounded corners, so
-       *  a long description just ends at the card edge. Tap the card to
-       *  read the rest in the full-screen detail view instead. */}
+       *  a long description just ends at the card edge. A tap used to open
+       *  the full-screen detail view here, but that made real swipes get
+       *  occasionally misread as taps — a dedicated button is unambiguous. */}
       <p className="text-[14px] leading-relaxed text-text-muted mt-4">{shift.description}</p>
       <p className="text-[12px] text-text-faint mt-2">
         {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
       </p>
 
       <div className="flex-1" />
+
+      {onOpenDetail && (
+        <button
+          onClick={onOpenDetail}
+          className="absolute bottom-4 right-4 flex items-center gap-0.5 h-8 pl-3 pr-2.5 rounded-full bg-surface-2/95 backdrop-blur border border-border-soft text-[12px] font-semibold text-text shadow-sm"
+        >
+          Подробнее <ChevronRight size={13} className="text-text-faint" />
+        </button>
+      )}
     </div>
   );
 }
