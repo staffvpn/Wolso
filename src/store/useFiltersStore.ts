@@ -7,7 +7,7 @@ const DEFAULT_FILTERS: Filters = {
   radiusKm: 'city',
   urgentOnly: false,
   employmentType: 'shift',
-  when: 'today',
+  when: 'upcoming',
   timeOfDay: [],
 };
 

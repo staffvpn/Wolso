@@ -189,6 +189,10 @@ export interface Filters {
   radiusKm: number | 'city';
   urgentOnly: boolean;
   employmentType: 'shift' | 'permanent' | 'internship';
-  when: 'today' | 'tomorrow' | 'custom';
+  /** 'upcoming' (default, no explicit chip selected) shows every shift from
+   *  today onward — 'today'/'tomorrow' are deliberate narrowing filters a
+   *  worker picks in the sheet, 'custom' means "dates I picked" but isn't
+   *  actually wired to specific dates yet, so it also shows everything. */
+  when: 'upcoming' | 'today' | 'tomorrow' | 'custom';
   timeOfDay: ('morning' | 'day' | 'evening' | 'night')[];
 }

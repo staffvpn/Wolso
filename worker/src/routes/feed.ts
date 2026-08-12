@@ -18,7 +18,7 @@ feedRoutes.get('/', async (c) => {
   const radiusKm = q.radiusKm && q.radiusKm !== 'city' ? Number(q.radiusKm) : undefined;
   const urgentOnly = q.urgentOnly === 'true';
   const employmentType = q.employmentType || undefined;
-  const when = q.when || 'today';
+  const when = q.when || 'upcoming';
   const timeOfDay = q.timeOfDay ? q.timeOfDay.split(',').filter(Boolean) : [];
 
   const clauses = ["s.status = 'active'"];
@@ -41,11 +41,19 @@ feedRoutes.get('/', async (c) => {
     clauses.push(`s.time_of_day IN (${timeOfDay.map(() => '?').join(',')})`);
     binds.push(...timeOfDay);
   }
-  if (when !== 'custom') {
+  if (when === 'today' || when === 'tomorrow') {
     const target = new Date();
     if (when === 'tomorrow') target.setDate(target.getDate() + 1);
     clauses.push('s.date = ?');
     binds.push(target.toISOString().slice(0, 10));
+  } else {
+    // 'upcoming' (default — no date chip explicitly picked) and 'custom'
+    // (not actually wired to specific dates yet) both show every shift
+    // from today on, so a shift posted for tomorrow or later doesn't
+    // silently disappear from the feed just because nobody narrowed the
+    // date filter. Still excludes anything dated in the past.
+    clauses.push('s.date >= ?');
+    binds.push(new Date().toISOString().slice(0, 10));
   }
 
   // Applicant's own shifts already applied to shouldn't show again.
