@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Company, Shift } from '@/types';
 import { apiFetch } from '@/lib/apiClient';
+import { fromApi as fromApiShift, type ShiftApiResponse } from '@/services/shiftsApi';
+import { fromApiCompanyRow, type CompanyApiRow } from '@/services/companyApi';
 
 interface FavoritesState {
   shiftIds: string[];
@@ -24,7 +26,12 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
   load: async () => {
     set({ loading: true });
     try {
-      const { shifts, companies } = await apiFetch<{ shifts: Shift[]; companies: Company[] }>('/favorites');
+      const { shifts: rawShifts, companies: rawCompanies } = await apiFetch<{
+        shifts: ShiftApiResponse[];
+        companies: CompanyApiRow[];
+      }>('/favorites');
+      const shifts = rawShifts.map(fromApiShift);
+      const companies = rawCompanies.map(fromApiCompanyRow);
       set({
         shifts,
         companies,

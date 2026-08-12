@@ -5,7 +5,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
-import { LogoBadge } from '@/components/ui/Avatar';
+import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
@@ -47,7 +47,11 @@ export function Favorites() {
                 return (
                   <div key={shift.id} className="rounded-card bg-surface border border-border-soft p-4">
                     <div className="flex items-center gap-3">
-                      <LogoBadge initial={company.logoInitial} color={company.logoColor} size={40} />
+                      {company.avatarUrl ? (
+                        <Avatar src={company.avatarUrl} name={company.name} size={40} className="rounded-2xl" />
+                      ) : (
+                        <LogoBadge initial={company.logoInitial} color={company.logoColor} size={40} />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-[15px] truncate">{shift.positionLabel} · {company.name}</p>
                         <p className="text-[13px] text-text-muted truncate">
@@ -76,7 +80,11 @@ export function Favorites() {
             <div className="space-y-3">
               {companies.map((company) => (
                 <div key={company.id} className="flex items-center gap-3 rounded-card bg-surface border border-border-soft p-4">
-                  <LogoBadge initial={company.logoInitial} color={company.logoColor} size={40} />
+                  {company.avatarUrl ? (
+                    <Avatar src={company.avatarUrl} name={company.name} size={40} className="rounded-2xl" />
+                  ) : (
+                    <LogoBadge initial={company.logoInitial} color={company.logoColor} size={40} />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[15px] truncate">{company.name}</p>
                     <p className="text-[12px] text-text-muted truncate">{company.address}</p>

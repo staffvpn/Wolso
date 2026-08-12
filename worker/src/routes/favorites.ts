@@ -19,11 +19,33 @@ favoriteRoutes.get('/', async (c) => {
     if (row) shifts.push(shiftToJson(row));
   }
 
-  const { results: companies } = await c.env.DB.prepare(
-    `SELECT c.* FROM favorite_companies f JOIN companies c ON c.id = f.company_id WHERE f.worker_id = ?`,
+  const { results: companyRows } = await c.env.DB.prepare(
+    `SELECT c.id, c.name, c.address, c.city, c.logo_initial, c.logo_color, c.rating, c.reviews_count,
+            c.description, c.founded_year, (c.avatar_data IS NOT NULL) as has_avatar
+     FROM favorite_companies f JOIN companies c ON c.id = f.company_id WHERE f.worker_id = ?`,
   )
     .bind(session.workerId)
-    .all();
+    .all<{
+      id: number; name: string; address: string | null; city: string; logo_initial: string; logo_color: string;
+      rating: number; reviews_count: number; description: string; founded_year: number | null; has_avatar: number;
+    }>();
+
+  // Shaped like companyApi.ts's CompanyApiRow (mixed snake/camel case, same
+  // as loadCompanyProfile) so the client can run it through the same
+  // fromApiCompanyRow transform instead of trusting a raw row shape.
+  const companies = companyRows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    address: c.address,
+    city: c.city,
+    logo_initial: c.logo_initial,
+    logo_color: c.logo_color,
+    rating: c.rating,
+    reviews_count: c.reviews_count,
+    description: c.description,
+    founded_year: c.founded_year,
+    avatarUrl: c.has_avatar ? `/media/companies/${c.id}/avatar` : null,
+  }));
 
   return c.json({ shifts, companies });
 });

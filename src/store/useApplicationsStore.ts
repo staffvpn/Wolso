@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Application, Shift } from '@/types';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { useNotificationsStore } from './useNotificationsStore';
 
 interface ApiApplication {
@@ -48,7 +48,9 @@ function fromApi(a: ApiApplication): Application {
       ? {
           id: String(a.shift.id),
           companyId: String(a.shift.companyId),
-          company: a.shift.company,
+          // The API sends a relative /media/... path — needs the API
+          // origin prefixed on, same as everywhere else avatarUrl shows up.
+          company: a.shift.company ? { ...a.shift.company, avatarUrl: resolveMediaUrl(a.shift.company.avatarUrl) } : undefined,
           position: a.shift.position as Shift['position'],
           positionLabel: a.shift.positionLabel,
           date: a.shift.date,

@@ -1,5 +1,5 @@
 import type { Filters, Shift } from '@/types';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 
 function buildQuery(filters: Filters): string {
   const params = new URLSearchParams();
@@ -13,7 +13,7 @@ function buildQuery(filters: Filters): string {
   return params.toString();
 }
 
-interface ShiftApiResponse {
+export interface ShiftApiResponse {
   id: number;
   companyId: number;
   position: string;
@@ -42,10 +42,17 @@ interface ShiftApiResponse {
     logoColor?: string;
     rating?: number;
     reviewsCount?: number;
+    avatarUrl?: string | null;
   };
 }
 
-function fromApi(s: ShiftApiResponse): Shift {
+/** Exported so other stores that embed a raw shift straight from the API
+ *  (applications, favorites) resolve company avatar URLs the same way the
+ *  feed does, instead of trusting the response shape to already match
+ *  `Shift` as-is — the API returns a relative `/media/...` path, which
+ *  only works as an <img src> if the app and API happen to share an
+ *  origin. */
+export function fromApi(s: ShiftApiResponse): Shift {
   return {
     id: String(s.id),
     companyId: String(s.companyId),
@@ -77,6 +84,7 @@ function fromApi(s: ShiftApiResponse): Shift {
           logoColor: s.company.logoColor ?? '#999',
           rating: s.company.rating ?? 0,
           reviewsCount: s.company.reviewsCount ?? 0,
+          avatarUrl: resolveMediaUrl(s.company.avatarUrl),
         }
       : undefined,
   };

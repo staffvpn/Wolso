@@ -1,7 +1,7 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import type { Company } from '@/types';
 
-interface CompanyApiRow {
+export interface CompanyApiRow {
   id: number;
   name: string;
   address: string | null;
@@ -13,8 +13,8 @@ interface CompanyApiRow {
   description: string;
   founded_year: number | null;
   avatarUrl: string | null;
-  profileComplete: boolean;
-  profileCompletion: number;
+  profileComplete?: boolean;
+  profileCompletion?: number;
 }
 
 interface CompanyResponse {
@@ -22,8 +22,11 @@ interface CompanyResponse {
   photos: { id: number; url: string }[];
 }
 
-function fromApi(r: CompanyResponse): Company {
-  const c = r.company;
+/** Exported so other stores embedding a raw company row (favorites) get
+ *  the same avatarUrl resolution as the owner's own profile — the API
+ *  sends a relative `/media/...` path, which needs the app's API origin
+ *  prefixed onto it before it works as an <img src>. */
+export function fromApiCompanyRow(c: CompanyApiRow): Company {
   return {
     id: String(c.id),
     name: c.name,
@@ -37,6 +40,12 @@ function fromApi(r: CompanyResponse): Company {
     avatarUrl: resolveMediaUrl(c.avatarUrl),
     profileComplete: c.profileComplete,
     profileCompletion: c.profileCompletion,
+  };
+}
+
+function fromApi(r: CompanyResponse): Company {
+  return {
+    ...fromApiCompanyRow(r.company),
     photos: r.photos.map((p) => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
   };
 }

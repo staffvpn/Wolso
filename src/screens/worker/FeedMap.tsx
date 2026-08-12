@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { ChevronLeft, List, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
-import { LogoBadge } from '@/components/ui/Avatar';
+import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { resolveCompany } from '@/data/companies';
 import { relativeDay } from '@/lib/format';
 import { useShiftsStore } from '@/store/useShiftsStore';
@@ -94,7 +94,11 @@ export function FeedMap() {
             const company = resolveCompany(shift);
             return (
               <div key={shift.id} className="flex items-center gap-3">
-                <LogoBadge initial={company.logoInitial} color={company.logoColor} size={38} />
+                {company.avatarUrl ? (
+                  <Avatar src={company.avatarUrl} name={company.name} size={38} className="rounded-2xl" />
+                ) : (
+                  <LogoBadge initial={company.logoInitial} color={company.logoColor} size={38} />
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
                   <p className="text-[12px] text-text-muted truncate">
