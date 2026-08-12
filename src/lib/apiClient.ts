@@ -8,7 +8,16 @@ const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 export function resolveMediaUrl(path?: string | null): string | undefined {
   if (!path) return undefined;
   if (/^https?:\/\//.test(path)) return path;
-  return `${API_URL ?? ''}${path}`;
+  const url = `${API_URL ?? ''}${path}`;
+  // Unlike gallery photos (a fresh, unique URL per upload), the avatar URL
+  // is always the same `.../avatar` path reused across re-uploads — the
+  // server sends `Cache-Control: no-store` so it's never served stale, but
+  // an unchanged <img src> string means some browsers/WebViews won't even
+  // issue a new request after a re-upload, just keep showing the old
+  // bitmap until the page is force-reloaded. Stamp a cache-buster onto it
+  // every time it's resolved from a fresh API response so the src always
+  // changes when the underlying photo does.
+  return path.endsWith('/avatar') ? `${url}?v=${Date.now()}` : url;
 }
 
 export class ApiError extends Error {

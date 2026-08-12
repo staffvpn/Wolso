@@ -47,7 +47,7 @@ async function loadProfile(env: Env, workerId: number) {
   const worker = await env.DB.prepare('SELECT * FROM workers WHERE id = ?').bind(workerId).first<WorkerRow>();
   if (!worker) return null;
 
-  const { results: positions } = await env.DB.prepare('SELECT position, position_label, years FROM worker_positions WHERE worker_id = ?')
+  const { results: positions } = await env.DB.prepare('SELECT id, position, position_label, months FROM worker_positions WHERE worker_id = ?')
     .bind(workerId)
     .all();
   const { results: photoRows } = await env.DB.prepare('SELECT id FROM worker_photos WHERE worker_id = ? ORDER BY position ASC')
@@ -111,11 +111,21 @@ profileRoutes.patch('/', async (c) => {
 profileRoutes.post('/positions', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const { position, positionLabel, years } = await c.req.json<{ position: string; positionLabel: string; years: number }>();
+  const { position, positionLabel, months } = await c.req.json<{ position: string; positionLabel: string; months: number }>();
 
-  await c.env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, years) VALUES (?, ?, ?, ?)')
-    .bind(session.workerId, position, positionLabel, years ?? 0)
+  await c.env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, months) VALUES (?, ?, ?, ?)')
+    .bind(session.workerId, position, positionLabel, months ?? 0)
     .run();
+
+  const profile = await loadProfile(c.env, session.workerId);
+  return c.json({ ok: true, ...profile });
+});
+
+profileRoutes.delete('/positions/:id', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  await c.env.DB.prepare('DELETE FROM worker_positions WHERE id = ? AND worker_id = ?').bind(c.req.param('id'), session.workerId).run();
 
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });

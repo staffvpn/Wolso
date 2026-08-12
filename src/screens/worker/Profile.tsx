@@ -8,6 +8,7 @@ import { Card, SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
 import { FEATURES } from '@/lib/features';
+import { formatExperience } from '@/lib/format';
 
 export function WorkerProfileScreen() {
   const navigate = useNavigate();
@@ -66,8 +67,8 @@ export function WorkerProfileScreen() {
         <SectionLabel>Должности</SectionLabel>
         <div className="flex flex-wrap gap-2">
           {positions.map((p) => (
-            <Chip key={p.position} tone="dark" selected>
-              {p.positionLabel} · {p.years} {p.years === 1 ? 'год' : 'года'}
+            <Chip key={p.id} tone="dark" selected>
+              {p.positionLabel} · {formatExperience(p.months)}
             </Chip>
           ))}
           <button

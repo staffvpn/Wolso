@@ -19,7 +19,7 @@ interface WorkerApiRow {
 
 interface MeResponse {
   worker: WorkerApiRow;
-  positions: { position: string; position_label: string; years: number }[];
+  positions: { id: number; position: string; position_label: string; months: number }[];
   photos: { id: number; url: string }[];
 }
 
@@ -37,7 +37,7 @@ function fromApi(r: MeResponse): WorkerProfile {
     birthdate: r.worker.birthdate ?? undefined,
     age: r.worker.age ?? undefined,
     avatarUrl: resolveMediaUrl(r.worker.avatarUrl),
-    positions: r.positions.map((p) => ({ position: p.position as Position, positionLabel: p.position_label, years: p.years })),
+    positions: r.positions.map((p) => ({ id: String(p.id), position: p.position as Position, positionLabel: p.position_label, months: p.months })),
     reviews: [],
     photos: r.photos.map((p) => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
   };
@@ -61,11 +61,16 @@ export async function updateMyProfile(update: ProfileUpdate): Promise<WorkerProf
   return fromApi(data);
 }
 
-export async function addExperience(exp: WorkerExperience): Promise<WorkerProfile> {
+export async function addExperience(exp: Omit<WorkerExperience, 'id'>): Promise<WorkerProfile> {
   const data = await apiFetch<MeResponse>('/me/positions', {
     method: 'POST',
-    body: { position: exp.position, positionLabel: exp.positionLabel, years: exp.years },
+    body: { position: exp.position, positionLabel: exp.positionLabel, months: exp.months },
   });
+  return fromApi(data);
+}
+
+export async function deleteExperience(id: string): Promise<WorkerProfile> {
+  const data = await apiFetch<MeResponse>(`/me/positions/${id}`, { method: 'DELETE' });
   return fromApi(data);
 }
 

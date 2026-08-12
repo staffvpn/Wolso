@@ -5,7 +5,7 @@ import { signSession } from '../lib/session';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
-const DEFAULT_POSITIONS = [{ position: 'barista', position_label: 'Бариста', years: 0 }];
+const DEFAULT_POSITIONS = [{ position: 'barista', position_label: 'Бариста', months: 0 }];
 
 /** Exported so admin/users.ts's role-switch action can provision the
  *  target role's row the same way onboarding does. */
@@ -21,8 +21,8 @@ export async function provisionWorker(env: Env, user: TelegramUser, name: string
     .first<{ id: number }>();
   worker = inserted!;
   for (const p of DEFAULT_POSITIONS) {
-    await env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, years) VALUES (?, ?, ?, ?)')
-      .bind(worker.id, p.position, p.position_label, p.years)
+    await env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, months) VALUES (?, ?, ?, ?)')
+      .bind(worker.id, p.position, p.position_label, p.months)
       .run();
   }
   return worker.id;

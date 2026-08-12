@@ -4,6 +4,7 @@ import {
   fetchMyProfile,
   updateMyProfile,
   addExperience,
+  deleteExperience,
   uploadAvatar as uploadAvatarApi,
   uploadPortfolioPhoto as uploadPortfolioPhotoApi,
   deletePortfolioPhoto as deletePortfolioPhotoApi,
@@ -30,7 +31,8 @@ interface ProfileState {
   loaded: boolean;
   load: () => Promise<void>;
   updateProfile: (update: ProfileUpdate) => Promise<void>;
-  addPosition: (exp: WorkerExperience) => Promise<void>;
+  addPosition: (exp: Omit<WorkerExperience, 'id'>) => Promise<void>;
+  deletePosition: (id: string) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
   uploadPhoto: (file: File) => Promise<void>;
   deletePhoto: (id: string) => Promise<void>;
@@ -69,6 +71,11 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   addPosition: async (exp) => {
     const profile = await addExperience(exp);
+    set({ ...profile, loaded: true });
+  },
+
+  deletePosition: async (id) => {
+    const profile = await deleteExperience(id);
     set({ ...profile, loaded: true });
   },
 

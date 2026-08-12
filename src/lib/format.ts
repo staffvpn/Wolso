@@ -71,6 +71,26 @@ export function timeAgoSince(timestamp: string) {
   return timeAgo(minutesSince(timestamp));
 }
 
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+/** Work experience is stored as a single total-months count so people can
+ *  enter "8 месяцев" without rounding up to a year — this renders it back
+ *  as "2 года 3 месяца" / "6 месяцев" / "1 год" for display. */
+export function formatExperience(totalMonths: number): string {
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} ${pluralize(years, 'год', 'года', 'лет')}`);
+  if (months > 0 || parts.length === 0) parts.push(`${months} ${pluralize(months, 'месяц', 'месяца', 'месяцев')}`);
+  return parts.join(' ');
+}
+
 /** Age from an ISO birthdate — profiles only ever show the computed age,
  *  never the date of birth itself. */
 export function ageFrom(birthdate?: string | null): number | undefined {

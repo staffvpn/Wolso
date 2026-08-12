@@ -7,7 +7,9 @@ interface SupportState {
   messagesByThread: Record<string, SupportMessage[]>;
   loading: boolean;
   loaded: boolean;
-  loadThreads: () => Promise<void>;
+  /** `silent` skips the loading flag — used by the background poll so the
+   *  list doesn't flicker every few seconds. */
+  loadThreads: (silent?: boolean) => Promise<void>;
   loadMessages: (threadId: string) => Promise<void>;
   reply: (threadId: string, text: string) => Promise<void>;
 }
@@ -18,8 +20,8 @@ export const useSupportStore = create<SupportState>((set, get) => ({
   loading: false,
   loaded: false,
 
-  loadThreads: async () => {
-    set({ loading: true });
+  loadThreads: async (silent = false) => {
+    if (!silent) set({ loading: true });
     const threads = await fetchSupportThreads();
     set({ threads, loading: false, loaded: true });
   },

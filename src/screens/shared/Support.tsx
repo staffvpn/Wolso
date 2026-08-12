@@ -23,6 +23,12 @@ export function Support() {
 
   useEffect(() => {
     load(actor);
+    // Support replies come from a staff member on the admin dashboard, not
+    // from this session, so there's no push channel to tell the app a new
+    // one arrived — poll while the screen is open instead of making people
+    // pull-to-refresh to see a reply.
+    const interval = setInterval(() => load(actor, true), 4000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

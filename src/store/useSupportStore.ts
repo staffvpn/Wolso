@@ -7,7 +7,9 @@ type Actor = 'worker' | 'company';
 interface SupportState {
   messages: ChatMessage[];
   loading: boolean;
-  load: (as: Actor) => Promise<void>;
+  /** `silent` skips the loading flag — used by the background poll so it
+   *  doesn't flicker the empty-state message every few seconds. */
+  load: (as: Actor, silent?: boolean) => Promise<void>;
   sendMessage: (text: string, as: Actor) => Promise<void>;
 }
 
@@ -15,8 +17,8 @@ export const useSupportStore = create<SupportState>((set) => ({
   messages: [],
   loading: false,
 
-  load: async (as) => {
-    set({ loading: true });
+  load: async (as, silent = false) => {
+    if (!silent) set({ loading: true });
     try {
       const messages = await fetchSupportThread(as);
       set({ messages, loading: false });

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, Plus, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
-import { Chip } from '@/components/ui/Chip';
 import { Button } from '@/components/ui/Button';
 import { TopBar } from '@/components/ui/TopBar';
 import { SectionLabel } from '@/components/ui/Card';
@@ -12,6 +11,7 @@ import { useProfileStore } from '@/store/useProfileStore';
 import { POSITIONS } from '@/data/positions';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
+import { formatExperience } from '@/lib/format';
 import type { Position } from '@/types';
 
 const FIELD_CLASS =
@@ -22,7 +22,7 @@ const FIELD_CLASS =
 export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   const navigate = useNavigate();
   const profile = useProfileStore();
-  const { load, loaded, updateProfile, addPosition, uploadAvatar, uploadPhoto, deletePhoto } = profile;
+  const { load, loaded, updateProfile, addPosition, deletePosition, uploadAvatar, uploadPhoto, deletePhoto } = profile;
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
@@ -30,7 +30,8 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   const [skills, setSkills] = useState('');
   const [birthdate, setBirthdate] = useState('');
   const [newPosition, setNewPosition] = useState<Position>('barista');
-  const [newYears, setNewYears] = useState(0);
+  const [newAmount, setNewAmount] = useState('');
+  const [newUnit, setNewUnit] = useState<'months' | 'years'>('years');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -85,10 +86,25 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   }
 
   async function addExperienceRow() {
+    const amount = Number(newAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите, сколько месяцев или лет опыта');
+      return;
+    }
+    const months = newUnit === 'years' ? Math.round(amount * 12) : Math.round(amount);
     try {
-      await addPosition({ position: newPosition, positionLabel: POSITIONS.find((p) => p.id === newPosition)!.label, years: newYears });
+      await addPosition({ position: newPosition, positionLabel: POSITIONS.find((p) => p.id === newPosition)!.label, months });
+      setNewAmount('');
     } catch {
       setError('Не получилось добавить опыт — попробуйте ещё раз');
+    }
+  }
+
+  async function removeExperienceRow(id: string) {
+    try {
+      await deletePosition(id);
+    } catch {
+      setError('Не получилось удалить опыт — попробуйте ещё раз');
     }
   }
 
@@ -185,32 +201,53 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
             {profile.positions.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {profile.positions.map((p) => (
-                  <Chip key={p.position} tone="dark" selected>
-                    {p.positionLabel} · {p.years} {p.years === 1 ? 'год' : 'года'}
-                  </Chip>
+                  <div
+                    key={p.id}
+                    className="h-10 pl-4 pr-2 rounded-full bg-text text-bg text-[14px] font-medium flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <span>
+                      {p.positionLabel} · {formatExperience(p.months)}
+                    </span>
+                    <button
+                      onClick={() => removeExperienceRow(p.id)}
+                      className="h-6 w-6 rounded-full bg-white/15 flex items-center justify-center shrink-0"
+                      aria-label="Удалить опыт"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <select
-                value={newPosition}
-                onChange={(e) => setNewPosition(e.target.value as Position)}
-                className="flex-1 h-11 rounded-2xl bg-surface border border-border px-3 text-[14px] outline-none focus:border-accent"
-              >
-                {POSITIONS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+            <select
+              value={newPosition}
+              onChange={(e) => setNewPosition(e.target.value as Position)}
+              className="w-full h-11 rounded-2xl bg-surface border border-border px-3 text-[14px] outline-none focus:border-accent"
+            >
+              {POSITIONS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-2 mt-2">
               <input
                 type="number"
                 min={0}
-                max={40}
-                value={newYears}
-                onChange={(e) => setNewYears(Number(e.target.value))}
-                className="w-16 h-11 rounded-2xl bg-surface border border-border px-2 text-[14px] text-center outline-none focus:border-accent"
+                inputMode="decimal"
+                value={newAmount}
+                onChange={(e) => setNewAmount(e.target.value)}
+                placeholder="Сколько?"
+                className="flex-1 h-11 rounded-2xl bg-surface border border-border px-3.5 text-[14px] outline-none focus:border-accent placeholder:text-text-faint"
               />
+              <select
+                value={newUnit}
+                onChange={(e) => setNewUnit(e.target.value as typeof newUnit)}
+                className="h-11 rounded-2xl bg-surface border border-border px-3 text-[14px] outline-none focus:border-accent"
+              >
+                <option value="months">мес.</option>
+                <option value="years">лет</option>
+              </select>
               <button onClick={addExperienceRow} className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
                 <Plus size={18} />
               </button>

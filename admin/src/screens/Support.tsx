@@ -34,6 +34,15 @@ export function Support() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // Replies land here from a mobile-app user's own session, not this one —
+  // poll the open thread so a new message shows up without a page refresh.
+  useEffect(() => {
+    if (!selectedId) return;
+    const interval = setInterval(() => loadMessages(selectedId), 4000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   const messages = useMemo(() => (selectedId ? messagesByThread[selectedId] ?? [] : []), [messagesByThread, selectedId]);
   const selected = threads.find((t) => t.id === selectedId) ?? null;
 

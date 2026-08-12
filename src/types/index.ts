@@ -96,9 +96,10 @@ export interface Chat {
 }
 
 export interface WorkerExperience {
+  id: string;
   position: Position;
   positionLabel: string;
-  years: number;
+  months: number;
 }
 
 export interface WorkerReview {
