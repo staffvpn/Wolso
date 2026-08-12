@@ -50,7 +50,7 @@ export function Welcome() {
         transition={{ duration: 0.5, delay: 0.15 }}
         className="flex-1 min-h-[220px] my-6"
       >
-        <Illustration caption="иллюстрация" hint="повар и стопка карточек" />
+        <Illustration src="/welcome-illustration.webp" caption="Wolso" />
       </motion.div>
 
       <motion.div
