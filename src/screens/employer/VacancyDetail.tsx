@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { Mail, X } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
@@ -7,9 +8,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
 import { timeAgoSince } from '@/lib/format';
+import type { Candidate } from '@/types';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Активна',
@@ -34,6 +37,7 @@ export function VacancyDetail() {
   const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
 
   const [ratingOnly, setRatingOnly] = useState(false);
+  const [selected, setSelected] = useState<Candidate | null>(null);
 
   useEffect(() => {
     if (!vacanciesLoaded) loadAll();
@@ -77,13 +81,13 @@ export function VacancyDetail() {
           <>
             {top && (
               <div className="rounded-card bg-surface border border-accent/40 p-4 mb-4">
-                <div className="flex items-center gap-3">
+                <button onClick={() => setSelected(top)} className="flex items-center gap-3 w-full text-left">
                   <Avatar name={top.name} size={52} />
                   <div className="min-w-0">
                     <p className="font-bold text-[17px]">{top.name}</p>
                     <p className="text-[13px] text-text-muted">★ {top.rating.toFixed(1)} · {top.shiftsCompleted} смен</p>
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
                     Взять на смену
@@ -105,14 +109,24 @@ export function VacancyDetail() {
 
             <div className="space-y-1">
               {rest.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 py-2.5">
+                <div
+                  key={c.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(c)}
+                  onKeyDown={(e) => e.key === 'Enter' && setSelected(c)}
+                  className="flex items-center gap-3 py-2.5 w-full text-left cursor-pointer"
+                >
                   <Avatar name={c.name} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
                     <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · ★ {c.rating.toFixed(1)}</p>
                   </div>
                   <button
-                    onClick={() => decideCandidate(vacancy.id, c.id, 'accepted')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      decideCandidate(vacancy.id, c.id, 'accepted');
+                    }}
                     className="text-[13px] font-semibold text-accent shrink-0"
                   >
                     Взять
@@ -123,6 +137,27 @@ export function VacancyDetail() {
           </>
         )}
       </div>
+
+      <AnimatePresence>
+        {selected && (
+          <CandidateDetailOverlay
+            candidate={selected}
+            onClose={() => setSelected(null)}
+            onAccept={() => {
+              decideCandidate(vacancy.id, selected.id, 'accepted');
+              setSelected(null);
+            }}
+            onDecline={() => {
+              decideCandidate(vacancy.id, selected.id, 'declined');
+              setSelected(null);
+            }}
+            onMessage={async () => {
+              const chatId = await startChatWithWorker(selected.workerId);
+              navigate(`/e/chats/${chatId}`);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
