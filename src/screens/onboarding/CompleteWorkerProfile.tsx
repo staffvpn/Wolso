@@ -139,22 +139,6 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
             </span>
           </button>
           <p className="text-[12px] text-text-faint">Главное фото</p>
-          {/* TEMPORARY debug — remove once the broken-image issue is confirmed fixed */}
-          {profile.avatarUrl && (
-            <>
-              <a href={profile.avatarUrl} target="_blank" rel="noreferrer" className="text-[10px] text-danger break-all px-4 text-center underline">
-                открыть avatarUrl напрямую
-              </a>
-              <a href={`${profile.avatarUrl}?debug=1`} target="_blank" rel="noreferrer" className="text-[10px] text-accent break-all px-4 text-center underline">
-                показать что реально хранится (debug)
-              </a>
-            </>
-          )}
-          {profile.photos.length > 0 && (
-            <a href={profile.photos[0].url} target="_blank" rel="noreferrer" className="text-[10px] text-danger break-all px-4 text-center underline">
-              открыть photo[0] напрямую
-            </a>
-          )}
         </div>
 
         <div className="space-y-4">
