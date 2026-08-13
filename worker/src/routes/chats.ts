@@ -79,9 +79,9 @@ chatRoutes.get('/', async (c) => {
 
 async function assertParticipant(env: Env, chatId: string, actor: { role: 'worker' | 'company'; id: number }) {
   const col = actor.role === 'worker' ? 'worker_id' : 'company_id';
-  return env.DB.prepare(`SELECT id, company_id, worker_id FROM chats WHERE id = ? AND ${col} = ?`)
+  return env.DB.prepare(`SELECT id, company_id, worker_id, worker_notified_at, company_notified_at FROM chats WHERE id = ? AND ${col} = ?`)
     .bind(chatId, actor.id)
-    .first<{ id: number; company_id: number; worker_id: number }>();
+    .first<{ id: number; company_id: number; worker_id: number; worker_notified_at: string | null; company_notified_at: string | null }>();
 }
 
 chatRoutes.get('/:id/messages', async (c) => {
@@ -93,8 +93,28 @@ chatRoutes.get('/:id/messages', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC').bind(chatId).all();
   await c.env.DB.prepare('UPDATE messages SET read = 1 WHERE chat_id = ? AND sender != ?').bind(chatId, actor.role).run();
 
+  // They've now actually seen everything — clear our own "last notified"
+  // mark for this chat so the *next* message that arrives pings again
+  // right away instead of still being inside the old cooldown window.
+  const notifiedCol = actor.role === 'worker' ? 'worker_notified_at' : 'company_notified_at';
+  await c.env.DB.prepare(`UPDATE chats SET ${notifiedCol} = NULL WHERE id = ?`).bind(chatId).run();
+
   return c.json({ messages: results });
 });
+
+/** One bot ping per unread streak, not one per message — otherwise a
+ *  quick back-and-forth turns into a wall of Telegram notifications.
+ *  After a ping, the same side stays quiet for this long even if more
+ *  messages come in; reading the chat (see GET /:id/messages above)
+ *  clears the cooldown early, since there's nothing left to batch once
+ *  they've actually seen the conversation. */
+const CHAT_NOTIFY_COOLDOWN_MINUTES = 5;
+
+function withinCooldown(notifiedAt: string | null): boolean {
+  if (!notifiedAt) return false;
+  const iso = notifiedAt.includes('T') ? notifiedAt : `${notifiedAt.replace(' ', 'T')}Z`;
+  return Date.now() - new Date(iso).getTime() < CHAT_NOTIFY_COOLDOWN_MINUTES * 60 * 1000;
+}
 
 chatRoutes.post('/:id/messages', async (c) => {
   const actor = actorFromSession(c.get('session'));
@@ -112,25 +132,30 @@ chatRoutes.post('/:id/messages', async (c) => {
     .bind(chatId, actor.role, text.trim())
     .first();
 
-  // Notify whoever didn't just send it — a worker/employer chat is the
-  // one place a reply genuinely needs to reach someone's phone right
-  // away, not just wait for them to happen to reopen the app.
+  // Notify whoever didn't just send it — but only once per unread streak
+  // (see CHAT_NOTIFY_COOLDOWN_MINUTES above), not on every single message.
   const preview = text.trim().length > 200 ? `${text.trim().slice(0, 200)}…` : text.trim();
   if (actor.role === 'worker') {
-    const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(actor.id).first<{ name: string }>();
-    const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
-      .bind(chat.company_id)
-      .first<{ owner_telegram_id: number }>();
-    if (company) {
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`));
+    if (!withinCooldown(chat.company_notified_at)) {
+      const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(actor.id).first<{ name: string }>();
+      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+        .bind(chat.company_id)
+        .first<{ owner_telegram_id: number }>();
+      if (company) {
+        c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`));
+        await c.env.DB.prepare("UPDATE chats SET company_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
+      }
     }
   } else {
-    const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(actor.id).first<{ name: string }>();
-    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
-      .bind(chat.worker_id)
-      .first<{ telegram_id: number }>();
-    if (worker) {
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`));
+    if (!withinCooldown(chat.worker_notified_at)) {
+      const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(actor.id).first<{ name: string }>();
+      const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
+        .bind(chat.worker_id)
+        .first<{ telegram_id: number }>();
+      if (worker) {
+        c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`));
+        await c.env.DB.prepare("UPDATE chats SET worker_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
+      }
     }
   }
 
