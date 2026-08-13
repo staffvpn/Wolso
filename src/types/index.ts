@@ -94,6 +94,7 @@ export interface Chat {
   companyId?: string;
   workerId?: string;
   contactName: string;
+  avatarUrl?: string;
   logoInitial?: string;
   logoColor?: string;
   shiftId?: string;

@@ -99,7 +99,7 @@ export function VacancyDetail() {
             {accepted.map((c) => (
               <Card key={c.id} className="p-4">
                 <div className="flex items-center gap-3">
-                  <Avatar name={c.name} size={44} />
+                  <Avatar src={c.photos[0]} name={c.name} size={44} />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
                     <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
@@ -129,7 +129,7 @@ export function VacancyDetail() {
             {top && (
               <div className="rounded-card bg-surface border border-accent/40 p-4 mb-4">
                 <button onClick={() => setSelected(top)} className="flex items-center gap-3 w-full text-left">
-                  <Avatar name={top.name} size={52} />
+                  <Avatar src={top.photos[0]} name={top.name} size={52} />
                   <div className="min-w-0">
                     <p className="font-bold text-[17px]">{top.name}</p>
                     <p className="text-[13px] text-text-muted">★ {top.rating.toFixed(1)} · {top.shiftsCompleted} смен</p>
@@ -156,7 +156,7 @@ export function VacancyDetail() {
                   onKeyDown={(e) => e.key === 'Enter' && setSelected(c)}
                   className="flex items-center gap-3 py-2.5 w-full text-left cursor-pointer"
                 >
-                  <Avatar name={c.name} size={40} />
+                  <Avatar src={c.photos[0]} name={c.name} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
                     <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · ★ {c.rating.toFixed(1)}</p>

@@ -14,7 +14,10 @@ interface ChatRow {
   company_name?: string;
   company_logo_initial?: string;
   company_logo_color?: string;
+  company_has_avatar?: number;
   worker_name?: string;
+  worker_has_avatar?: number;
+  worker_photo_url?: string | null;
 }
 
 function actorFromSession(session: SessionPayload | null) {
@@ -29,9 +32,11 @@ chatRoutes.get('/', async (c) => {
 
   const sql =
     actor.role === 'worker'
-      ? `SELECT ch.*, co.name as company_name, co.logo_initial as company_logo_initial, co.logo_color as company_logo_color
+      ? `SELECT ch.*, co.name as company_name, co.logo_initial as company_logo_initial, co.logo_color as company_logo_color,
+           (co.avatar_data IS NOT NULL) as company_has_avatar
          FROM chats ch JOIN companies co ON co.id = ch.company_id WHERE ch.worker_id = ? ORDER BY ch.created_at DESC`
-      : `SELECT ch.*, w.name as worker_name FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ? ORDER BY ch.created_at DESC`;
+      : `SELECT ch.*, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url
+         FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ? ORDER BY ch.created_at DESC`;
 
   const { results } = await c.env.DB.prepare(sql).bind(actor.id).all<ChatRow>();
 
@@ -46,12 +51,22 @@ chatRoutes.get('/', async (c) => {
       .bind(row.id, actor.role)
       .first<{ n: number }>();
 
+    const avatarUrl =
+      actor.role === 'worker'
+        ? row.company_has_avatar
+          ? `/media/companies/${row.company_id}/avatar`
+          : null
+        : row.worker_has_avatar
+          ? `/media/workers/${row.worker_id}/avatar`
+          : row.worker_photo_url ?? null;
+
     chats.push({
       id: row.id,
       companyId: row.company_id,
       workerId: row.worker_id,
       shiftId: row.shift_id,
       contactName: actor.role === 'worker' ? row.company_name : row.worker_name,
+      avatarUrl,
       logoInitial: row.company_logo_initial,
       logoColor: row.company_logo_color,
       lastMessage: last,

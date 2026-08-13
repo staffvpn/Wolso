@@ -65,7 +65,9 @@ export function ChatDetail() {
         <IconButton onClick={() => navigate(-1)} aria-label="Назад">
           <ChevronLeft size={20} />
         </IconButton>
-        {chat.logoInitial ? (
+        {chat.avatarUrl ? (
+          <Avatar src={chat.avatarUrl} name={chat.contactName} size={38} />
+        ) : chat.logoInitial ? (
           <LogoBadge initial={chat.logoInitial} color={chat.logoColor ?? '#6b6d76'} size={38} />
         ) : (
           <Avatar name={chat.contactName} size={38} />

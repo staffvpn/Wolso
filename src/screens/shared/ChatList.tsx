@@ -38,7 +38,9 @@ export function ChatList() {
                 className="w-full flex items-center gap-3 py-3.5 text-left"
               >
                 <div className="relative shrink-0">
-                  {chat.logoInitial ? (
+                  {chat.avatarUrl ? (
+                    <Avatar src={chat.avatarUrl} name={chat.contactName} size={46} />
+                  ) : chat.logoInitial ? (
                     <LogoBadge initial={chat.logoInitial} color={chat.logoColor ?? '#6b6d76'} size={46} />
                   ) : (
                     <Avatar name={chat.contactName} size={46} />

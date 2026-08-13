@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import type { Chat, ChatMessage } from '@/types';
 
 export type ChatActor = 'worker' | 'company';
@@ -9,6 +9,7 @@ interface ApiChat {
   workerId: number;
   shiftId: number | null;
   contactName?: string;
+  avatarUrl?: string | null;
   logoInitial?: string;
   logoColor?: string;
   unread: number;
@@ -30,6 +31,7 @@ function chatFromApi(c: ApiChat): Chat {
     companyId: c.companyId ? String(c.companyId) : undefined,
     workerId: c.workerId ? String(c.workerId) : undefined,
     contactName: c.contactName ?? 'Собеседник',
+    avatarUrl: resolveMediaUrl(c.avatarUrl),
     logoInitial: c.logoInitial,
     logoColor: c.logoColor,
     shiftId: c.shiftId ? String(c.shiftId) : undefined,
