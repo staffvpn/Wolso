@@ -34,7 +34,14 @@ export function ChatDetail() {
   const markRead = useChatStore((s) => s.markRead);
 
   const [text, setText] = useState('');
+  const [messagesError, setMessagesError] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  function reloadMessages() {
+    if (!chatId) return;
+    setMessagesError(false);
+    loadMessages(chatId, actor).catch(() => setMessagesError(true));
+  }
 
   // Navigating here directly (deep link, reopening the app on this exact
   // route) can beat ChatList's own load — chats would still be empty, and
@@ -48,7 +55,8 @@ export function ChatDetail() {
 
   useEffect(() => {
     if (chatId) {
-      loadMessages(chatId, actor);
+      setMessagesError(false);
+      loadMessages(chatId, actor).catch(() => setMessagesError(true));
       markRead(chatId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,6 +122,14 @@ export function ChatDetail() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
+        {messagesError && (
+          <div className="rounded-2xl bg-danger/10 border border-danger/30 px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] text-danger">Не удалось загрузить сообщения</p>
+            <button onClick={reloadMessages} className="text-[13px] font-semibold text-danger shrink-0 flex items-center gap-1">
+              <RotateCw size={13} /> Повторить
+            </button>
+          </div>
+        )}
         {messages.map((m) => {
           if (m.kind === 'system') {
             return (

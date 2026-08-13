@@ -47,6 +47,8 @@ export function Candidates() {
         loading={loading}
         renderCard={(candidate) => <CandidateCard candidate={candidate} />}
         onSwiped={(candidate, direction) => decideCandidate(candidate.vacancyId, candidate.id, direction === 'right' ? 'accepted' : 'declined')}
+        rightLabel="Пригласить на смену"
+        leftLabel="Отклонить"
         empty={
           <EmptyState
             title="Пока нет новых кандидатов"

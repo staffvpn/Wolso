@@ -87,6 +87,8 @@ export function FindWorkers() {
             loading={loading}
             renderCard={(worker) => <CandidateCard candidate={worker} />}
             onSwiped={(worker, direction) => handleSwiped(worker, direction)}
+            rightLabel="Написать"
+            leftLabel="Пропуск"
             empty={
               <EmptyState
                 title="Подходящих анкет пока нет"

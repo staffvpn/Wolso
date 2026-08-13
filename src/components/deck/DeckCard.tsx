@@ -12,6 +12,12 @@ interface DeckCardProps {
   active: boolean;
   onSwiped: (direction: 'left' | 'right') => void;
   children: ReactNode;
+  /** The drag stamp's wording — defaults suit the worker's own "apply to
+   *  a shift" deck. Employer-facing decks swipe on a completely different
+   *  action (hiring someone, or just messaging them) and need their own
+   *  wording so the stamp doesn't claim they're "applying". */
+  rightLabel?: string;
+  leftLabel?: string;
 }
 
 const SWIPE_THRESHOLD = 110;
@@ -19,7 +25,7 @@ const VELOCITY_THRESHOLD = 600;
 const FLY_DISTANCE = 560;
 
 export const DeckCard = forwardRef<DeckCardHandle, DeckCardProps>(function DeckCard(
-  { index, active, onSwiped, children },
+  { index, active, onSwiped, children, rightLabel = 'Откликаюсь', leftLabel = 'Пропуск' },
   ref,
 ) {
   const x = useMotionValue(0);
@@ -87,7 +93,7 @@ export const DeckCard = forwardRef<DeckCardHandle, DeckCardProps>(function DeckC
                 <div className="h-16 w-16 rounded-full border-[3px] border-accent-fg flex items-center justify-center">
                   <Check size={30} className="text-accent-fg" strokeWidth={3} />
                 </div>
-                <span className="text-accent-fg text-[22px] font-extrabold">Откликаюсь</span>
+                <span className="text-accent-fg text-[22px] font-extrabold">{rightLabel}</span>
               </motion.div>
               <motion.div
                 style={{ opacity: leftStamp }}
@@ -96,7 +102,7 @@ export const DeckCard = forwardRef<DeckCardHandle, DeckCardProps>(function DeckC
                 <div className="h-16 w-16 rounded-full border-[3px] border-text-faint flex items-center justify-center">
                   <X size={30} className="text-text-faint" strokeWidth={3} />
                 </div>
-                <span className="text-text-muted text-[22px] font-extrabold">Пропуск</span>
+                <span className="text-text-muted text-[22px] font-extrabold">{leftLabel}</span>
               </motion.div>
             </>
           )}

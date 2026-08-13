@@ -17,10 +17,12 @@ interface SwipeDeckProps<T> {
   loading?: boolean;
   empty?: ReactNode;
   stackSize?: number;
+  rightLabel?: string;
+  leftLabel?: string;
 }
 
 function SwipeDeckInner<T>(props: SwipeDeckProps<T>, ref: Ref<SwipeDeckHandle>) {
-  const { items, keyOf, renderCard, onSwiped, loading, empty, stackSize = 2 } = props;
+  const { items, keyOf, renderCard, onSwiped, loading, empty, stackSize = 2, rightLabel, leftLabel } = props;
   const cardRefs = useRef(new Map<string, DeckCardHandle>());
 
   useImperativeHandle(ref, () => ({
@@ -64,6 +66,8 @@ function SwipeDeckInner<T>(props: SwipeDeckProps<T>, ref: Ref<SwipeDeckHandle>) 
               index={i}
               active={i === 0}
               onSwiped={(direction) => onSwiped(item, direction)}
+              rightLabel={rightLabel}
+              leftLabel={leftLabel}
             >
               {renderCard(item)}
             </DeckCard>
