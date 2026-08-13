@@ -75,6 +75,7 @@ interface ApplicationsState {
   applications: Application[];
   loading: boolean;
   loaded: boolean;
+  error: boolean;
   load: () => Promise<void>;
   apply: (shiftId: string) => Promise<void>;
   checkIn: (applicationId: string) => Promise<void>;
@@ -85,14 +86,18 @@ export const useApplicationsStore = create<ApplicationsState>((set) => ({
   applications: [],
   loading: false,
   loaded: false,
+  error: false,
 
   load: async () => {
-    set({ loading: true });
+    set({ loading: true, error: false });
     try {
       const { applications } = await apiFetch<{ applications: ApiApplication[] }>('/applications');
       set({ applications: applications.map(fromApi), loading: false, loaded: true });
     } catch {
-      set({ loading: false });
+      // PendingReviewGate (AuthGate.tsx) blocks the entire app on `loaded`
+      // — a request that fails and never resolves it would soft-lock every
+      // worker session on a spinner forever, so this has to settle either way.
+      set({ loading: false, loaded: true, error: true });
     }
   },
 

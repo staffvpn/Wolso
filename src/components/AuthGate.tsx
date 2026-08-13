@@ -27,6 +27,23 @@ function Spinner({ label }: { label: string }) {
   );
 }
 
+/** Every gate below blocks the entire app on one API call — if that call
+ *  fails (and nothing here retries it automatically), showing the spinner
+ *  forever would soft-lock the whole session with no way out. This is the
+ *  one recoverable dead end: a real error message plus a button that
+ *  actually re-fires the load. */
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-8 gap-4 text-center safe-top safe-bottom">
+      <p className="font-bold text-[16px]">Не удалось загрузить</p>
+      <p className="text-[14px] text-text-muted max-w-[280px]">Проверьте соединение и попробуйте ещё раз.</p>
+      <Button onClick={onRetry}>
+        <RotateCw size={16} /> Попробовать снова
+      </Button>
+    </div>
+  );
+}
+
 /** Wolso is one-account-one-role and requires a complete profile before the
  *  rest of the app is usable — a worker can't be swiped on without a real
  *  anketa, and an employer can't publish without one either. Sits between
@@ -39,6 +56,7 @@ function ProfileGate({ children }: { children: ReactNode }) {
 
 function WorkerProfileGate({ children }: { children: ReactNode }) {
   const loaded = useProfileStore((s) => s.loaded);
+  const error = useProfileStore((s) => s.error);
   const complete = useProfileStore((s) => s.profileComplete);
   const load = useProfileStore((s) => s.load);
 
@@ -47,6 +65,7 @@ function WorkerProfileGate({ children }: { children: ReactNode }) {
   }, [loaded, load]);
 
   if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (error) return <LoadError onRetry={load} />;
   if (!complete) return <CompleteWorkerProfile gate />;
   return <PendingReviewGate>{children}</PendingReviewGate>;
 }
@@ -56,6 +75,7 @@ function WorkerProfileGate({ children }: { children: ReactNode }) {
  *  just checked one layer in since it needs a complete profile first. */
 function PendingReviewGate({ children }: { children: ReactNode }) {
   const loaded = useApplicationsStore((s) => s.loaded);
+  const error = useApplicationsStore((s) => s.error);
   const owesReview = useApplicationsStore((s) => s.applications.some((a) => a.workStage === 'employer_closed'));
   const load = useApplicationsStore((s) => s.load);
 
@@ -64,12 +84,14 @@ function PendingReviewGate({ children }: { children: ReactNode }) {
   }, [loaded, load]);
 
   if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (error) return <LoadError onRetry={load} />;
   if (owesReview) return <ShiftCheckout gate />;
   return <>{children}</>;
 }
 
 function EmployerProfileGate({ children }: { children: ReactNode }) {
   const loaded = useCompanyStore((s) => s.loaded);
+  const error = useCompanyStore((s) => s.error);
   const complete = useCompanyStore((s) => s.company?.profileComplete);
   const load = useCompanyStore((s) => s.load);
 
@@ -78,6 +100,7 @@ function EmployerProfileGate({ children }: { children: ReactNode }) {
   }, [loaded, load]);
 
   if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (error) return <LoadError onRetry={load} />;
   if (!complete) return <CompleteEmployerProfile gate />;
   return <>{children}</>;
 }

@@ -29,6 +29,7 @@ interface ProfileState {
   photos: { id: string; url: string }[];
   loading: boolean;
   loaded: boolean;
+  error: boolean;
   load: () => Promise<void>;
   updateProfile: (update: ProfileUpdate) => Promise<void>;
   addPosition: (exp: Omit<WorkerExperience, 'id'>) => Promise<void>;
@@ -52,14 +53,18 @@ export const useProfileStore = create<ProfileState>((set) => ({
   photos: [],
   loading: false,
   loaded: false,
+  error: false,
 
   load: async () => {
-    set({ loading: true });
+    set({ loading: true, error: false });
     try {
       const profile = await fetchMyProfile();
       set({ ...profile, loading: false, loaded: true });
     } catch {
-      set({ loading: false });
+      // WorkerProfileGate (AuthGate.tsx) blocks the entire app on `loaded`
+      // — a request that fails and never resolves it would soft-lock every
+      // worker session on a spinner forever, so this has to settle either way.
+      set({ loading: false, loaded: true, error: true });
     }
   },
 

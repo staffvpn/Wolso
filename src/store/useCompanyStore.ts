@@ -14,6 +14,7 @@ interface CompanyState {
   company: Company | null;
   loading: boolean;
   loaded: boolean;
+  error: boolean;
   load: () => Promise<void>;
   updateCompany: (update: CompanyUpdate) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
@@ -25,14 +26,18 @@ export const useCompanyStore = create<CompanyState>((set) => ({
   company: null,
   loading: false,
   loaded: false,
+  error: false,
 
   load: async () => {
-    set({ loading: true });
+    set({ loading: true, error: false });
     try {
       const company = await fetchMyCompany();
       set({ company, loading: false, loaded: true });
     } catch {
-      set({ loading: false });
+      // EmployerProfileGate (AuthGate.tsx) blocks the entire app on `loaded`
+      // — a request that fails and never resolves it would soft-lock every
+      // employer session on a spinner forever, so this has to settle either way.
+      set({ loading: false, loaded: true, error: true });
     }
   },
 

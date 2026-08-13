@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Send, ChevronLeft } from 'lucide-react';
+import { Send, ChevronLeft, RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
+import { Button } from '@/components/ui/Button';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
@@ -15,6 +16,7 @@ export function ChatDetail() {
   const actor = role === 'worker' ? 'worker' : 'company';
   const { chatId } = useParams<{ chatId: string }>();
   const chatsLoaded = useChatStore((s) => s.loaded);
+  const chatsError = useChatStore((s) => s.error);
   const loadChats = useChatStore((s) => s.load);
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const messages = useChatStore((s) => s.messagesByChat[chatId ?? ''] ?? []);
@@ -48,6 +50,17 @@ export function ChatDetail() {
   }, [messages.length]);
 
   if (!chatsLoaded) return null;
+  if (!chat && chatsError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-8 gap-4 text-center safe-top safe-bottom">
+        <p className="text-[15px] font-semibold">Не удалось загрузить чат</p>
+        <p className="text-[13px] text-text-muted">Проверьте соединение и попробуйте ещё раз.</p>
+        <Button onClick={() => loadChats(actor)}>
+          <RotateCw size={16} /> Повторить
+        </Button>
+      </div>
+    );
+  }
   if (!chat) {
     navigate(-1);
     return null;

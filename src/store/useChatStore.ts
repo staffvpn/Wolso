@@ -7,6 +7,7 @@ interface ChatState {
   messagesByChat: Record<string, ChatMessage[]>;
   loading: boolean;
   loaded: boolean;
+  error: boolean;
   load: (as: ChatActor) => Promise<void>;
   loadMessages: (chatId: string, as: ChatActor) => Promise<void>;
   sendMessage: (chatId: string, text: string, as: ChatActor) => Promise<void>;
@@ -19,14 +20,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messagesByChat: {},
   loading: false,
   loaded: false,
+  error: false,
 
   load: async (as) => {
-    set({ loading: true });
+    set({ loading: true, error: false });
     try {
       const chats = await fetchChats(as);
       set({ chats, loading: false, loaded: true });
     } catch {
-      set({ loading: false });
+      // `loaded` still flips to true on failure — screens gated on it (see
+      // ChatDetail) check `loaded` before deciding "not found", so a failed
+      // fetch has to resolve one way or another instead of leaving them
+      // stuck showing nothing forever.
+      set({ loading: false, loaded: true, error: true });
     }
   },
 

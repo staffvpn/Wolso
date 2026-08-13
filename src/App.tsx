@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { OfflineBanner } from './components/OfflineBanner';
 import { PaywallSheet } from './components/PaywallSheet';
 import { AuthGate } from './components/AuthGate';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAuthStore } from './store/useAuthStore';
 import { TabShell } from './components/nav/TabShell';
 
@@ -38,53 +39,55 @@ export default function App() {
   return (
     <HashRouter>
       <div className="relative flex flex-col h-full min-h-0">
-        <AuthGate>
-          <Routes>
-            <Route path="/" element={<HomeRedirect />} />
+        <ErrorBoundary>
+          <AuthGate>
+            <Routes>
+              <Route path="/" element={<HomeRedirect />} />
 
-            {/* Worker tabs */}
-            <Route path="/w" element={<TabShell />}>
-              <Route index element={<Navigate to="feed" replace />} />
-              <Route path="feed" element={<Feed />} />
-              <Route path="responses" element={<Responses />} />
-              <Route path="shifts" element={<Shifts />} />
-              <Route path="chats" element={<ChatList />} />
-              <Route path="profile" element={<WorkerProfileScreen />} />
-            </Route>
-            {/* Worker pushed screens */}
-            <Route path="/w/map" element={<FeedMap />} />
-            <Route path="/w/chats/:chatId" element={<ChatDetail />} />
-            <Route path="/w/checkout/:applicationId" element={<ShiftCheckout />} />
-            <Route path="/w/wallet" element={<Wallet />} />
-            <Route path="/w/settings" element={<Settings />} />
-            <Route path="/w/favorites" element={<Favorites />} />
-            <Route path="/w/notifications" element={<Notifications />} />
-            <Route path="/w/support" element={<Support />} />
-            <Route path="/w/profile/edit" element={<CompleteWorkerProfile />} />
+              {/* Worker tabs */}
+              <Route path="/w" element={<TabShell />}>
+                <Route index element={<Navigate to="feed" replace />} />
+                <Route path="feed" element={<Feed />} />
+                <Route path="responses" element={<Responses />} />
+                <Route path="shifts" element={<Shifts />} />
+                <Route path="chats" element={<ChatList />} />
+                <Route path="profile" element={<WorkerProfileScreen />} />
+              </Route>
+              {/* Worker pushed screens */}
+              <Route path="/w/map" element={<FeedMap />} />
+              <Route path="/w/chats/:chatId" element={<ChatDetail />} />
+              <Route path="/w/checkout/:applicationId" element={<ShiftCheckout />} />
+              <Route path="/w/wallet" element={<Wallet />} />
+              <Route path="/w/settings" element={<Settings />} />
+              <Route path="/w/favorites" element={<Favorites />} />
+              <Route path="/w/notifications" element={<Notifications />} />
+              <Route path="/w/support" element={<Support />} />
+              <Route path="/w/profile/edit" element={<CompleteWorkerProfile />} />
 
-            {/* Employer tabs */}
-            <Route path="/e" element={<TabShell />}>
-              <Route index element={<Navigate to="candidates" replace />} />
-              <Route path="find" element={<FindWorkers />} />
-              <Route path="candidates" element={<Candidates />} />
-              <Route path="vacancies" element={<Vacancies />} />
-              <Route path="chats" element={<ChatList />} />
-              <Route path="profile" element={<EmployerProfileScreen />} />
-            </Route>
-            {/* Employer pushed screens */}
-            <Route path="/e/vacancies/new" element={<NewVacancy />} />
-            <Route path="/e/vacancies/:vacancyId" element={<VacancyDetail />} />
-            <Route path="/e/chats/:chatId" element={<ChatDetail />} />
-            <Route path="/e/notifications" element={<Notifications />} />
-            <Route path="/e/support" element={<Support />} />
-            <Route path="/e/profile/edit" element={<CompleteEmployerProfile />} />
+              {/* Employer tabs */}
+              <Route path="/e" element={<TabShell />}>
+                <Route index element={<Navigate to="candidates" replace />} />
+                <Route path="find" element={<FindWorkers />} />
+                <Route path="candidates" element={<Candidates />} />
+                <Route path="vacancies" element={<Vacancies />} />
+                <Route path="chats" element={<ChatList />} />
+                <Route path="profile" element={<EmployerProfileScreen />} />
+              </Route>
+              {/* Employer pushed screens */}
+              <Route path="/e/vacancies/new" element={<NewVacancy />} />
+              <Route path="/e/vacancies/:vacancyId" element={<VacancyDetail />} />
+              <Route path="/e/chats/:chatId" element={<ChatDetail />} />
+              <Route path="/e/notifications" element={<Notifications />} />
+              <Route path="/e/support" element={<Support />} />
+              <Route path="/e/profile/edit" element={<CompleteEmployerProfile />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
 
-          <OfflineBanner />
-          <PaywallSheet />
-        </AuthGate>
+            <OfflineBanner />
+            <PaywallSheet />
+          </AuthGate>
+        </ErrorBoundary>
       </div>
     </HashRouter>
   );
