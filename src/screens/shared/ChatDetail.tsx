@@ -9,6 +9,15 @@ import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
 import { QUICK_REPLIES } from '@/data/chats';
 import { cn } from '@/lib/cn';
+import type { ChatMessage } from '@/types';
+
+// `?? []` directly inside a Zustand selector allocates a brand-new array
+// every single time the store re-evaluates it — since nothing ever equals
+// a freshly allocated array by reference, useSyncExternalStore sees a
+// "changed" snapshot on every check and re-renders forever (React throws
+// "Maximum update depth exceeded" once its loop guard trips). One stable
+// reference for the empty case avoids that entirely.
+const EMPTY_MESSAGES: ChatMessage[] = [];
 
 export function ChatDetail() {
   const navigate = useNavigate();
@@ -19,7 +28,7 @@ export function ChatDetail() {
   const chatsError = useChatStore((s) => s.error);
   const loadChats = useChatStore((s) => s.load);
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
-  const messages = useChatStore((s) => s.messagesByChat[chatId ?? ''] ?? []);
+  const messages = useChatStore((s) => (chatId ? s.messagesByChat[chatId] : undefined) ?? EMPTY_MESSAGES);
   const loadMessages = useChatStore((s) => s.loadMessages);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
@@ -49,6 +58,20 @@ export function ChatDetail() {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
 
+  // Navigating away belongs in an effect, not the render body: calling
+  // navigate(-1) directly while rendering used to bounce back to a chat
+  // that's genuinely gone (deleted when its shift closed, a stale link, a
+  // deep link with no browser history behind it) — history.back() with
+  // nothing to go back to doesn't change the route, so the same render
+  // fired again, calling navigate(-1) again, forever, until React's
+  // re-render guard tripped and took down the whole app. A fixed
+  // destination (the chat list) can't loop like that.
+  useEffect(() => {
+    if (chatsLoaded && !chatsError && !chat) {
+      navigate(role === 'worker' ? '/w/chats' : '/e/chats', { replace: true });
+    }
+  }, [chatsLoaded, chatsError, chat, navigate, role]);
+
   if (!chatsLoaded) return null;
   if (!chat && chatsError) {
     return (
@@ -61,10 +84,7 @@ export function ChatDetail() {
       </div>
     );
   }
-  if (!chat) {
-    navigate(-1);
-    return null;
-  }
+  if (!chat) return null;
 
   function handleSend(value: string) {
     if (!value.trim() || !chatId) return;
