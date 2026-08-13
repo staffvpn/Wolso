@@ -13,6 +13,7 @@ import {
   switchEmployerToSeeker,
   deleteSeeker,
   deleteEmployer,
+  syncTelegramUsernames,
 } from '@/services/usersApi';
 
 interface UsersState {
@@ -21,6 +22,7 @@ interface UsersState {
   team: TeamMember[];
   loading: boolean;
   loaded: boolean;
+  syncingUsernames: boolean;
   load: () => Promise<void>;
   toggleBlock: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
@@ -28,6 +30,7 @@ interface UsersState {
   revokeAccess: (memberId: string) => Promise<void>;
   switchRole: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   deleteUser: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
+  syncUsernames: () => Promise<void>;
 }
 
 export const useUsersStore = create<UsersState>((set, get) => ({
@@ -36,6 +39,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   team: [],
   loading: false,
   loaded: false,
+  syncingUsernames: false,
 
   load: async () => {
     set({ loading: true });
@@ -86,6 +90,25 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     } else {
       await deleteEmployer(id);
       set({ employers: get().employers.filter((u) => u.id !== id) });
+    }
+  },
+
+  // Keeps calling the batch endpoint (it caps itself per call) so one click
+  // covers the whole backlog. Stops once a round updates nothing — accounts
+  // the bot has no username for (or has never talked to) stay NULL and
+  // would otherwise keep coming back up as the same "still missing" batch
+  // forever.
+  syncUsernames: async () => {
+    set({ syncingUsernames: true });
+    try {
+      for (let i = 0; i < 25; i++) {
+        const { checked, updated } = await syncTelegramUsernames();
+        if (checked === 0 || updated === 0) break;
+      }
+      const [seekers, employers] = await Promise.all([fetchSeekers(), fetchEmployers()]);
+      set({ seekers, employers });
+    } finally {
+      set({ syncingUsernames: false });
     }
   },
 }));

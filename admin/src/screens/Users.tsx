@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -114,6 +114,8 @@ function TelegramLinkRow({ telegramId, telegramUsername }: { telegramId: number;
 
 export function Users() {
   const { seekers, employers, team, load } = useUsersStore();
+  const syncingUsernames = useUsersStore((s) => s.syncingUsernames);
+  const syncUsernames = useUsersStore((s) => s.syncUsernames);
   const roles = useRolesStore((s) => s.roles);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
@@ -193,9 +195,14 @@ export function Users() {
             { id: 'team', label: 'Команда', count: team.length },
           ]}
         />
-        <Button variant="primary" className="ml-auto" disabled={!canManageTeam} onClick={() => setInviteOpen(true)}>
-          <UserPlus size={15} /> Пригласить в команду
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" disabled={syncingUsernames} onClick={syncUsernames} title="Подтянуть @username из Telegram для тех, у кого его ещё нет в базе">
+            <RefreshCw size={15} className={cn(syncingUsernames && 'animate-spin')} /> {syncingUsernames ? 'Обновляем…' : 'Обновить username'}
+          </Button>
+          <Button variant="primary" disabled={!canManageTeam} onClick={() => setInviteOpen(true)}>
+            <UserPlus size={15} /> Пригласить в команду
+          </Button>
+        </div>
       </div>
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">

@@ -101,6 +101,14 @@ export async function fetchEmployers(query?: string): Promise<PlatformUser[]> {
   return employers.map(fromApiEmployer);
 }
 
+/** Backfills telegram_username straight from the Bot API for accounts that
+ *  registered before that column existed or haven't reopened the app since
+ *  — one batch per call (see the route for the cap), call again if
+ *  `checked` comes back equal to the batch size to keep going. */
+export async function syncTelegramUsernames(): Promise<{ checked: number; updated: number }> {
+  return apiFetch('/admin/users/sync-telegram-usernames', { method: 'POST' });
+}
+
 interface SeekerDetailApiRow {
   id: number;
   telegram_id: number;

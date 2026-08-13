@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware, staffHasPermission } from '../middleware/auth';
 import { provisionWorker, provisionCompany } from '../routes/auth';
+import { getTelegramUsername } from '../lib/telegramBot';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -57,6 +58,48 @@ adminUserRoutes.get('/employers', requireStaffMiddleware, async (c) => {
        WHERE t.active_role = 'employer' OR t.active_role IS NULL ORDER BY co.created_at DESC LIMIT 200`;
   const { results } = await (search ? c.env.DB.prepare(sql).bind(`%${search}%`) : c.env.DB.prepare(sql)).all();
   return c.json({ employers: results });
+});
+
+/** telegram_username is only captured/refreshed at login (see routes/auth.ts)
+ *  — accounts that registered before that existed, or just haven't reopened
+ *  the app since, sit with a NULL username until then. This backfills them
+ *  straight from the Bot API instead of waiting: getChat works for any
+ *  chat_id the bot has ever messaged, which in practice is every worker and
+ *  company (launching the Mini App and getting notifications both go
+ *  through the bot). Capped per call to stay well inside the request's CPU
+ *  budget — safe to call again for the next batch. */
+adminUserRoutes.post('/sync-telegram-usernames', requireStaffMiddleware, async (c) => {
+  const BATCH = 40;
+  const { results: workers } = await c.env.DB.prepare(
+    'SELECT id, telegram_id FROM workers WHERE telegram_username IS NULL LIMIT ?',
+  )
+    .bind(BATCH)
+    .all<{ id: number; telegram_id: number }>();
+  const { results: companies } = await c.env.DB.prepare(
+    'SELECT id, owner_telegram_id FROM companies WHERE telegram_username IS NULL LIMIT ?',
+  )
+    .bind(BATCH)
+    .all<{ id: number; owner_telegram_id: number }>();
+
+  let updated = 0;
+  await Promise.all([
+    ...workers.map(async (w) => {
+      const username = await getTelegramUsername(c.env, w.telegram_id);
+      if (username) {
+        await c.env.DB.prepare('UPDATE workers SET telegram_username = ? WHERE id = ?').bind(username, w.id).run();
+        updated++;
+      }
+    }),
+    ...companies.map(async (co) => {
+      const username = await getTelegramUsername(c.env, co.owner_telegram_id);
+      if (username) {
+        await c.env.DB.prepare('UPDATE companies SET telegram_username = ? WHERE id = ?').bind(username, co.id).run();
+        updated++;
+      }
+    }),
+  ]);
+
+  return c.json({ checked: workers.length + companies.length, updated });
 });
 
 /** Full profile — everything the person themselves filled in, plus their
