@@ -69,16 +69,34 @@ applicationRoutes.post('/', async (c) => {
     .first<{ id: number; company_id: number; position_label: string }>();
   if (!shift) return c.json({ error: 'shift_not_found' }, 404);
 
-  const existing = await c.env.DB.prepare('SELECT id FROM applications WHERE shift_id = ? AND worker_id = ?')
+  const existing = await c.env.DB.prepare('SELECT id, status FROM applications WHERE shift_id = ? AND worker_id = ?')
     .bind(shiftId, session.workerId)
-    .first();
-  if (existing) return c.json({ error: 'already_applied' }, 409);
+    .first<{ id: number; status: string }>();
 
-  const inserted = await c.env.DB.prepare(
-    "INSERT INTO applications (shift_id, worker_id, status, work_stage) VALUES (?, ?, 'pending', 'upcoming') RETURNING *",
-  )
-    .bind(shiftId, session.workerId)
-    .first<AppRow>();
+  let inserted: AppRow | null;
+  if (existing) {
+    // A declined invite or a cancelled shift is a closed decision, not an
+    // open one — the feed lets the shift reappear for this worker (see
+    // feed.ts), so re-applying has to actually work rather than hit the
+    // shift_id+worker_id UNIQUE constraint. Reuse the row instead of a
+    // fresh INSERT, wiping the earlier outcome so it starts over cleanly.
+    if (existing.status !== 'declined' && existing.status !== 'cancelled') return c.json({ error: 'already_applied' }, 409);
+    inserted = await c.env.DB.prepare(
+      `UPDATE applications
+       SET status = 'pending', work_stage = 'upcoming', check_in_at = NULL, closed_by_employer_at = NULL,
+           rating = NULL, review_tags = NULL, review_comment = NULL,
+           cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL, created_at = datetime('now')
+       WHERE id = ? RETURNING *`,
+    )
+      .bind(existing.id)
+      .first<AppRow>();
+  } else {
+    inserted = await c.env.DB.prepare(
+      "INSERT INTO applications (shift_id, worker_id, status, work_stage) VALUES (?, ?, 'pending', 'upcoming') RETURNING *",
+    )
+      .bind(shiftId, session.workerId)
+      .first<AppRow>();
+  }
 
   const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
   await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')

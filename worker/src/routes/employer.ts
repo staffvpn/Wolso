@@ -367,7 +367,10 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
       chat = await c.env.DB.prepare('INSERT INTO chats (company_id, worker_id, shift_id) VALUES (?, ?, ?) RETURNING id')
         .bind(session.companyId, app.worker_id, shiftId)
         .first<{ id: number }>();
-      await c.env.DB.prepare("INSERT INTO messages (chat_id, sender, kind, text) VALUES (?, 'system', 'system', ?)")
+      // Addressed to the worker ("Вас приглашают…") — the employer is the
+      // one doing the inviting, so seeing this in their own chat view would
+      // read like a message from nowhere. Scope it to the worker's side only.
+      await c.env.DB.prepare("INSERT INTO messages (chat_id, sender, kind, text, visible_to) VALUES (?, 'system', 'system', ?, 'worker')")
         .bind(chat!.id, `Вас приглашают на смену «${shift.position_label}». ${company?.address ? `Адрес: ${company.address}` : ''}`)
         .run();
     }

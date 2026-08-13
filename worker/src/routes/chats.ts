@@ -43,13 +43,18 @@ chatRoutes.get('/', async (c) => {
 
   const chats = [];
   for (const row of results) {
-    const last = await c.env.DB.prepare('SELECT text, kind, sender, created_at FROM messages WHERE chat_id = ? ORDER BY created_at DESC LIMIT 1')
-      .bind(row.id)
-      .first<{ text: string; kind: string; sender: string; created_at: string }>();
-    const unread = await c.env.DB.prepare(
-      "SELECT COUNT(*) as n FROM messages WHERE chat_id = ? AND read = 0 AND sender != ?",
+    // A system message can be scoped to just one side (visible_to) — keep
+    // it out of the other side's preview and unread count entirely, same
+    // as it's kept out of their message list below.
+    const last = await c.env.DB.prepare(
+      'SELECT text, kind, sender, created_at FROM messages WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?) ORDER BY created_at DESC LIMIT 1',
     )
       .bind(row.id, actor.role)
+      .first<{ text: string; kind: string; sender: string; created_at: string }>();
+    const unread = await c.env.DB.prepare(
+      "SELECT COUNT(*) as n FROM messages WHERE chat_id = ? AND read = 0 AND sender != ? AND (visible_to IS NULL OR visible_to = ?)",
+    )
+      .bind(row.id, actor.role, actor.role)
       .first<{ n: number }>();
 
     const avatarUrl =
@@ -90,7 +95,11 @@ chatRoutes.get('/:id/messages', async (c) => {
   const chatId = c.req.param('id');
   if (!(await assertParticipant(c.env, chatId, actor))) return c.json({ error: 'not_found' }, 404);
 
-  const { results } = await c.env.DB.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC').bind(chatId).all();
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM messages WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?) ORDER BY created_at ASC',
+  )
+    .bind(chatId, actor.role)
+    .all();
   await c.env.DB.prepare('UPDATE messages SET read = 1 WHERE chat_id = ? AND sender != ?').bind(chatId, actor.role).run();
 
   // They've now actually seen everything — clear our own "last notified"

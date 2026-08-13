@@ -56,8 +56,14 @@ feedRoutes.get('/', async (c) => {
     binds.push(new Date().toISOString().slice(0, 10));
   }
 
-  // Applicant's own shifts already applied to shouldn't show again.
-  clauses.push('s.id NOT IN (SELECT shift_id FROM applications WHERE worker_id = ?)');
+  // Only a *live* application on this shift hides it from the feed —
+  // something already pending, invited, or confirmed. A declined invite or
+  // a cancelled shift is a closed decision, not an ongoing one: the shift
+  // is still open and other workers still see it, so this worker should
+  // too rather than have it disappear from their feed forever.
+  clauses.push(
+    "s.id NOT IN (SELECT shift_id FROM applications WHERE worker_id = ? AND status IN ('pending', 'invited', 'accepted'))",
+  );
   binds.push(session.kind === 'worker' ? session.workerId : -1);
 
   // radiusKm is accepted but not yet applied — there's no lat/lng captured
