@@ -159,8 +159,16 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
 
         <div className="space-y-4">
           <div>
-            <SectionLabel>Имя и фамилия</SectionLabel>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Как к вам обращаться" className={FIELD_CLASS} />
+            <SectionLabel>
+              Имя и фамилия <span className="text-danger">*</span>
+            </SectionLabel>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Как к вам обращаться"
+              className={FIELD_CLASS}
+              required
+            />
           </div>
 
           <div>

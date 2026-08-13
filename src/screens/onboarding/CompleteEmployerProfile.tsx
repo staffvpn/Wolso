@@ -132,8 +132,16 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
 
         <div className="space-y-4">
           <div>
-            <SectionLabel>Название заведения</SectionLabel>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="«Кофе и Точка»" className={FIELD_CLASS} />
+            <SectionLabel>
+              Название заведения <span className="text-danger">*</span>
+            </SectionLabel>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="«Кофе и Точка»"
+              className={FIELD_CLASS}
+              required
+            />
           </div>
 
           <div>
