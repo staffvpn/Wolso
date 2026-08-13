@@ -32,3 +32,7 @@ export async function fetchNotifications(as: Actor = 'worker'): Promise<AppNotif
 export async function markAllNotificationsRead(as: Actor = 'worker'): Promise<void> {
   await apiFetch('/notifications/read-all', { method: 'POST', as });
 }
+
+export async function markNotificationRead(id: string, as: Actor = 'worker'): Promise<void> {
+  await apiFetch(`/notifications/${id}/read`, { method: 'POST', as });
+}

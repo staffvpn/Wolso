@@ -17,6 +17,16 @@ notificationRoutes.get('/', async (c) => {
   return c.json({ notifications: results });
 });
 
+notificationRoutes.post('/:id/read', async (c) => {
+  const session = c.get('session');
+  if (!session || (session.kind !== 'worker' && session.kind !== 'company')) return c.json({ error: 'auth_required' }, 401);
+
+  const col = session.kind === 'worker' ? 'worker_id' : 'company_id';
+  const id = session.kind === 'worker' ? session.workerId : session.companyId;
+  await c.env.DB.prepare(`UPDATE notifications SET read = 1 WHERE id = ? AND ${col} = ?`).bind(c.req.param('id'), id).run();
+  return c.json({ ok: true });
+});
+
 notificationRoutes.post('/read-all', async (c) => {
   const session = c.get('session');
   if (!session || (session.kind !== 'worker' && session.kind !== 'company')) return c.json({ error: 'auth_required' }, 401);
