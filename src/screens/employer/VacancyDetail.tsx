@@ -13,18 +13,20 @@ import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay
 import { CloseShiftSheet } from '@/components/CloseShiftSheet';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
-import { timeAgoSince } from '@/lib/format';
+import { localDateStr, timeAgoSince } from '@/lib/format';
 import type { Candidate } from '@/types';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Активна',
   pending_review: 'На модерации',
   rejected: 'Отклонена',
+  closed: 'Завершена',
 };
 const STATUS_TONE: Record<string, 'accent' | 'neutral' | 'danger'> = {
   active: 'accent',
   pending_review: 'neutral',
   rejected: 'danger',
+  closed: 'neutral',
 };
 
 export function VacancyDetail() {
@@ -38,8 +40,8 @@ export function VacancyDetail() {
   const loadVacancyCandidates = useEmployerStore((s) => s.loadVacancyCandidates);
   const closeShift = useEmployerStore((s) => s.closeShift);
   // Chat only exists once someone's hired (created server-side on accept)
-  // — this just finds that existing chat to open it, never creates one.
-  const chats = useChatStore((s) => s.chats);
+  // — openChatFor below just finds that existing chat to open it, never
+  // creates one.
   const chatsLoaded = useChatStore((s) => s.loaded);
   const loadChats = useChatStore((s) => s.load);
 
@@ -70,12 +72,19 @@ export function VacancyDetail() {
 
   // "Этот день прошёл" — closing (and the mandatory review that comes with
   // it) only makes sense once the shift has actually happened.
-  const shiftIsPast = vacancy.date < new Date().toISOString().slice(0, 10);
+  const shiftIsPast = vacancy.date < localDateStr();
 
   const [top, ...rest] = filtered;
 
-  function openChatFor(candidate: Candidate) {
-    const chat = chats.find((ch) => ch.workerId === candidate.workerId && ch.shiftId === vacancy!.id);
+  // The mount effect kicks off loadChats(), but there's nothing stopping a
+  // tap on "Написать" before that fetch actually resolves — chats would
+  // still read as [] and this would wrongly fall back to the chat list
+  // instead of opening the real one. Wait for a fresh load first, and read
+  // straight from the store afterwards instead of trusting the `chats`
+  // closure, which may be stale by the time the await returns.
+  async function openChatFor(candidate: Candidate) {
+    if (!useChatStore.getState().loaded) await loadChats('company');
+    const chat = useChatStore.getState().chats.find((ch) => ch.workerId === candidate.workerId && ch.shiftId === vacancy!.id);
     navigate(chat ? `/e/chats/${chat.id}` : '/e/chats');
   }
 

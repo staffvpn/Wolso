@@ -37,6 +37,19 @@ export function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+/** "Today" as a YYYY-MM-DD string in the device's own local time zone —
+ *  unlike `toISOString().slice(0, 10)` (always UTC), this matches what a
+ *  shift's `date` field actually means: the calendar day someone picked in
+ *  their own timezone. Comparing against the UTC version made a shift that
+ *  had already ended hours ago still read as "not over yet" for a few
+ *  hours around local midnight. */
+export function localDateStr(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function relativeDay(date: Date, now = new Date()) {
   if (isSameDay(date, now)) return 'Сегодня';
   const tomorrow = new Date(now);

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
-import { IconButton } from '@/components/ui/IconButton';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -105,9 +104,6 @@ export function Responses() {
                       >
                         <MessageCircle size={15} /> Открыть чат
                       </button>
-                      <IconButton size={40} aria-label="Маршрут">
-                        <MapPin size={16} />
-                      </IconButton>
                     </div>
                   )}
                 </motion.div>

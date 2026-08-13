@@ -4,6 +4,7 @@ import { attachSession, requireCompany } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { sendTelegramMessage } from '../lib/telegramBot';
+import { mskTodayStr } from '../lib/time';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -362,9 +363,16 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
         .run();
     }
 
+    const title = `${company?.name ?? 'Работодатель'} взял вас на смену`;
     await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-      .bind(app.worker_id, 'accepted', `${company?.name ?? 'Работодатель'} взял вас на смену`, company?.address ?? '')
+      .bind(app.worker_id, 'accepted', title, company?.address ?? '')
       .run();
+
+    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
+    if (worker) {
+      const text = company?.address ? `🎉 ${title}\nАдрес: ${company.address}` : `🎉 ${title}`;
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, text));
+    }
   }
 
   return c.json({ ok: true });
@@ -388,8 +396,7 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
     .first<{ id: number; date: string; position_label: string }>();
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
-  const today = new Date().toISOString().slice(0, 10);
-  if (shift.date >= today) return c.json({ error: 'too_early' }, 400);
+  if (shift.date >= mskTodayStr()) return c.json({ error: 'too_early' }, 400);
 
   const app = await c.env.DB.prepare('SELECT id, worker_id, status, closed_by_employer_at FROM applications WHERE id = ? AND shift_id = ?')
     .bind(appId, shiftId)

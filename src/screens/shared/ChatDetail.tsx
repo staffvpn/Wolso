@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Send, MapPin, ChevronLeft } from 'lucide-react';
+import { Send, ChevronLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
@@ -91,12 +91,8 @@ export function ChatDetail() {
           }
           if (m.kind === 'location') {
             return (
-              <div key={m.id} className="rounded-2xl bg-surface border border-border-soft px-4 py-3 flex items-start gap-3">
-                <MapPin size={18} className="text-accent shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-[13px] whitespace-pre-line leading-relaxed">{m.text}</p>
-                </div>
-                <span className="text-accent text-[13px] font-semibold shrink-0">Маршрут</span>
+              <div key={m.id} className="rounded-2xl bg-surface border border-border-soft px-4 py-3">
+                <p className="text-[13px] whitespace-pre-line leading-relaxed">{m.text}</p>
               </div>
             );
           }

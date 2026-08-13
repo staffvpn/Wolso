@@ -32,6 +32,12 @@ export interface ShiftRow {
   company_reviews_count?: number;
   company_has_avatar?: number;
   company_description?: string;
+  company_photo_ids?: string | null;
+}
+
+function companyPhotosFrom(r: ShiftRow) {
+  const ids = r.company_photo_ids ? (JSON.parse(r.company_photo_ids) as number[]) : [];
+  return ids.map((id) => ({ id, url: `/media/companies/${r.company_id}/photos/${id}` }));
 }
 
 export function shiftToJson(r: ShiftRow) {
@@ -67,6 +73,7 @@ export function shiftToJson(r: ShiftRow) {
           reviewsCount: r.company_reviews_count,
           avatarUrl: r.company_has_avatar ? `/media/companies/${r.company_id}/avatar` : null,
           description: r.company_description || undefined,
+          photos: companyPhotosFrom(r),
         }
       : undefined,
   };
@@ -76,7 +83,8 @@ export const SHIFT_SELECT = `
   SELECT s.*, c.name as company_name, c.address as company_address, c.city as company_city,
          c.logo_initial as company_logo_initial, c.logo_color as company_logo_color,
          c.rating as company_rating, c.reviews_count as company_reviews_count,
-         (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description
+         (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description,
+         (SELECT json_group_array(id) FROM company_photos cp WHERE cp.company_id = c.id) as company_photo_ids
   FROM shifts s JOIN companies c ON c.id = s.company_id
 `;
 

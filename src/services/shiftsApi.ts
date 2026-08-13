@@ -43,6 +43,7 @@ export interface ShiftApiResponse {
     rating?: number;
     reviewsCount?: number;
     avatarUrl?: string | null;
+    photos?: { id: number; url: string }[];
   };
 }
 
@@ -85,6 +86,7 @@ export function fromApi(s: ShiftApiResponse): Shift {
           rating: s.company.rating ?? 0,
           reviewsCount: s.company.reviewsCount ?? 0,
           avatarUrl: resolveMediaUrl(s.company.avatarUrl),
+          photos: (s.company.photos ?? []).map((p) => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
         }
       : undefined,
   };

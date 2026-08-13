@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { MapPin, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Card } from '@/components/ui/Card';
@@ -149,7 +149,6 @@ export function Shifts() {
                         {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}–{String(shift.endHour).padStart(2, '0')}:{String(shift.endMin).padStart(2, '0')} · {formatMoney(shift.totalPay)}
                       </p>
                     </div>
-                    <MapPin size={16} className="text-text-faint shrink-0" />
                   </div>
                 );
               })}

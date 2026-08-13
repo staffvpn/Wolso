@@ -2,8 +2,16 @@ import { useState } from 'react';
 import { BottomSheet } from './ui/BottomSheet';
 import { Button } from './ui/Button';
 import { ReviewForm } from './ReviewForm';
+import { ApiError } from '@/lib/apiClient';
 
 const TAGS = ['Пришёл вовремя', 'Хорошо справился', 'Опоздал', 'Ушёл раньше', 'Не справился'];
+
+const ERROR_MESSAGES: Record<string, string> = {
+  too_early: 'Эту смену ещё нельзя закрыть — она пока не наступила или идёт прямо сейчас.',
+  not_accepted: 'Этот кандидат не был принят на смену.',
+  already_closed: 'Смена уже закрыта.',
+  rating_required: 'Поставьте оценку от 1 до 5.',
+};
 
 interface CloseShiftSheetProps {
   open: boolean;
@@ -35,8 +43,9 @@ export function CloseShiftSheet({ open, onClose, workerName, onSubmit }: CloseSh
       setTags([TAGS[0]]);
       setComment('');
       onClose();
-    } catch {
-      setError('Не получилось закрыть смену — попробуйте ещё раз');
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : undefined;
+      setError((code && ERROR_MESSAGES[code]) ?? 'Не получилось закрыть смену — попробуйте ещё раз');
     } finally {
       setSubmitting(false);
     }

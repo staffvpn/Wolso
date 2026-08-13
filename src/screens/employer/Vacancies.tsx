@@ -6,17 +6,19 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatMoney, timeAgoSince } from '@/lib/format';
+import { formatMoney, localDateStr, timeAgoSince } from '@/lib/format';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Активна',
   pending_review: 'На модерации',
   rejected: 'Отклонена',
+  closed: 'Завершена',
 };
 const STATUS_TONE: Record<string, 'accent' | 'neutral' | 'danger'> = {
   active: 'accent',
   pending_review: 'neutral',
   rejected: 'danger',
+  closed: 'neutral',
 };
 
 export function Vacancies() {
@@ -58,7 +60,7 @@ export function Vacancies() {
           {vacancies.map((vac, i) => {
             const pending = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'pending').length;
             const needsClosing =
-              vac.date < new Date().toISOString().slice(0, 10) &&
+              vac.date < localDateStr() &&
               candidates.some(
                 (c) => c.vacancyId === vac.id && c.status === 'accepted' && c.workStage !== 'employer_closed' && c.workStage !== 'reviewed',
               );
