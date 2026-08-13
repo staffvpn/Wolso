@@ -69,8 +69,3 @@ export async function postMessage(chatId: string, text: string, as: ChatActor): 
   });
   return messageFromApi(message, as);
 }
-
-export async function startChatWithWorker(workerId: string): Promise<string> {
-  const { chatId } = await apiFetch<{ chatId: number }>(`/employer/candidates/${workerId}/chat`, { method: 'POST', as: 'company' });
-  return String(chatId);
-}

@@ -167,6 +167,18 @@ export async function passWorker(workerId: string): Promise<void> {
   await apiFetch(`/employer/workers/${workerId}/pass`, { method: 'POST', as: 'company' });
 }
 
+/** Right swipe in "find staff" — invites this worker straight onto the
+ *  chosen shift (no prior application needed), same outcome as accepting
+ *  an applicant: a live invite, the shift-scoped chat, their notification.
+ *  Returns the chat id so the screen can jump straight into it. */
+export async function inviteWorkerToShift(shiftId: string, workerId: string): Promise<string> {
+  const { chatId } = await apiFetch<{ chatId: number }>(`/employer/vacancies/${shiftId}/invite/${workerId}`, {
+    method: 'POST',
+    as: 'company',
+  });
+  return String(chatId);
+}
+
 export async function decideCandidate(vacancyId: string, applicationId: string, status: 'accepted' | 'declined'): Promise<void> {
   await apiFetch(`/employer/vacancies/${vacancyId}/candidates/${applicationId}/decide`, {
     method: 'POST',

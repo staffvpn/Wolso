@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
@@ -52,24 +52,6 @@ async function loadCompanyProfile(env: Env, companyId: number) {
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${companyId}/photos/${p.id}` })),
   };
 }
-
-/** Lets an employer message a candidate before deciding — a chat can exist
- *  with no shift_id, just company+worker. */
-employerRoutes.post('/candidates/:workerId/chat', async (c) => {
-  const session = requireCompany(c as never);
-  if (!session) return c.json({ error: 'auth_required' }, 401);
-  const workerId = c.req.param('workerId');
-
-  let chat = await c.env.DB.prepare('SELECT id FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id IS NULL')
-    .bind(session.companyId, workerId)
-    .first<{ id: number }>();
-  if (!chat) {
-    chat = await c.env.DB.prepare('INSERT INTO chats (company_id, worker_id) VALUES (?, ?) RETURNING id')
-      .bind(session.companyId, workerId)
-      .first<{ id: number }>();
-  }
-  return c.json({ chatId: chat!.id });
-});
 
 employerRoutes.get('/me', async (c) => {
   const session = requireCompany(c as never);
@@ -331,10 +313,56 @@ employerRoutes.get('/vacancies/:id/candidates', async (c) => {
   return c.json({ candidates: results.map(withWorkerPhotos) });
 });
 
+/** The full "invite" side effect, shared by both ways an employer can
+ *  invite someone: accepting an applicant below, and proactively inviting
+ *  a worker found via search (see /vacancies/:shiftId/invite/:workerId).
+ *  Opens/reuses the shift-scoped chat (with the worker-only "you're
+ *  invited" system message on first creation), pushes the in-app
+ *  notification, and pings the bot — the worker still has to confirm (see
+ *  applications.ts's /:id/respond) before they're actually on the shift. */
+async function notifyInvite(
+  c: Context<{ Bindings: Env; Variables: { session: unknown } }>,
+  companyId: number,
+  workerId: number,
+  shift: { id: number | string; position_label: string },
+): Promise<{ chatId: number }> {
+  const company = await c.env.DB.prepare('SELECT name, address FROM companies WHERE id = ?').bind(companyId).first<{
+    name: string;
+    address: string;
+  }>();
+
+  let chat = await c.env.DB.prepare('SELECT id FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id = ?')
+    .bind(companyId, workerId, shift.id)
+    .first<{ id: number }>();
+  if (!chat) {
+    chat = await c.env.DB.prepare('INSERT INTO chats (company_id, worker_id, shift_id) VALUES (?, ?, ?) RETURNING id')
+      .bind(companyId, workerId, shift.id)
+      .first<{ id: number }>();
+    // Addressed to the worker ("Вас приглашают…") — the employer is the
+    // one doing the inviting, so seeing this in their own chat view would
+    // read like a message from nowhere. Scope it to the worker's side only.
+    await c.env.DB.prepare("INSERT INTO messages (chat_id, sender, kind, text, visible_to) VALUES (?, 'system', 'system', ?, 'worker')")
+      .bind(chat!.id, `Вас приглашают на смену «${shift.position_label}». ${company?.address ? `Адрес: ${company.address}` : ''}`)
+      .run();
+  }
+
+  const title = `${company?.name ?? 'Работодатель'} приглашает вас на смену`;
+  const subtitle = `«${shift.position_label}» — подтвердите в приложении`;
+  await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+    .bind(workerId, 'invited', title, subtitle)
+    .run();
+
+  const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(workerId).first<{ telegram_id: number }>();
+  if (worker) {
+    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🎉 ${title}\n${subtitle}`));
+  }
+
+  return { chatId: chat!.id };
+}
+
 /** The employer's first decision on an applicant — "declined" is final,
- *  but "accepted" isn't a hire yet, just an invitation: it opens a chat
- *  and pings the worker, who still has to confirm (see applications.ts's
- *  /:id/respond) before they're actually on the shift. */
+ *  but "accepted" isn't a hire yet, just an invitation (see notifyInvite
+ *  above for what that triggers). */
 employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -355,39 +383,62 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
   await c.env.DB.prepare('UPDATE applications SET status = ? WHERE id = ?').bind(dbStatus, appId).run();
 
   if (dbStatus === 'invited') {
-    const company = await c.env.DB.prepare('SELECT name, address FROM companies WHERE id = ?').bind(session.companyId).first<{
-      name: string;
-      address: string;
-    }>();
-
-    let chat = await c.env.DB.prepare('SELECT id FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id = ?')
-      .bind(session.companyId, app.worker_id, shiftId)
-      .first<{ id: number }>();
-    if (!chat) {
-      chat = await c.env.DB.prepare('INSERT INTO chats (company_id, worker_id, shift_id) VALUES (?, ?, ?) RETURNING id')
-        .bind(session.companyId, app.worker_id, shiftId)
-        .first<{ id: number }>();
-      // Addressed to the worker ("Вас приглашают…") — the employer is the
-      // one doing the inviting, so seeing this in their own chat view would
-      // read like a message from nowhere. Scope it to the worker's side only.
-      await c.env.DB.prepare("INSERT INTO messages (chat_id, sender, kind, text, visible_to) VALUES (?, 'system', 'system', ?, 'worker')")
-        .bind(chat!.id, `Вас приглашают на смену «${shift.position_label}». ${company?.address ? `Адрес: ${company.address}` : ''}`)
-        .run();
-    }
-
-    const title = `${company?.name ?? 'Работодатель'} приглашает вас на смену`;
-    const subtitle = `«${shift.position_label}» — подтвердите в приложении`;
-    await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-      .bind(app.worker_id, 'invited', title, subtitle)
-      .run();
-
-    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
-    if (worker) {
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🎉 ${title}\n${subtitle}`));
-    }
+    await notifyInvite(c, session.companyId, app.worker_id, shift);
   }
 
   return c.json({ ok: true });
+});
+
+/** Proactively inviting a worker found via search/browse ("Поиск") straight
+ *  onto one of the employer's own open shifts — the mirror image of
+ *  accepting an applicant above, just without an existing application to
+ *  start from. Requires a real, still-active vacancy: there's nothing to
+ *  invite someone onto otherwise. Ends up in exactly the same place either
+ *  way — a live 'invited' application, the worker sees it under Отклики
+ *  and can confirm or decline (declining deletes the chat, see
+ *  applications.ts's /:id/respond). */
+employerRoutes.post('/vacancies/:shiftId/invite/:workerId', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const { shiftId, workerId } = c.req.param();
+
+  const shift = await c.env.DB.prepare("SELECT id, position_label FROM shifts WHERE id = ? AND company_id = ? AND status = 'active'")
+    .bind(shiftId, session.companyId)
+    .first<{ id: number; position_label: string }>();
+  if (!shift) return c.json({ error: 'not_found' }, 404);
+
+  const worker = await c.env.DB.prepare("SELECT id FROM workers WHERE id = ? AND status != 'suspended'").bind(workerId).first();
+  if (!worker) return c.json({ error: 'worker_not_found' }, 404);
+
+  const existing = await c.env.DB.prepare('SELECT id, status FROM applications WHERE shift_id = ? AND worker_id = ?')
+    .bind(shiftId, workerId)
+    .first<{ id: number; status: string }>();
+
+  if (existing && (existing.status === 'invited' || existing.status === 'accepted')) {
+    return c.json({ error: 'already_invited' }, 409);
+  }
+
+  if (existing) {
+    // 'pending' (they'd already applied themselves — this just fast-tracks
+    // straight to invited) or 'declined'/'cancelled' (a closed decision,
+    // same reasoning as the worker's own re-apply in applications.ts):
+    // reuse the row instead of a fresh INSERT hitting the
+    // shift_id+worker_id UNIQUE constraint.
+    await c.env.DB.prepare(
+      `UPDATE applications SET status = 'invited', work_stage = 'upcoming', check_in_at = NULL, closed_by_employer_at = NULL,
+         rating = NULL, review_tags = NULL, review_comment = NULL,
+         cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL WHERE id = ?`,
+    )
+      .bind(existing.id)
+      .run();
+  } else {
+    await c.env.DB.prepare("INSERT INTO applications (shift_id, worker_id, status, work_stage) VALUES (?, ?, 'invited', 'upcoming')")
+      .bind(shiftId, workerId)
+      .run();
+  }
+
+  const { chatId } = await notifyInvite(c, session.companyId, Number(workerId), shift);
+  return c.json({ chatId });
 });
 
 /** Employer backs out of a candidate they already invited or confirmed —

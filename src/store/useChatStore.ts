@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Chat, ChatMessage } from '@/types';
-import { fetchChats, fetchMessages, postMessage, startChatWithWorker, type ChatActor } from '@/services/chatApi';
+import { fetchChats, fetchMessages, postMessage, type ChatActor } from '@/services/chatApi';
 
 interface ChatState {
   chats: Chat[];
@@ -12,10 +12,9 @@ interface ChatState {
   loadMessages: (chatId: string, as: ChatActor) => Promise<void>;
   sendMessage: (chatId: string, text: string, as: ChatActor) => Promise<void>;
   markRead: (chatId: string) => void;
-  startChatWithWorker: (workerId: string) => Promise<string>;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set) => ({
   chats: [],
   messagesByChat: {},
   loading: false,
@@ -54,10 +53,4 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   markRead: (chatId) => set((s) => ({ chats: s.chats.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c)) })),
-
-  startChatWithWorker: async (workerId) => {
-    const chatId = await startChatWithWorker(workerId);
-    await get().load('company');
-    return chatId;
-  },
 }));

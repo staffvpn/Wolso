@@ -1,46 +1,54 @@
 import { create } from 'zustand';
 import type { Position, WorkerListing } from '@/types';
-import { fetchWorkerListings, passWorker } from '@/services/employerApi';
-import { haptic } from '@/lib/telegram';
+import { fetchWorkerListings, passWorker, inviteWorkerToShift } from '@/services/employerApi';
+import { haptic, hapticNotify } from '@/lib/telegram';
 
 interface WorkerBrowseState {
-  positions: Position[];
+  /** The shift being staffed right now — every invite in this deck goes
+   *  onto it, so browsing is always scoped to one real, active vacancy
+   *  rather than a free-floating position filter. */
+  shiftId: string | null;
+  position: Position | null;
   deck: WorkerListing[];
   index: number;
   loading: boolean;
   loaded: boolean;
-  setPositions: (positions: Position[]) => void;
+  setVacancy: (shiftId: string, position: Position) => void;
   loadDeck: () => Promise<void>;
   /** Left swipe — records the pass server-side so this person doesn't
    *  reappear next time, and moves on to the next card. */
   pass: () => void;
-  /** Right swipe ("Написать") advances the deck locally — the actual chat
-   *  is started by the screen (it needs to navigate), this just keeps the
-   *  card from lingering once that's underway. */
-  advance: () => void;
+  /** Right swipe ("Пригласить на смену") — invites the current card's
+   *  worker onto `shiftId` server-side, then advances. Returns the
+   *  resulting chat id (null on failure) so the screen can open it. */
+  invite: () => Promise<string | null>;
 }
 
 export const useWorkerBrowseStore = create<WorkerBrowseState>((set, get) => ({
-  positions: [],
+  shiftId: null,
+  position: null,
   deck: [],
   index: 0,
   loading: false,
   loaded: false,
 
-  setPositions: (positions) => set({ positions }),
+  setVacancy: (shiftId, position) => {
+    if (shiftId === get().shiftId) return;
+    set({ shiftId, position, deck: [], index: 0, loaded: false });
+  },
 
   loadDeck: async () => {
-    const { positions } = get();
-    // No position picked yet — an empty deck (with its own "choose a
-    // position" empty state) beats silently showing every worker on the
-    // platform regardless of what the employer is actually hiring for.
-    if (positions.length === 0) {
+    const { position } = get();
+    // No vacancy picked yet — an empty deck (with its own "pick a shift"
+    // empty state) beats silently showing every worker on the platform
+    // regardless of what's actually open right now.
+    if (!position) {
       set({ deck: [], index: 0, loaded: true });
       return;
     }
     set({ loading: true, index: 0 });
     try {
-      const deck = await fetchWorkerListings(positions);
+      const deck = await fetchWorkerListings([position]);
       set({ deck, loading: false, loaded: true });
     } catch {
       set({ loading: false });
@@ -56,5 +64,17 @@ export const useWorkerBrowseStore = create<WorkerBrowseState>((set, get) => ({
     set({ index: index + 1 });
   },
 
-  advance: () => set((s) => ({ index: s.index + 1 })),
+  invite: async () => {
+    const { deck, index, shiftId } = get();
+    const worker = deck[index];
+    if (!worker || !shiftId) return null;
+    set({ index: index + 1 });
+    try {
+      const chatId = await inviteWorkerToShift(shiftId, worker.workerId);
+      hapticNotify('success');
+      return chatId;
+    } catch {
+      return null;
+    }
+  },
 }));
