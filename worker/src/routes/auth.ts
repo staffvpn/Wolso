@@ -8,7 +8,11 @@ export const authRoutes = new Hono<{ Bindings: Env }>();
 const DEFAULT_POSITIONS = [{ position: 'barista', position_label: 'Бариста', months: 0 }];
 
 /** Exported so admin/users.ts's role-switch action can provision the
- *  target role's row the same way onboarding does. */
+ *  target role's row the same way onboarding does — that path deliberately
+ *  still passes a name (carried over from the person's other role), but
+ *  fresh registration (see /choose-role below) always passes '': a
+ *  worker's real name has to be typed in on the onboarding screen, not
+ *  quietly inherited from their Telegram profile. */
 export async function provisionWorker(env: Env, user: TelegramUser, name: string): Promise<number> {
   let worker = await env.DB.prepare('SELECT id FROM workers WHERE telegram_id = ?').bind(user.id).first<{ id: number }>();
   if (worker) return worker.id;
@@ -28,14 +32,16 @@ export async function provisionWorker(env: Env, user: TelegramUser, name: string
   return worker.id;
 }
 
+/** Deliberately no name/logo_initial derived from the Telegram account —
+ *  an employer's "name" is the venue's name, not the owner's, so it has
+ *  to start blank and get filled in on the onboarding screen rather than
+ *  quietly inheriting the owner's personal Telegram identity. */
 export async function provisionCompany(env: Env, user: TelegramUser): Promise<number> {
   let company = await env.DB.prepare('SELECT id FROM companies WHERE owner_telegram_id = ?').bind(user.id).first<{ id: number }>();
   if (company) return company.id;
 
-  const inserted = await env.DB.prepare(
-    'INSERT INTO companies (owner_telegram_id, name, logo_initial) VALUES (?, ?, ?) RETURNING id',
-  )
-    .bind(user.id, `Компания ${user.first_name}`, (user.first_name?.[0] ?? 'W').toUpperCase())
+  const inserted = await env.DB.prepare('INSERT INTO companies (owner_telegram_id, name) VALUES (?, ?) RETURNING id')
+    .bind(user.id, '')
     .first<{ id: number }>();
   return inserted!.id;
 }
@@ -81,7 +87,12 @@ authRoutes.post('/telegram', async (c) => {
     }
   }
 
-  const session = await issueSessionForRole(c.env, user, name, account.active_role);
+  // This only ever actually provisions a row for pre-existing accounts
+  // being backfilled into telegram_accounts for the first time (a brand
+  // new account with no row yet returns needsRoleChoice above instead) —
+  // '' here is a no-op in that case since provisionWorker/provisionCompany
+  // both bail out early once the row already exists.
+  const session = await issueSessionForRole(c.env, user, '', account.active_role);
   return c.json({ ...session, telegramUser });
 });
 
@@ -103,7 +114,11 @@ authRoutes.post('/choose-role', async (c) => {
   await c.env.DB.prepare('INSERT INTO telegram_accounts (telegram_id, active_role) VALUES (?, ?)').bind(user.id, role).run();
 
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
-  const session = await issueSessionForRole(c.env, user, name, role);
+  // '' — not `name` — for provisioning: a fresh worker/company profile
+  // starts blank (see provisionWorker/provisionCompany above) rather than
+  // pre-filling from the Telegram account. `name` still goes out on
+  // telegramUser below, unrelated to the stored profile.
+  const session = await issueSessionForRole(c.env, user, '', role);
   return c.json({ ...session, telegramUser: { id: user.id, name, photoUrl: user.photo_url } });
 });
 

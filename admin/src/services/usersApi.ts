@@ -46,7 +46,10 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
   return {
     id: String(w.id),
     kind: 'seeker',
-    name: w.name,
+    // Registration no longer pre-fills this from Telegram — someone who
+    // signed up but hasn't finished onboarding yet genuinely has no name
+    // set, rather than always having at least their Telegram one.
+    name: w.name || 'Без имени',
     contact: `Telegram ID ${w.telegram_id}`,
     status: w.status as UserStatus,
     statusLabel: suspended ? 'Заблокирован' : 'Активен',
@@ -77,7 +80,7 @@ function fromApiEmployer(c: EmployerApiRow): PlatformUser {
   return {
     id: String(c.id),
     kind: 'employer',
-    name: c.name,
+    name: c.name || 'Без названия',
     contact: `Telegram ID ${c.owner_telegram_id}`,
     status: c.status as UserStatus,
     statusLabel: suspended ? 'Заблокирован' : 'Активен',
