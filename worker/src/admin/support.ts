@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, requirePermission, requireStaff } from '../middleware/auth';
+import { sendTelegramMessage } from '../lib/telegramBot';
 
 export const adminSupportRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSupportRoutes.use('*', attachSession);
@@ -61,6 +62,22 @@ adminSupportRoutes.post('/threads/:id/messages', requirePermission('viewSupportC
   )
     .bind(id, staff?.name ?? 'Wolso', text.trim())
     .first();
+
+  const thread = await c.env.DB.prepare('SELECT worker_id, company_id FROM support_threads WHERE id = ?')
+    .bind(id)
+    .first<{ worker_id: number | null; company_id: number | null }>();
+  const preview = text.trim().length > 200 ? `${text.trim().slice(0, 200)}…` : text.trim();
+  if (thread?.worker_id) {
+    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
+      .bind(thread.worker_id)
+      .first<{ telegram_id: number }>();
+    if (worker) c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🛟 Поддержка Wolso:\n${preview}`));
+  } else if (thread?.company_id) {
+    const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+      .bind(thread.company_id)
+      .first<{ owner_telegram_id: number }>();
+    if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `🛟 Поддержка Wolso:\n${preview}`));
+  }
 
   return c.json({ message: inserted });
 });

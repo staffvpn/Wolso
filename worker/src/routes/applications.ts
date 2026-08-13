@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { sendTelegramMessage } from '../lib/telegramBot';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 applicationRoutes.use('*', attachSession);
@@ -57,9 +58,9 @@ applicationRoutes.post('/', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const { shiftId } = await c.req.json<{ shiftId: number }>();
 
-  const shift = await c.env.DB.prepare("SELECT id, company_id FROM shifts WHERE id = ? AND status = 'active'")
+  const shift = await c.env.DB.prepare("SELECT id, company_id, position_label FROM shifts WHERE id = ? AND status = 'active'")
     .bind(shiftId)
-    .first<{ id: number; company_id: number }>();
+    .first<{ id: number; company_id: number; position_label: string }>();
   if (!shift) return c.json({ error: 'shift_not_found' }, 404);
 
   const existing = await c.env.DB.prepare('SELECT id FROM applications WHERE shift_id = ? AND worker_id = ?')
@@ -77,6 +78,14 @@ applicationRoutes.post('/', async (c) => {
   await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
     .bind(shift.company_id, 'new_response', 'Новый отклик на смену', worker?.name ?? 'Соискатель откликнулся')
     .run();
+
+  const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+    .bind(shift.company_id)
+    .first<{ owner_telegram_id: number }>();
+  if (company) {
+    const text = `📩 Новый отклик на «${shift.position_label}»\n${worker?.name ?? 'Соискатель'} хочет выйти на смену`;
+    c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, text));
+  }
 
   return c.json({ application: appToJson(inserted!) });
 });

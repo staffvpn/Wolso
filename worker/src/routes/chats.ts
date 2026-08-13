@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
+import { sendTelegramMessage } from '../lib/telegramBot';
 
 export const chatRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 chatRoutes.use('*', attachSession);
@@ -78,7 +79,9 @@ chatRoutes.get('/', async (c) => {
 
 async function assertParticipant(env: Env, chatId: string, actor: { role: 'worker' | 'company'; id: number }) {
   const col = actor.role === 'worker' ? 'worker_id' : 'company_id';
-  return env.DB.prepare(`SELECT id FROM chats WHERE id = ? AND ${col} = ?`).bind(chatId, actor.id).first();
+  return env.DB.prepare(`SELECT id, company_id, worker_id FROM chats WHERE id = ? AND ${col} = ?`)
+    .bind(chatId, actor.id)
+    .first<{ id: number; company_id: number; worker_id: number }>();
 }
 
 chatRoutes.get('/:id/messages', async (c) => {
@@ -97,7 +100,8 @@ chatRoutes.post('/:id/messages', async (c) => {
   const actor = actorFromSession(c.get('session'));
   if (!actor) return c.json({ error: 'auth_required' }, 401);
   const chatId = c.req.param('id');
-  if (!(await assertParticipant(c.env, chatId, actor))) return c.json({ error: 'not_found' }, 404);
+  const chat = await assertParticipant(c.env, chatId, actor);
+  if (!chat) return c.json({ error: 'not_found' }, 404);
 
   const { text } = await c.req.json<{ text: string }>();
   if (!text?.trim()) return c.json({ error: 'empty_message' }, 400);
@@ -107,6 +111,28 @@ chatRoutes.post('/:id/messages', async (c) => {
   )
     .bind(chatId, actor.role, text.trim())
     .first();
+
+  // Notify whoever didn't just send it — a worker/employer chat is the
+  // one place a reply genuinely needs to reach someone's phone right
+  // away, not just wait for them to happen to reopen the app.
+  const preview = text.trim().length > 200 ? `${text.trim().slice(0, 200)}…` : text.trim();
+  if (actor.role === 'worker') {
+    const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(actor.id).first<{ name: string }>();
+    const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+      .bind(chat.company_id)
+      .first<{ owner_telegram_id: number }>();
+    if (company) {
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`));
+    }
+  } else {
+    const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(actor.id).first<{ name: string }>();
+    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
+      .bind(chat.worker_id)
+      .first<{ telegram_id: number }>();
+    if (worker) {
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`));
+    }
+  }
 
   return c.json({ message: inserted });
 });
