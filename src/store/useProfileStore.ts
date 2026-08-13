@@ -11,6 +11,8 @@ import {
   type ProfileUpdate,
 } from '@/services/profileApi';
 import { hapticNotify } from '@/lib/telegram';
+import { ApiError } from '@/lib/apiClient';
+import { useAuthStore } from './useAuthStore';
 
 interface ProfileState {
   name: string;
@@ -60,7 +62,16 @@ export const useProfileStore = create<ProfileState>((set) => ({
     try {
       const profile = await fetchMyProfile();
       set({ ...profile, loading: false, loaded: true });
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        // The worker row this session points to is gone — deleted from
+        // the admin dashboard. Force back through /auth/telegram instead
+        // of sitting on a permanent "не удалось загрузить": a fresh
+        // bootstrap discovers there's no account anymore and routes to
+        // the role-choice screen, same as it would for a new signup.
+        useAuthStore.getState().signOut();
+        return;
+      }
       // WorkerProfileGate (AuthGate.tsx) blocks the entire app on `loaded`
       // — a request that fails and never resolves it would soft-lock every
       // worker session on a spinner forever, so this has to settle either way.

@@ -24,6 +24,13 @@ interface AuthState {
   error: string | null;
   bootstrap: () => Promise<void>;
   chooseRole: (role: Role) => Promise<void>;
+  /** Drops the current session and drives the app back through
+   *  bootstrap() — used when the account this session points to no
+   *  longer exists server-side (staff deleted it from the admin
+   *  dashboard). Re-running /auth/telegram from scratch is what actually
+   *  discovers there's no worker/company row anymore and routes to the
+   *  role-choice screen, same as a genuinely new account. */
+  signOut: () => void;
 }
 
 async function callAuth<T>(path: string, body: unknown): Promise<T> {
@@ -114,6 +121,8 @@ export const useAuthStore = create<AuthState>()(
           set({ status: 'error', error: `Не получилось сохранить выбор: ${detail}` });
         }
       },
+
+      signOut: () => set({ workerToken: null, companyToken: null, telegramUser: null, role: null, status: 'idle' }),
     }),
     {
       name: 'wolso/auth',

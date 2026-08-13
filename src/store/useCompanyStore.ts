@@ -9,6 +9,8 @@ import {
   type CompanyUpdate,
 } from '@/services/companyApi';
 import { hapticNotify } from '@/lib/telegram';
+import { ApiError } from '@/lib/apiClient';
+import { useAuthStore } from './useAuthStore';
 
 interface CompanyState {
   company: Company | null;
@@ -33,7 +35,16 @@ export const useCompanyStore = create<CompanyState>((set) => ({
     try {
       const company = await fetchMyCompany();
       set({ company, loading: false, loaded: true });
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        // The company row this session points to is gone — deleted from
+        // the admin dashboard. Force back through /auth/telegram instead
+        // of sitting on a permanent "не удалось загрузить": a fresh
+        // bootstrap discovers there's no account anymore and routes to
+        // the role-choice screen, same as it would for a new signup.
+        useAuthStore.getState().signOut();
+        return;
+      }
       // EmployerProfileGate (AuthGate.tsx) blocks the entire app on `loaded`
       // — a request that fails and never resolves it would soft-lock every
       // employer session on a spinner forever, so this has to settle either way.
