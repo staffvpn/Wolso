@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, X, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { CandidateCard } from '@/components/deck/CandidateCard';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { useChatStore } from '@/store/useChatStore';
 
 export function Candidates() {
   const navigate = useNavigate();
@@ -17,7 +16,6 @@ export function Candidates() {
   const candidates = useEmployerStore((s) => s.candidates);
   const loadAll = useEmployerStore((s) => s.loadAll);
   const decideCandidate = useEmployerStore((s) => s.decideCandidate);
-  const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
 
   useEffect(() => {
     loadAll();
@@ -70,13 +68,6 @@ export function Candidates() {
           <Button size="lg" className="flex-1 max-w-[220px]" onClick={() => deckRef.current?.swipeRight()}>
             <Check size={18} /> Взять на смену
           </Button>
-          <IconButton
-            size={56}
-            aria-label="Написать"
-            onClick={async () => navigate(`/e/chats/${await startChatWithWorker(current.workerId)}`)}
-          >
-            <Mail size={19} />
-          </IconButton>
         </div>
       )}
 

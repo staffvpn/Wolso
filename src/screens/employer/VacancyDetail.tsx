@@ -36,15 +36,20 @@ export function VacancyDetail() {
   const decideCandidate = useEmployerStore((s) => s.decideCandidate);
   const loadAll = useEmployerStore((s) => s.loadAll);
   const loadVacancyCandidates = useEmployerStore((s) => s.loadVacancyCandidates);
-  const startChatWithWorker = useChatStore((s) => s.startChatWithWorker);
+  const closeShift = useEmployerStore((s) => s.closeShift);
+  // Chat only exists once someone's hired (created server-side on accept)
+  // — this just finds that existing chat to open it, never creates one.
+  const chats = useChatStore((s) => s.chats);
+  const chatsLoaded = useChatStore((s) => s.loaded);
+  const loadChats = useChatStore((s) => s.load);
 
   const [ratingOnly, setRatingOnly] = useState(false);
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [closing, setClosing] = useState<Candidate | null>(null);
-  const closeShift = useEmployerStore((s) => s.closeShift);
 
   useEffect(() => {
     if (!vacanciesLoaded) loadAll();
+    if (!chatsLoaded) loadChats('company');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -68,6 +73,11 @@ export function VacancyDetail() {
   const shiftIsPast = vacancy.date < new Date().toISOString().slice(0, 10);
 
   const [top, ...rest] = filtered;
+
+  function openChatFor(candidate: Candidate) {
+    const chat = chats.find((ch) => ch.workerId === candidate.workerId && ch.shiftId === vacancy!.id);
+    navigate(chat ? `/e/chats/${chat.id}` : '/e/chats');
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -94,6 +104,9 @@ export function VacancyDetail() {
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
                     <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
                   </div>
+                  <Button variant="dark" size="icon" onClick={() => openChatFor(c)} aria-label="Написать">
+                    <Mail size={16} />
+                  </Button>
                   {c.workStage === 'employer_closed' || c.workStage === 'reviewed' ? (
                     <Badge tone="accent">Смена закрыта</Badge>
                   ) : shiftIsPast ? (
@@ -125,14 +138,6 @@ export function VacancyDetail() {
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
                     Взять на смену
-                  </Button>
-                  <Button
-                    variant="dark"
-                    size="icon"
-                    onClick={async () => navigate(`/e/chats/${await startChatWithWorker(top.workerId)}`)}
-                    aria-label="Написать"
-                  >
-                    <Mail size={17} />
                   </Button>
                   <Button variant="dark" size="icon" onClick={() => decideCandidate(vacancy.id, top.id, 'declined')} aria-label="Отклонить">
                     <X size={17} />
@@ -184,10 +189,6 @@ export function VacancyDetail() {
             onDecline={() => {
               decideCandidate(vacancy.id, selected.id, 'declined');
               setSelected(null);
-            }}
-            onMessage={async () => {
-              const chatId = await startChatWithWorker(selected.workerId);
-              navigate(`/e/chats/${chatId}`);
             }}
           />
         )}

@@ -427,6 +427,13 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
     c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `✅ ${title}\n${subtitle}`));
   }
 
+  // The chat was only ever meant to last for the duration of this hire —
+  // once the shift is closed there's nothing left to coordinate about, so
+  // it (and its messages, via ON DELETE CASCADE) goes away with it.
+  await c.env.DB.prepare('DELETE FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id = ?')
+    .bind(session.companyId, app.worker_id, shiftId)
+    .run();
+
   return c.json({ ok: true });
 });
 

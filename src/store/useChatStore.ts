@@ -6,6 +6,7 @@ interface ChatState {
   chats: Chat[];
   messagesByChat: Record<string, ChatMessage[]>;
   loading: boolean;
+  loaded: boolean;
   load: (as: ChatActor) => Promise<void>;
   loadMessages: (chatId: string, as: ChatActor) => Promise<void>;
   sendMessage: (chatId: string, text: string, as: ChatActor) => Promise<void>;
@@ -17,12 +18,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
   loading: false,
+  loaded: false,
 
   load: async (as) => {
     set({ loading: true });
     try {
       const chats = await fetchChats(as);
-      set({ chats, loading: false });
+      set({ chats, loading: false, loaded: true });
     } catch {
       set({ loading: false });
     }

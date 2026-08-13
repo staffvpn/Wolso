@@ -14,6 +14,8 @@ export function ChatDetail() {
   const role = useRole();
   const actor = role === 'worker' ? 'worker' : 'company';
   const { chatId } = useParams<{ chatId: string }>();
+  const chatsLoaded = useChatStore((s) => s.loaded);
+  const loadChats = useChatStore((s) => s.load);
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const messages = useChatStore((s) => s.messagesByChat[chatId ?? ''] ?? []);
   const loadMessages = useChatStore((s) => s.loadMessages);
@@ -22,6 +24,16 @@ export function ChatDetail() {
 
   const [text, setText] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Navigating here directly (deep link, reopening the app on this exact
+  // route) can beat ChatList's own load — chats would still be empty, and
+  // bouncing straight back below would fire immediately, before the store
+  // ever got a chance to actually find this chat. Load it here too if
+  // nobody has yet.
+  useEffect(() => {
+    if (!chatsLoaded) loadChats(actor);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (chatId) {
@@ -35,6 +47,7 @@ export function ChatDetail() {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
 
+  if (!chatsLoaded) return null;
   if (!chat) {
     navigate(-1);
     return null;
