@@ -50,6 +50,9 @@ interface CandidateApiResponse {
   status: string;
   work_stage?: string;
   closed_by_employer_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
   worker_name: string;
   worker_rating: number;
   worker_shifts_completed: number;
@@ -77,6 +80,9 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     status: c.status as Candidate['status'],
     workStage: c.work_stage as Candidate['workStage'],
     closedByEmployerAt: c.closed_by_employer_at ?? undefined,
+    cancelledBy: (c.cancelled_by as Candidate['cancelledBy']) ?? undefined,
+    cancelReason: c.cancel_reason ?? undefined,
+    cancelledAt: c.cancelled_at ?? undefined,
     bio: c.worker_bio ?? undefined,
     skills: c.worker_skills ?? undefined,
     age: ageFrom(c.worker_birthdate),
@@ -165,6 +171,16 @@ export async function decideCandidate(vacancyId: string, applicationId: string, 
   await apiFetch(`/employer/vacancies/${vacancyId}/candidates/${applicationId}/decide`, {
     method: 'POST',
     body: { status },
+    as: 'company',
+  });
+}
+
+/** Withdraws an invitation or an already-confirmed hire — a reason is
+ *  mandatory, and the shift's chat goes away with it. */
+export async function cancelCandidate(vacancyId: string, applicationId: string, reason: string): Promise<void> {
+  await apiFetch(`/employer/vacancies/${vacancyId}/candidates/${applicationId}/cancel`, {
+    method: 'POST',
+    body: { reason },
     as: 'company',
   });
 }

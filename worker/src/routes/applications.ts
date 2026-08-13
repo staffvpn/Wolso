@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { sendTelegramMessage } from '../lib/telegramBot';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
@@ -18,6 +18,9 @@ interface AppRow {
   rating: number | null;
   review_tags: string | null;
   review_comment: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
   created_at: string;
 }
 
@@ -32,6 +35,9 @@ function appToJson(a: AppRow, shift?: ReturnType<typeof shiftToJson>) {
     rating: a.rating,
     reviewTags: a.review_tags ? JSON.parse(a.review_tags) : [],
     reviewComment: a.review_comment,
+    cancelledBy: a.cancelled_by,
+    cancelReason: a.cancel_reason,
+    cancelledAt: a.cancelled_at,
     createdAt: a.created_at,
     shift,
   };
@@ -93,6 +99,96 @@ applicationRoutes.post('/', async (c) => {
 async function ownedApplication(env: Env, id: string, workerId: number) {
   return env.DB.prepare('SELECT * FROM applications WHERE id = ? AND worker_id = ?').bind(id, workerId).first<AppRow>();
 }
+
+/** The worker's answer to an employer's invitation — confirming is what
+ *  actually makes them the hire; declining ends it here, same as never
+ *  having been invited, and the chat goes with it. */
+applicationRoutes.post('/:id/respond', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const app = await ownedApplication(c.env, c.req.param('id'), session.workerId);
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.status !== 'invited') return c.json({ error: 'not_invited' }, 400);
+
+  const { accept } = await c.req.json<{ accept: boolean }>();
+  const shift = await c.env.DB.prepare('SELECT company_id, position_label FROM shifts WHERE id = ?')
+    .bind(app.shift_id)
+    .first<{ company_id: number; position_label: string }>();
+  const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
+
+  if (accept) {
+    await c.env.DB.prepare("UPDATE applications SET status = 'accepted' WHERE id = ?").bind(app.id).run();
+    if (shift) {
+      const title = `${worker?.name ?? 'Кандидат'} подтвердил(а) смену`;
+      const subtitle = `«${shift.position_label}»`;
+      await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+        .bind(shift.company_id, 'invite_accepted', title, subtitle)
+        .run();
+      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+        .bind(shift.company_id)
+        .first<{ owner_telegram_id: number }>();
+      if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `✅ ${title}\n${subtitle}`));
+    }
+  } else {
+    await c.env.DB.prepare("UPDATE applications SET status = 'declined' WHERE id = ?").bind(app.id).run();
+    if (shift) {
+      await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
+      const title = `${worker?.name ?? 'Кандидат'} отклонил(а) приглашение`;
+      const subtitle = `«${shift.position_label}»`;
+      await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+        .bind(shift.company_id, 'invite_declined', title, subtitle)
+        .run();
+      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+        .bind(shift.company_id)
+        .first<{ owner_telegram_id: number }>();
+      if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `↩️ ${title}\n${subtitle}`));
+    }
+  }
+
+  return c.json({ ok: true });
+});
+
+/** A worker who already confirmed a shift can still back out — a reason
+ *  is mandatory, matching the employer's own /vacancies/:id/candidates/:id/cancel,
+ *  so the employer isn't left guessing why someone they were counting on
+ *  just disappeared from the chat. */
+applicationRoutes.post('/:id/cancel', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const app = await ownedApplication(c.env, c.req.param('id'), session.workerId);
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.status !== 'accepted') return c.json({ error: 'not_accepted' }, 400);
+  if (app.work_stage !== 'upcoming') return c.json({ error: 'already_started' }, 400);
+
+  const { reason } = await c.req.json<{ reason: string }>();
+  if (!reason?.trim()) return c.json({ error: 'reason_required' }, 400);
+
+  await c.env.DB.prepare(
+    "UPDATE applications SET status = 'cancelled', cancelled_by = 'worker', cancel_reason = ?, cancelled_at = datetime('now') WHERE id = ?",
+  )
+    .bind(reason.trim(), app.id)
+    .run();
+
+  const shift = await c.env.DB.prepare('SELECT company_id, position_label FROM shifts WHERE id = ?')
+    .bind(app.shift_id)
+    .first<{ company_id: number; position_label: string }>();
+  if (shift) {
+    await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
+
+    const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
+    const title = `${worker?.name ?? 'Сотрудник'} не сможет выйти на смену`;
+    const subtitle = `«${shift.position_label}» — причина: ${reason.trim()}`;
+    await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+      .bind(shift.company_id, 'cancelled_by_worker', title, subtitle)
+      .run();
+    const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+      .bind(shift.company_id)
+      .first<{ owner_telegram_id: number }>();
+    if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `❌ ${title}\n${subtitle}`));
+  }
+
+  return c.json({ ok: true });
+});
 
 applicationRoutes.post('/:id/check-in', async (c) => {
   const session = requireWorker(c as never);

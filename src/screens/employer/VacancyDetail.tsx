@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Check, Mail, X } from 'lucide-react';
+import { Check, Mail, X, XCircle } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay';
 import { CloseShiftSheet } from '@/components/CloseShiftSheet';
+import { CancelSheet } from '@/components/CancelSheet';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
 import { localDateStr, timeAgoSince } from '@/lib/format';
@@ -36,6 +38,7 @@ export function VacancyDetail() {
   const vacanciesLoaded = useEmployerStore((s) => s.vacancies.length > 0);
   const allCandidates = useEmployerStore((s) => s.candidates);
   const decideCandidate = useEmployerStore((s) => s.decideCandidate);
+  const cancelCandidate = useEmployerStore((s) => s.cancelCandidate);
   const loadAll = useEmployerStore((s) => s.loadAll);
   const loadVacancyCandidates = useEmployerStore((s) => s.loadVacancyCandidates);
   const closeShift = useEmployerStore((s) => s.closeShift);
@@ -48,6 +51,7 @@ export function VacancyDetail() {
   const [ratingOnly, setRatingOnly] = useState(false);
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [closing, setClosing] = useState<Candidate | null>(null);
+  const [cancelling, setCancelling] = useState<Candidate | null>(null);
 
   useEffect(() => {
     if (!vacanciesLoaded) loadAll();
@@ -62,7 +66,11 @@ export function VacancyDetail() {
 
   const candidates = useMemo(() => allCandidates.filter((c) => c.vacancyId === vacancyId), [allCandidates, vacancyId]);
   const pending = useMemo(() => candidates.filter((c) => c.status === 'pending'), [candidates]);
-  const accepted = useMemo(() => candidates.filter((c) => c.status === 'accepted'), [candidates]);
+  // Invited-but-not-confirmed sits alongside confirmed hires — both have a
+  // chat open and both are "someone I'm counting on for this shift",
+  // they just differ in whether the worker has actually said yes yet.
+  const engaged = useMemo(() => candidates.filter((c) => c.status === 'invited' || c.status === 'accepted'), [candidates]);
+  const cancelled = useMemo(() => candidates.filter((c) => c.status === 'cancelled'), [candidates]);
   const filtered = useMemo(() => pending.filter((c) => !ratingOnly || c.rating >= 4.5), [pending, ratingOnly]);
 
   if (!vacancy) {
@@ -103,30 +111,61 @@ export function VacancyDetail() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4">
-        {accepted.length > 0 && (
+        {engaged.length > 0 && (
           <div className="space-y-2.5 mb-5">
-            {accepted.map((c) => (
-              <Card key={c.id} className="p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar src={c.photos[0]} name={c.name} size={44} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-[14px] truncate">{c.name}</p>
-                    <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
-                  </div>
-                  <Button variant="dark" size="icon" onClick={() => openChatFor(c)} aria-label="Написать">
-                    <Mail size={16} />
-                  </Button>
-                  {c.workStage === 'employer_closed' || c.workStage === 'reviewed' ? (
-                    <Badge tone="accent">Смена закрыта</Badge>
-                  ) : shiftIsPast ? (
-                    <Button size="md" onClick={() => setClosing(c)}>
-                      <Check size={14} /> Закрыть смену
+            {engaged.map((c) => {
+              const isClosed = c.workStage === 'employer_closed' || c.workStage === 'reviewed';
+              // Withdrawing only makes sense before the shift's actually
+              // happened — once it has, closing (and reviewing) is the path.
+              const canCancel = !isClosed && !shiftIsPast;
+              return (
+                <Card key={c.id} className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={c.photos[0]} name={c.name} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-[14px] truncate">{c.name}</p>
+                      <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
+                    </div>
+                    <Button variant="dark" size="icon" onClick={() => openChatFor(c)} aria-label="Написать">
+                      <Mail size={16} />
                     </Button>
-                  ) : (
-                    <Badge tone="neutral">Смена ещё впереди</Badge>
-                  )}
+                    {canCancel && (
+                      <IconButton size={40} onClick={() => setCancelling(c)} aria-label="Отменить">
+                        <XCircle size={17} className="text-danger" />
+                      </IconButton>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    {c.status === 'invited' ? (
+                      <Badge tone="neutral">Ждём подтверждения от сотрудника</Badge>
+                    ) : isClosed ? (
+                      <Badge tone="accent">Смена закрыта</Badge>
+                    ) : shiftIsPast ? (
+                      <Button size="md" fullWidth onClick={() => setClosing(c)}>
+                        <Check size={14} /> Закрыть смену
+                      </Button>
+                    ) : (
+                      <Badge tone="neutral">Смена ещё впереди</Badge>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {cancelled.length > 0 && (
+          <div className="space-y-1.5 mb-5">
+            {cancelled.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 rounded-card bg-surface-2/60 px-4 py-3">
+                <Avatar src={c.photos[0]} name={c.name} size={32} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] text-text-muted truncate">
+                    {c.name} · {c.cancelledBy === 'worker' ? 'сотрудник отменил' : 'вы отменили'}
+                  </p>
+                  {c.cancelReason && <p className="text-[12px] text-text-faint truncate">«{c.cancelReason}»</p>}
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}
@@ -146,7 +185,7 @@ export function VacancyDetail() {
                 </button>
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
-                    Взять на смену
+                    Пригласить на смену
                   </Button>
                   <Button variant="dark" size="icon" onClick={() => decideCandidate(vacancy.id, top.id, 'declined')} aria-label="Отклонить">
                     <X size={17} />
@@ -177,7 +216,7 @@ export function VacancyDetail() {
                     }}
                     className="text-[13px] font-semibold text-accent shrink-0"
                   >
-                    Взять
+                    Пригласить
                   </button>
                 </div>
               ))}
@@ -191,6 +230,7 @@ export function VacancyDetail() {
           <CandidateDetailOverlay
             candidate={selected}
             onClose={() => setSelected(null)}
+            acceptLabel="Пригласить на смену"
             onAccept={() => {
               decideCandidate(vacancy.id, selected.id, 'accepted');
               setSelected(null);
@@ -209,6 +249,17 @@ export function VacancyDetail() {
           onClose={() => setClosing(null)}
           workerName={closing.name}
           onSubmit={(rating, tags, comment) => closeShift(vacancy.id, closing.id, rating, tags, comment)}
+        />
+      )}
+
+      {cancelling && (
+        <CancelSheet
+          open
+          onClose={() => setCancelling(null)}
+          title={cancelling.status === 'invited' ? 'Отозвать приглашение' : 'Отменить кандидата'}
+          description={`${cancelling.name} получит уведомление и причину, чат по этой смене закроется.`}
+          confirmLabel={cancelling.status === 'invited' ? 'Отозвать приглашение' : 'Отменить кандидата'}
+          onSubmit={(reason) => cancelCandidate(vacancy.id, cancelling.id, reason)}
         />
       )}
     </div>

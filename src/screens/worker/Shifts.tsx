@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
@@ -6,11 +6,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { resolveCompany } from '@/data/companies';
 import { formatMoney, isSameDay, weekdayShort } from '@/lib/format';
+import { hapticNotify } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
-import type { Shift } from '@/types';
+import type { Application, Shift } from '@/types';
 
 function timeUntil(shift: Shift): string | null {
   const start = new Date(shift.date);
@@ -25,6 +27,8 @@ export function Shifts() {
   const applications = useApplicationsStore((s) => s.applications);
   const load = useApplicationsStore((s) => s.load);
   const checkIn = useApplicationsStore((s) => s.checkIn);
+  const cancelApplication = useApplicationsStore((s) => s.cancelApplication);
+  const [cancelling, setCancelling] = useState<Application | null>(null);
 
   useEffect(() => {
     load();
@@ -123,6 +127,17 @@ export function Shifts() {
                         <Mail size={17} />
                       </Button>
                     </div>
+                    {app.workStage === 'upcoming' && (
+                      <button
+                        onClick={() => {
+                          hapticNotify('warning');
+                          setCancelling(app);
+                        }}
+                        className="text-[13px] font-semibold text-danger mt-3"
+                      >
+                        Не смогу выйти
+                      </button>
+                    )}
                   </motion.div>
                 );
               })}
@@ -149,6 +164,15 @@ export function Shifts() {
                         {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}–{String(shift.endHour).padStart(2, '0')}:{String(shift.endMin).padStart(2, '0')} · {formatMoney(shift.totalPay)}
                       </p>
                     </div>
+                    <button
+                      onClick={() => {
+                        hapticNotify('warning');
+                        setCancelling(app);
+                      }}
+                      className="text-[12px] font-semibold text-danger shrink-0"
+                    >
+                      Отменить
+                    </button>
                   </div>
                 );
               })}
@@ -163,6 +187,17 @@ export function Shifts() {
           />
         )}
       </div>
+
+      {cancelling && (
+        <CancelSheet
+          open
+          onClose={() => setCancelling(null)}
+          title="Не сможете выйти на смену?"
+          description="Работодатель получит уведомление с причиной, чат по этой смене закроется."
+          confirmLabel="Отменить смену"
+          onSubmit={(reason) => cancelApplication(cancelling.id, reason)}
+        />
+      )}
     </div>
   );
 }

@@ -58,7 +58,13 @@ export interface Shift {
   timeOfDay: 'morning' | 'day' | 'evening' | 'night';
 }
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
+/** 'invited' is a swipe-right/"accept" from the employer that isn't a hire
+ *  yet — just an invitation the worker still has to confirm ('accepted')
+ *  or turn down ('declined', same as if they'd never been invited).
+ *  'cancelled' is either side backing out of an 'invited' or already-
+ *  'accepted' application after the fact — always with a reason, see
+ *  cancelledBy/cancelReason below. */
+export type ApplicationStatus = 'pending' | 'invited' | 'accepted' | 'declined' | 'cancelled';
 /** 'employer_closed' is the real "this shift happened" signal now — set
  *  when the employer confirms it, not by worker self-checkout. Both
  *  sides' review becomes mandatory from that point ('reviewed' once the
@@ -77,6 +83,10 @@ export interface Application {
   workStage?: WorkStage;
   checkInAt?: string;
   closedByEmployerAt?: string;
+  /** Only set once status is 'cancelled' — who backed out and why. */
+  cancelledBy?: 'worker' | 'employer';
+  cancelReason?: string;
+  cancelledAt?: string;
   tipAmount?: number;
 }
 
@@ -166,9 +176,12 @@ export interface CandidateProfile {
 export interface Candidate extends CandidateProfile {
   /** The shift (vacancy) this application is for. */
   vacancyId: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: ApplicationStatus;
   workStage?: WorkStage;
   closedByEmployerAt?: string;
+  cancelledBy?: 'worker' | 'employer';
+  cancelReason?: string;
+  cancelledAt?: string;
 }
 
 /** A worker the employer is browsing directly (not tied to any one
@@ -194,7 +207,17 @@ export interface Vacancy {
 
 export interface AppNotification {
   id: string;
-  kind: 'accepted' | 'new_shifts' | 'message' | 'payout' | 'shift_closed';
+  kind:
+    | 'accepted'
+    | 'new_shifts'
+    | 'message'
+    | 'payout'
+    | 'shift_closed'
+    | 'invited'
+    | 'invite_accepted'
+    | 'invite_declined'
+    | 'cancelled_by_employer'
+    | 'cancelled_by_worker';
   title: string;
   subtitle: string;
   minutesAgo: number;

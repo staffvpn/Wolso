@@ -13,6 +13,9 @@ interface ApiApplication {
   rating: number | null;
   reviewTags: string[];
   reviewComment: string | null;
+  cancelledBy: string | null;
+  cancelReason: string | null;
+  cancelledAt: string | null;
   createdAt: string;
   shift?: {
     id: number;
@@ -43,6 +46,9 @@ function fromApi(a: ApiApplication): Application {
     workStage: a.workStage,
     checkInAt: a.checkInAt ?? undefined,
     closedByEmployerAt: a.closedByEmployerAt ?? undefined,
+    cancelledBy: (a.cancelledBy as Application['cancelledBy']) ?? undefined,
+    cancelReason: a.cancelReason ?? undefined,
+    cancelledAt: a.cancelledAt ?? undefined,
     createdAt: a.createdAt,
     shift: a.shift
       ? {
@@ -79,6 +85,10 @@ interface ApplicationsState {
   load: () => Promise<void>;
   apply: (shiftId: string) => Promise<void>;
   checkIn: (applicationId: string) => Promise<void>;
+  /** The worker's answer to an employer's invitation. */
+  respondToInvite: (applicationId: string, accept: boolean) => Promise<void>;
+  /** Backing out of an already-confirmed shift — reason is mandatory. */
+  cancelApplication: (applicationId: string, reason: string) => Promise<void>;
   submitReview: (applicationId: string, rating: number, tags: string[], comment: string) => Promise<void>;
 }
 
@@ -113,6 +123,22 @@ export const useApplicationsStore = create<ApplicationsState>((set) => ({
     await apiFetch(`/applications/${applicationId}/check-in`, { method: 'POST' });
     set((s) => ({
       applications: s.applications.map((a) => (a.id === applicationId ? { ...a, workStage: 'checked_in' } : a)),
+    }));
+  },
+
+  respondToInvite: async (applicationId, accept) => {
+    await apiFetch(`/applications/${applicationId}/respond`, { method: 'POST', body: { accept } });
+    set((s) => ({
+      applications: s.applications.map((a) => (a.id === applicationId ? { ...a, status: accept ? 'accepted' : 'declined' } : a)),
+    }));
+  },
+
+  cancelApplication: async (applicationId, reason) => {
+    await apiFetch(`/applications/${applicationId}/cancel`, { method: 'POST', body: { reason } });
+    set((s) => ({
+      applications: s.applications.map((a) =>
+        a.id === applicationId ? { ...a, status: 'cancelled', cancelledBy: 'worker', cancelReason: reason } : a,
+      ),
     }));
   },
 

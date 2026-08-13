@@ -59,6 +59,7 @@ export function Vacancies() {
         <div className="space-y-3">
           {vacancies.map((vac, i) => {
             const pending = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'pending').length;
+            const invited = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'invited').length;
             const needsClosing =
               vac.date < localDateStr() &&
               candidates.some(
@@ -84,6 +85,7 @@ export function Vacancies() {
                 <div className="flex items-center gap-2 mt-3">
                   <Badge tone="dark">Отклики · {vac.responseCount}</Badge>
                   {pending > 0 && <Badge tone="warning">{pending} ждут решения</Badge>}
+                  {invited > 0 && <Badge tone="neutral">{invited} приглашены</Badge>}
                   {needsClosing && <Badge tone="accent">Пора закрыть смену</Badge>}
                 </div>
               </motion.button>

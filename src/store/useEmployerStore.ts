@@ -5,6 +5,7 @@ import {
   fetchVacancies,
   fetchVacancyCandidates,
   decideCandidate as decideCandidateApi,
+  cancelCandidate as cancelCandidateApi,
   closeShift as closeShiftApi,
   createVacancy as createVacancyApi,
 } from '@/services/employerApi';
@@ -18,6 +19,7 @@ interface EmployerState {
   loadVacancyCandidates: (vacancyId: string, positionLabel?: string) => Promise<void>;
   pendingCandidates: () => Candidate[];
   decideCandidate: (vacancyId: string, candidateId: string, decision: 'accepted' | 'declined') => Promise<void>;
+  cancelCandidate: (vacancyId: string, candidateId: string, reason: string) => Promise<void>;
   closeShift: (vacancyId: string, candidateId: string, rating: number, tags: string[], comment: string) => Promise<void>;
   createVacancy: (input: {
     position: Position;
@@ -59,8 +61,13 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
   decideCandidate: async (vacancyId, candidateId, decision) => {
     if (decision === 'accepted') hapticNotify('success');
     else haptic('light');
+    // "accepted" here means "employer wants to move forward" — the server
+    // turns that into an invitation, not an immediate hire, so the local
+    // optimistic status has to match or the UI would claim someone's
+    // hired before they've actually confirmed.
+    const status = decision === 'accepted' ? 'invited' : 'declined';
     set((s) => ({
-      candidates: s.candidates.map((c) => (c.id === candidateId ? { ...c, status: decision } : c)),
+      candidates: s.candidates.map((c) => (c.id === candidateId ? { ...c, status } : c)),
     }));
     try {
       await decideCandidateApi(vacancyId, candidateId, decision);
@@ -69,6 +76,16 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
       const candidates = await fetchCandidates();
       set({ candidates });
     }
+  },
+
+  cancelCandidate: async (vacancyId, candidateId, reason) => {
+    await cancelCandidateApi(vacancyId, candidateId, reason);
+    haptic('light');
+    set((s) => ({
+      candidates: s.candidates.map((c) =>
+        c.id === candidateId ? { ...c, status: 'cancelled', cancelledBy: 'employer', cancelReason: reason } : c,
+      ),
+    }));
   },
 
   closeShift: async (vacancyId, candidateId, rating, tags, comment) => {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Zap, Mail, Banknote, Star } from 'lucide-react';
+import { Check, Zap, Mail, Banknote, Star, UserPlus, UserCheck, UserX, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -15,6 +15,11 @@ const ICONS: Record<AppNotification['kind'], typeof Check> = {
   message: Mail,
   payout: Banknote,
   shift_closed: Star,
+  invited: UserPlus,
+  invite_accepted: UserCheck,
+  invite_declined: UserX,
+  cancelled_by_employer: XCircle,
+  cancelled_by_worker: XCircle,
 };
 
 export function Notifications() {

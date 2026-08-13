@@ -92,3 +92,14 @@ export async function getRolePermissions(env: Env, roleId: string): Promise<Reco
   const row = await env.DB.prepare('SELECT permissions FROM roles WHERE id = ?').bind(roleId).first<{ permissions: string }>();
   return row ? JSON.parse(row.permissions) : null;
 }
+
+/** The chat tied to a shift only ever makes sense while there's an active
+ *  engagement over it — invited, confirmed, or actually being worked.
+ *  Every way that engagement can end (declined, cancelled by either side,
+ *  or the shift being closed once it's happened) shares this same
+ *  cleanup; messages cascade-delete with the chat row. */
+export async function deleteShiftChat(env: Env, companyId: number, workerId: number, shiftId: number | string): Promise<void> {
+  await env.DB.prepare('DELETE FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id = ?')
+    .bind(companyId, workerId, shiftId)
+    .run();
+}

@@ -68,13 +68,13 @@ export function Candidates() {
             <X size={22} className="text-text-muted" />
           </IconButton>
           <Button size="lg" className="flex-1 max-w-[220px]" onClick={() => deckRef.current?.swipeRight()}>
-            <Check size={18} /> Взять на смену
+            <Check size={18} /> Пригласить на смену
           </Button>
         </div>
       )}
 
       <p className="text-center text-[11px] text-text-faint pb-2 shrink-0">
-        свайп вправо — берём · влево — дальше
+        свайп вправо — приглашаем · влево — дальше
       </p>
     </div>
   );

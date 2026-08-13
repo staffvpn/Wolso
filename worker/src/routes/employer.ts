@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
@@ -288,10 +288,12 @@ function withWorkerPhotos<T extends CandidateWorkerRow>(row: T) {
 }
 
 /** Pending applicants and current hires across every vacancy this company
- *  owns — feeds both the employer's swipe deck (client-side filtered to
- *  'pending') and the Vacancies list's "pора закрыть смену" badge (needs
- *  'accepted' ones too), without an N+1 fetch per vacancy. Declined
- *  applicants aren't included — nothing reads those. */
+ *  owns — feeds the employer's swipe deck (client-side filtered to
+ *  'pending'), the "приглашены"/"pора закрыть смену" badges on the
+ *  Vacancies list (needs 'invited' and 'accepted' too), without an N+1
+ *  fetch per vacancy. Declined/cancelled applicants aren't included —
+ *  nothing in the overview reads those, the reason lives in the
+ *  notification each side already got. */
 employerRoutes.get('/candidates', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -302,7 +304,7 @@ employerRoutes.get('/candidates', async (c) => {
      FROM applications a
      JOIN shifts s ON s.id = a.shift_id
      JOIN workers w ON w.id = a.worker_id
-     WHERE s.company_id = ? AND a.status IN ('pending', 'accepted')
+     WHERE s.company_id = ? AND a.status IN ('pending', 'invited', 'accepted')
      ORDER BY a.created_at ASC`,
   )
     .bind(session.companyId)
@@ -329,13 +331,19 @@ employerRoutes.get('/vacancies/:id/candidates', async (c) => {
   return c.json({ candidates: results.map(withWorkerPhotos) });
 });
 
+/** The employer's first decision on an applicant — "declined" is final,
+ *  but "accepted" isn't a hire yet, just an invitation: it opens a chat
+ *  and pings the worker, who still has to confirm (see applications.ts's
+ *  /:id/respond) before they're actually on the shift. */
 employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const { shiftId, appId } = c.req.param();
   const { status } = await c.req.json<{ status: 'accepted' | 'declined' }>();
 
-  const shift = await c.env.DB.prepare('SELECT id FROM shifts WHERE id = ? AND company_id = ?').bind(shiftId, session.companyId).first();
+  const shift = await c.env.DB.prepare('SELECT id, position_label FROM shifts WHERE id = ? AND company_id = ?')
+    .bind(shiftId, session.companyId)
+    .first<{ id: number; position_label: string }>();
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
   const app = await c.env.DB.prepare('SELECT * FROM applications WHERE id = ? AND shift_id = ?').bind(appId, shiftId).first<{
@@ -343,9 +351,10 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
   }>();
   if (!app) return c.json({ error: 'not_found' }, 404);
 
-  await c.env.DB.prepare('UPDATE applications SET status = ? WHERE id = ?').bind(status, appId).run();
+  const dbStatus = status === 'accepted' ? 'invited' : 'declined';
+  await c.env.DB.prepare('UPDATE applications SET status = ? WHERE id = ?').bind(dbStatus, appId).run();
 
-  if (status === 'accepted') {
+  if (dbStatus === 'invited') {
     const company = await c.env.DB.prepare('SELECT name, address FROM companies WHERE id = ?').bind(session.companyId).first<{
       name: string;
       address: string;
@@ -359,20 +368,68 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
         .bind(session.companyId, app.worker_id, shiftId)
         .first<{ id: number }>();
       await c.env.DB.prepare("INSERT INTO messages (chat_id, sender, kind, text) VALUES (?, 'system', 'system', ?)")
-        .bind(chat!.id, `Вас взяли на смену. ${company?.address ? `Адрес: ${company.address}` : ''}`)
+        .bind(chat!.id, `Вас приглашают на смену «${shift.position_label}». ${company?.address ? `Адрес: ${company.address}` : ''}`)
         .run();
     }
 
-    const title = `${company?.name ?? 'Работодатель'} взял вас на смену`;
+    const title = `${company?.name ?? 'Работодатель'} приглашает вас на смену`;
+    const subtitle = `«${shift.position_label}» — подтвердите в приложении`;
     await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-      .bind(app.worker_id, 'accepted', title, company?.address ?? '')
+      .bind(app.worker_id, 'invited', title, subtitle)
       .run();
 
     const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
     if (worker) {
-      const text = company?.address ? `🎉 ${title}\nАдрес: ${company.address}` : `🎉 ${title}`;
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, text));
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🎉 ${title}\n${subtitle}`));
     }
+  }
+
+  return c.json({ ok: true });
+});
+
+/** Employer backs out of a candidate they already invited or confirmed —
+ *  a reason is mandatory, same as the worker's own cancel below, so
+ *  whoever's on the other end isn't just left guessing why the chat and
+ *  the shift both disappeared. */
+employerRoutes.post('/vacancies/:shiftId/candidates/:appId/cancel', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const { shiftId, appId } = c.req.param();
+  const { reason } = await c.req.json<{ reason: string }>();
+  if (!reason?.trim()) return c.json({ error: 'reason_required' }, 400);
+
+  const shift = await c.env.DB.prepare('SELECT id, position_label FROM shifts WHERE id = ? AND company_id = ?')
+    .bind(shiftId, session.companyId)
+    .first<{ id: number; position_label: string }>();
+  if (!shift) return c.json({ error: 'not_found' }, 404);
+
+  const app = await c.env.DB.prepare('SELECT id, worker_id, status FROM applications WHERE id = ? AND shift_id = ?')
+    .bind(appId, shiftId)
+    .first<{ id: number; worker_id: number; status: string }>();
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.status !== 'invited' && app.status !== 'accepted') return c.json({ error: 'not_cancellable' }, 400);
+
+  const wasAccepted = app.status === 'accepted';
+  await c.env.DB.prepare(
+    "UPDATE applications SET status = 'cancelled', cancelled_by = 'employer', cancel_reason = ?, cancelled_at = datetime('now') WHERE id = ?",
+  )
+    .bind(reason.trim(), appId)
+    .run();
+
+  await deleteShiftChat(c.env, session.companyId, app.worker_id, shiftId);
+
+  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
+  const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
+
+  const title = wasAccepted
+    ? `${company?.name ?? 'Работодатель'} отменил(а) смену`
+    : `${company?.name ?? 'Работодатель'} отозвал(а) приглашение`;
+  const subtitle = `«${shift.position_label}» — причина: ${reason.trim()}`;
+  await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+    .bind(app.worker_id, 'cancelled_by_employer', title, subtitle)
+    .run();
+  if (worker) {
+    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `❌ ${title}\n${subtitle}`));
   }
 
   return c.json({ ok: true });
@@ -437,9 +494,7 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
   // The chat was only ever meant to last for the duration of this hire —
   // once the shift is closed there's nothing left to coordinate about, so
   // it (and its messages, via ON DELETE CASCADE) goes away with it.
-  await c.env.DB.prepare('DELETE FROM chats WHERE company_id = ? AND worker_id = ? AND shift_id = ?')
-    .bind(session.companyId, app.worker_id, shiftId)
-    .run();
+  await deleteShiftChat(c.env, session.companyId, app.worker_id, shiftId);
 
   return c.json({ ok: true });
 });
