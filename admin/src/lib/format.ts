@@ -39,6 +39,19 @@ export function minutesSince(timestamp: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 }
 
+/** A username gives a universal https://t.me link that opens fine from any
+ *  browser or client. Without one (not every account has picked a public
+ *  username, or an older row predates us capturing it), fall back to a
+ *  tg:// deep link by numeric id — works from clients with Telegram
+ *  registered as a protocol handler, best effort otherwise. */
+export function telegramLink(telegramId: number, username?: string | null): string {
+  return username ? `https://t.me/${username}` : `tg://user?id=${telegramId}`;
+}
+
+export function telegramLabel(telegramId: number, username?: string | null): string {
+  return username ? `@${username}` : `Telegram ID ${telegramId}`;
+}
+
 export function timeAgo(minutes: number) {
   if (minutes < 1) return 'сейчас';
   if (minutes < 60) return `${minutes} мин назад`;

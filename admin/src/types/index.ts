@@ -55,6 +55,83 @@ export interface PlatformUser {
   city: string;
   rating?: number;
   shiftsCompleted?: number;
+  telegramId: number;
+  telegramUsername?: string;
+}
+
+export interface UserPosition {
+  id: string;
+  position: string;
+  positionLabel: string;
+  months: number;
+}
+
+export interface UserPhoto {
+  id: string;
+  url: string;
+}
+
+export interface SeekerApplication {
+  id: string;
+  status: string;
+  workStage: string;
+  rating: number | null;
+  cancelledBy: 'worker' | 'employer' | null;
+  cancelReason: string | null;
+  createdAt: string;
+  positionLabel: string;
+  date: string;
+  startHour: number;
+  startMin: number;
+  companyName: string;
+}
+
+/** Everything the person themselves filled in, plus their application
+ *  history — fetched only once a specific card is opened, the list stays
+ *  on the thin PlatformUser shape. */
+export interface SeekerDetail {
+  id: string;
+  name: string;
+  telegramId: number;
+  telegramUsername?: string;
+  city: string;
+  bio: string;
+  skills: string;
+  birthdate?: string;
+  avatarUrl?: string;
+  rating: number;
+  shiftsCompleted: number;
+  status: UserStatus;
+  createdAt: string;
+  positions: UserPosition[];
+  photos: UserPhoto[];
+  applications: SeekerApplication[];
+}
+
+export interface EmployerVacancy {
+  id: string;
+  positionLabel: string;
+  date: string;
+  status: string;
+  responseCount: number;
+}
+
+export interface EmployerDetail {
+  id: string;
+  name: string;
+  telegramId: number;
+  telegramUsername?: string;
+  address?: string;
+  city: string;
+  description: string;
+  foundedYear?: number;
+  avatarUrl?: string;
+  rating: number;
+  reviewsCount: number;
+  status: UserStatus;
+  createdAt: string;
+  photos: UserPhoto[];
+  vacancies: EmployerVacancy[];
 }
 
 export type PayoutStatus = 'paid' | 'processing' | 'dispute';

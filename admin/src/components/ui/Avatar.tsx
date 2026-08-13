@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 
 function initialsOf(name: string) {
@@ -28,9 +29,29 @@ interface AvatarProps {
   size?: number;
   className?: string;
   square?: boolean;
+  /** Real uploaded photo — falls back to the colored initials mark when
+   *  absent, or if the URL 404s/fails to decode. */
+  src?: string;
 }
 
-export function Avatar({ name, size = 40, className, square }: AvatarProps) {
+export function Avatar({ name, size = 40, className, square, src }: AvatarProps) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        width={size}
+        height={size}
+        onError={() => setFailed(true)}
+        className={cn('shrink-0 object-cover', square ? 'rounded-xl' : 'rounded-full', className)}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
     <div
       className={cn('shrink-0 flex items-center justify-center font-bold text-white', square ? 'rounded-xl' : 'rounded-full', className)}

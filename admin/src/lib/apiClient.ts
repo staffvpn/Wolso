@@ -2,6 +2,16 @@ import { useSessionStore } from '@/store/useSessionStore';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
+/** Profile photo endpoints (worker's routes/media.ts) return a relative
+ *  path like `/media/workers/12/avatar` — prefix the API origin so it
+ *  works as an <img src>. */
+export function resolveMediaUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//.test(path)) return path;
+  const url = `${API_URL ?? ''}${path}`;
+  return path.endsWith('/avatar') ? `${url}?v=${Date.now()}` : url;
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;

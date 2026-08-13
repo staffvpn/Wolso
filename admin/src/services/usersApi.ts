@@ -1,6 +1,6 @@
-import { apiFetch } from '@/lib/apiClient';
-import { minutesSince } from '@/lib/format';
-import type { PlatformUser, TeamMember, UserStatus } from '@/types';
+import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
+import { minutesSince, telegramLabel } from '@/lib/format';
+import type { EmployerDetail, EmployerVacancy, PlatformUser, SeekerApplication, SeekerDetail, TeamMember, UserPhoto, UserPosition, UserStatus } from '@/types';
 
 interface TeamApiRow {
   id: number;
@@ -33,6 +33,7 @@ export async function fetchTeam(): Promise<TeamMember[]> {
 interface SeekerApiRow {
   id: number;
   telegram_id: number;
+  telegram_username: string | null;
   name: string;
   city: string;
   rating: number;
@@ -50,13 +51,15 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
     // signed up but hasn't finished onboarding yet genuinely has no name
     // set, rather than always having at least their Telegram one.
     name: w.name || 'Без имени',
-    contact: `Telegram ID ${w.telegram_id}`,
+    contact: telegramLabel(w.telegram_id, w.telegram_username),
     status: w.status as UserStatus,
     statusLabel: suspended ? 'Заблокирован' : 'Активен',
     createdMinAgo: minutesSince(w.created_at),
     city: w.city,
     rating: w.rating,
     shiftsCompleted: w.shifts_completed,
+    telegramId: w.telegram_id,
+    telegramUsername: w.telegram_username ?? undefined,
   };
 }
 
@@ -69,6 +72,7 @@ export async function fetchSeekers(query?: string): Promise<PlatformUser[]> {
 interface EmployerApiRow {
   id: number;
   owner_telegram_id: number;
+  telegram_username: string | null;
   name: string;
   city: string;
   status: string;
@@ -81,11 +85,13 @@ function fromApiEmployer(c: EmployerApiRow): PlatformUser {
     id: String(c.id),
     kind: 'employer',
     name: c.name || 'Без названия',
-    contact: `Telegram ID ${c.owner_telegram_id}`,
+    contact: telegramLabel(c.owner_telegram_id, c.telegram_username),
     status: c.status as UserStatus,
     statusLabel: suspended ? 'Заблокирован' : 'Активен',
     createdMinAgo: minutesSince(c.created_at),
     city: c.city,
+    telegramId: c.owner_telegram_id,
+    telegramUsername: c.telegram_username ?? undefined,
   };
 }
 
@@ -93,6 +99,152 @@ export async function fetchEmployers(query?: string): Promise<PlatformUser[]> {
   const qs = query ? `?q=${encodeURIComponent(query)}` : '';
   const { employers } = await apiFetch<{ employers: EmployerApiRow[] }>(`/admin/users/employers${qs}`);
   return employers.map(fromApiEmployer);
+}
+
+interface SeekerDetailApiRow {
+  id: number;
+  telegram_id: number;
+  telegram_username: string | null;
+  name: string;
+  city: string;
+  bio: string;
+  skills: string;
+  birthdate: string | null;
+  avatarUrl: string | null;
+  rating: number;
+  shifts_completed: number;
+  status: string;
+  created_at: string;
+}
+
+interface SeekerApplicationApiRow {
+  id: number;
+  status: string;
+  work_stage: string;
+  rating: number | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  created_at: string;
+  position_label: string;
+  date: string;
+  start_hour: number;
+  start_min: number;
+  company_name: string;
+}
+
+export async function fetchSeekerDetail(id: string): Promise<SeekerDetail> {
+  const { worker, positions, photos, applications } = await apiFetch<{
+    worker: SeekerDetailApiRow;
+    positions: { id: number; position: string; position_label: string; months: number }[];
+    photos: { id: number; url: string }[];
+    applications: SeekerApplicationApiRow[];
+  }>(`/admin/users/seekers/${id}`);
+
+  return {
+    id: String(worker.id),
+    name: worker.name,
+    telegramId: worker.telegram_id,
+    telegramUsername: worker.telegram_username ?? undefined,
+    city: worker.city,
+    bio: worker.bio,
+    skills: worker.skills,
+    birthdate: worker.birthdate ?? undefined,
+    avatarUrl: resolveMediaUrl(worker.avatarUrl),
+    rating: worker.rating,
+    shiftsCompleted: worker.shifts_completed,
+    status: worker.status as UserStatus,
+    createdAt: worker.created_at,
+    positions: positions.map((p): UserPosition => ({ id: String(p.id), position: p.position, positionLabel: p.position_label, months: p.months })),
+    photos: photos.map((p): UserPhoto => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
+    applications: applications.map(
+      (a): SeekerApplication => ({
+        id: String(a.id),
+        status: a.status,
+        workStage: a.work_stage,
+        rating: a.rating,
+        cancelledBy: a.cancelled_by as SeekerApplication['cancelledBy'],
+        cancelReason: a.cancel_reason,
+        createdAt: a.created_at,
+        positionLabel: a.position_label,
+        date: a.date,
+        startHour: a.start_hour,
+        startMin: a.start_min,
+        companyName: a.company_name,
+      }),
+    ),
+  };
+}
+
+interface EmployerDetailApiRow {
+  id: number;
+  owner_telegram_id: number;
+  telegram_username: string | null;
+  name: string;
+  address: string | null;
+  city: string;
+  description: string;
+  founded_year: number | null;
+  avatarUrl: string | null;
+  rating: number;
+  reviews_count: number;
+  status: string;
+  created_at: string;
+}
+
+interface EmployerVacancyApiRow {
+  id: number;
+  position_label: string;
+  date: string;
+  status: string;
+  response_count: number;
+}
+
+export async function fetchEmployerDetail(id: string): Promise<EmployerDetail> {
+  const { company, photos, vacancies } = await apiFetch<{
+    company: EmployerDetailApiRow;
+    photos: { id: number; url: string }[];
+    vacancies: EmployerVacancyApiRow[];
+  }>(`/admin/users/employers/${id}`);
+
+  return {
+    id: String(company.id),
+    name: company.name,
+    telegramId: company.owner_telegram_id,
+    telegramUsername: company.telegram_username ?? undefined,
+    address: company.address ?? undefined,
+    city: company.city,
+    description: company.description,
+    foundedYear: company.founded_year ?? undefined,
+    avatarUrl: resolveMediaUrl(company.avatarUrl),
+    rating: company.rating,
+    reviewsCount: company.reviews_count,
+    status: company.status as UserStatus,
+    createdAt: company.created_at,
+    photos: photos.map((p): UserPhoto => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
+    vacancies: vacancies.map(
+      (v): EmployerVacancy => ({
+        id: String(v.id),
+        positionLabel: v.position_label,
+        date: v.date,
+        status: v.status,
+        responseCount: v.response_count,
+      }),
+    ),
+  };
+}
+
+export async function updateSeeker(
+  id: string,
+  update: { name?: string; city?: string; bio?: string; skills?: string; birthdate?: string },
+): Promise<void> {
+  await apiFetch(`/admin/users/seekers/${id}`, { method: 'PATCH', body: update });
+}
+
+export async function updateEmployer(
+  id: string,
+  update: { name?: string; address?: string; city?: string; description?: string; foundedYear?: number },
+): Promise<void> {
+  await apiFetch(`/admin/users/employers/${id}`, { method: 'PATCH', body: update });
 }
 
 export async function toggleBlockSeeker(id: string): Promise<UserStatus> {

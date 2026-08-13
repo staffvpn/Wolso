@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search, UserPlus } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Search, UserPlus, Send, ImageOff } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -7,18 +7,19 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Select } from '@/components/ui/Select';
-import { Input, Label } from '@/components/ui/Input';
+import { Input, Label, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useUsersStore } from '@/store/useUsersStore';
+import { useUserDetailStore } from '@/store/useUserDetailStore';
 import { useRolesStore } from '@/store/useRolesStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
-import { timeAgo } from '@/lib/format';
+import { timeAgo, telegramLink, telegramLabel, formatDayMonth } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { ApiError } from '@/lib/apiClient';
-import type { PlatformUser, TeamMember } from '@/types';
+import type { PlatformUser, TeamMember, UserPhoto } from '@/types';
 
 const ERROR_MESSAGES: Record<string, string> = {
   owner_transfer_requires_permission: 'Передать или снять роль владельца может только сам владелец.',
@@ -40,6 +41,49 @@ const STATUS_COLOR: Record<string, string> = {
   invited: 'text-info',
   suspended: 'text-danger',
 };
+
+const APPLICATION_STATUS_LABEL: Record<string, string> = {
+  pending: 'Ждёт ответа',
+  invited: 'Приглашён',
+  accepted: 'Подтверждено',
+  declined: 'Отклонено',
+  cancelled: 'Отменено',
+};
+
+const VACANCY_STATUS: Record<string, { label: string; tone: 'accent' | 'warning' | 'neutral' | 'danger' }> = {
+  active: { label: 'Активна', tone: 'accent' },
+  pending_review: { label: 'На модерации', tone: 'warning' },
+  closed: { label: 'Закрыта', tone: 'neutral' },
+  rejected: { label: 'Отклонена', tone: 'danger' },
+};
+
+function ageFromBirthdate(birthdate?: string): number | null {
+  if (!birthdate) return null;
+  const dob = new Date(birthdate);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+/** Opens the person's real Telegram account — a username gives a
+ *  universal https://t.me link, a bare id falls back to a tg:// deep
+ *  link (best-effort, works from clients with Telegram registered as a
+ *  protocol handler). */
+function TelegramLinkRow({ telegramId, telegramUsername }: { telegramId: number; telegramUsername?: string }) {
+  return (
+    <a
+      href={telegramLink(telegramId, telegramUsername)}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent mb-4 hover:underline"
+    >
+      <Send size={13} /> {telegramLabel(telegramId, telegramUsername)}
+    </a>
+  );
+}
 
 export function Users() {
   const { seekers, employers, team, load } = useUsersStore();
@@ -262,32 +306,207 @@ function TeamDetail({ member }: { member: TeamMember }) {
   );
 }
 
+function DetailSkeleton() {
+  return <p className="text-[13px] text-text-faint py-8 text-center">Загружаем анкету…</p>;
+}
+
+function PhotoStrip({ photos }: { photos: UserPhoto[] }) {
+  if (photos.length === 0) {
+    return (
+      <div className="flex items-center gap-1.5 text-[13px] text-text-faint">
+        <ImageOff size={15} /> Фото не загружены
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {photos.map((p) => (
+        <img key={p.id} src={p.url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+      ))}
+    </div>
+  );
+}
+
+function formatShiftWhen(date: string, startHour: number, startMin: number) {
+  const d = new Date(date);
+  const day = Number.isNaN(d.getTime()) ? date : formatDayMonth(d);
+  return `${day}, ${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`;
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-1.5">{children}</p>;
+}
+
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
   const switchRole = useUsersStore((s) => s.switchRole);
   const deleteUser = useUsersStore((s) => s.deleteUser);
+  const detail = useUserDetailStore((s) => s.seeker);
+  const loadSeeker = useUserDetailStore((s) => s.loadSeeker);
+  const updateSeeker = useUserDetailStore((s) => s.updateSeeker);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
   const canManageData = useCan('manageData');
   const blocked = user.status === 'suspended';
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', city: '', bio: '', skills: '', birthdate: '' });
+
+  useEffect(() => {
+    setEditing(false);
+    loadSeeker(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+
+  useEffect(() => {
+    if (detail && detail.id === user.id) {
+      setForm({ name: detail.name, city: detail.city, bio: detail.bio, skills: detail.skills, birthdate: detail.birthdate ?? '' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail]);
+
+  const ready = detail && detail.id === user.id ? detail : null;
+  const age = ageFromBirthdate(ready?.birthdate);
+  const activeApplications = ready?.applications.filter(
+    (a) => a.workStage !== 'employer_closed' && a.workStage !== 'reviewed' && a.status !== 'cancelled' && a.status !== 'declined',
+  ) ?? [];
+  const completedApplications = ready?.applications.filter((a) => a.workStage === 'employer_closed' || a.workStage === 'reviewed') ?? [];
+
+  async function save() {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await updateSeeker(user.id, {
+        name: form.name.trim(),
+        city: form.city.trim(),
+        bio: form.bio.trim(),
+        skills: form.skills.trim(),
+        birthdate: form.birthdate || undefined,
+      });
+      setEditing(false);
+    } catch (err) {
+      setFormError(friendlyError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <Avatar name={user.name} size={44} />
-        <div>
-          <p className="font-bold text-[17px] leading-tight">{user.name}</p>
-          <p className="text-[13px] text-text-muted mt-0.5">{user.city} · {user.contact}</p>
+      <div className="flex items-center gap-3 mb-3">
+        <Avatar name={user.name} size={44} src={ready?.avatarUrl} />
+        <div className="min-w-0">
+          <p className="font-bold text-[17px] leading-tight truncate">{user.name}</p>
+          <p className="text-[13px] text-text-muted mt-0.5">{user.city}{age !== null ? ` · ${age} лет` : ''}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2 mb-5">
+
+      <TelegramLinkRow telegramId={user.telegramId} telegramUsername={user.telegramUsername} />
+
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
         {user.rating !== undefined && <Badge tone="neutral">★ {user.rating} · {user.shiftsCompleted} смен</Badge>}
       </div>
-      <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
-        Профиль соискателя: история откликов и отзывы заведений доступны в карточке пользователя на платформе.
-      </div>
+
+      {!ready && <DetailSkeleton />}
+
+      {ready && !editing && (
+        <div className="space-y-5 mb-6">
+          <div>
+            <SectionLabel>О себе</SectionLabel>
+            <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{ready.bio || '—'}</p>
+          </div>
+          <div>
+            <SectionLabel>Навыки</SectionLabel>
+            <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{ready.skills || '—'}</p>
+          </div>
+          <div>
+            <SectionLabel>Опыт работы</SectionLabel>
+            {ready.positions.length === 0 && <p className="text-[13px] text-text-faint">Не указан</p>}
+            <div className="flex flex-col gap-1.5">
+              {ready.positions.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-[13px]">
+                  <span className="text-text">{p.positionLabel}</span>
+                  <span className="text-text-faint">{p.months} мес.</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <SectionLabel>Фото</SectionLabel>
+            <PhotoStrip photos={ready.photos} />
+          </div>
+          <div>
+            <SectionLabel>Активные смены{activeApplications.length > 0 ? ` (${activeApplications.length})` : ''}</SectionLabel>
+            {activeApplications.length === 0 && <p className="text-[13px] text-text-faint">Нет активных откликов</p>}
+            <div className="flex flex-col gap-2">
+              {activeApplications.map((a) => (
+                <div key={a.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text">{a.positionLabel}</span>
+                    <Badge tone="info">{APPLICATION_STATUS_LABEL[a.status] ?? a.status}</Badge>
+                  </div>
+                  <p className="text-text-faint mt-0.5">{a.companyName} · {formatShiftWhen(a.date, a.startHour, a.startMin)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <SectionLabel>Завершённые смены{completedApplications.length > 0 ? ` (${completedApplications.length})` : ''}</SectionLabel>
+            {completedApplications.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}
+            <div className="flex flex-col gap-2">
+              {completedApplications.map((a) => (
+                <div key={a.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text">{a.positionLabel}</span>
+                    {a.rating !== null && <Badge tone="neutral">★ {a.rating}</Badge>}
+                  </div>
+                  <p className="text-text-faint mt-0.5">{a.companyName} · {formatShiftWhen(a.date, a.startHour, a.startMin)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ready && editing && (
+        <div className="space-y-3 mb-6">
+          <div>
+            <Label>Имя и фамилия</Label>
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Город</Label>
+            <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Дата рождения</Label>
+            <Input type="date" value={form.birthdate} onChange={(e) => setForm((f) => ({ ...f, birthdate: e.target.value }))} />
+          </div>
+          <div>
+            <Label>О себе</Label>
+            <Textarea rows={3} value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Навыки</Label>
+            <Textarea rows={2} value={form.skills} onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))} />
+          </div>
+          {formError && <p className="text-[12px] text-danger leading-relaxed">{formError}</p>}
+          <div className="flex gap-2">
+            <Button variant="primary" className="flex-1" disabled={saving} onClick={save}>Сохранить</Button>
+            <Button variant="outline" className="flex-1" disabled={saving} onClick={() => setEditing(false)}>Отмена</Button>
+          </div>
+        </div>
+      )}
+
+      {ready && !editing && (
+        <Button variant="outline" className="w-full mb-2" disabled={!canBlock} onClick={() => setEditing(true)}>
+          Редактировать анкету
+        </Button>
+      )}
+
       <div className="flex flex-col gap-2">
         <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>
           {blocked ? 'Разблокировать' : 'Заблокировать'}
@@ -315,27 +534,173 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
   const switchRole = useUsersStore((s) => s.switchRole);
   const deleteUser = useUsersStore((s) => s.deleteUser);
+  const detail = useUserDetailStore((s) => s.employer);
+  const loadEmployer = useUserDetailStore((s) => s.loadEmployer);
+  const updateEmployer = useUserDetailStore((s) => s.updateEmployer);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
   const canManageData = useCan('manageData');
   const blocked = user.status === 'suspended';
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', address: '', city: '', description: '', foundedYear: '' });
+
+  useEffect(() => {
+    setEditing(false);
+    loadEmployer(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+
+  useEffect(() => {
+    if (detail && detail.id === user.id) {
+      setForm({
+        name: detail.name,
+        address: detail.address ?? '',
+        city: detail.city,
+        description: detail.description,
+        foundedYear: detail.foundedYear ? String(detail.foundedYear) : '',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail]);
+
+  const ready = detail && detail.id === user.id ? detail : null;
+  const activeVacancies = ready?.vacancies.filter((v) => v.status === 'active' || v.status === 'pending_review') ?? [];
+  const closedVacancies = ready?.vacancies.filter((v) => v.status === 'closed' || v.status === 'rejected') ?? [];
+
+  async function save() {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await updateEmployer(user.id, {
+        name: form.name.trim(),
+        address: form.address.trim(),
+        city: form.city.trim(),
+        description: form.description.trim(),
+        foundedYear: form.foundedYear ? Number(form.foundedYear) : undefined,
+      });
+      setEditing(false);
+    } catch (err) {
+      setFormError(friendlyError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <Avatar name={user.name} size={44} square />
-        <div>
-          <p className="font-bold text-[17px] leading-tight">{user.name}</p>
-          <p className="text-[13px] text-text-muted mt-0.5">{user.city} · {user.contact}</p>
+      <div className="flex items-center gap-3 mb-3">
+        <Avatar name={user.name} size={44} square src={ready?.avatarUrl} />
+        <div className="min-w-0">
+          <p className="font-bold text-[17px] leading-tight truncate">{user.name}</p>
+          <p className="text-[13px] text-text-muted mt-0.5">{user.city}{ready?.foundedYear ? ` · с ${ready.foundedYear}` : ''}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2 mb-5">
+
+      <TelegramLinkRow telegramId={user.telegramId} telegramUsername={user.telegramUsername} />
+
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
+        {ready && ready.rating > 0 && <Badge tone="neutral">★ {ready.rating} · {ready.reviewsCount} отзывов</Badge>}
       </div>
-      <div className="rounded-xl bg-surface-2 p-4 text-[13px] text-text-muted leading-relaxed mb-6">
-        Профиль работодателя: опубликованные вакансии, история сотрудничества и отзывы соискателей доступны в карточке компании.
-      </div>
+
+      {!ready && <DetailSkeleton />}
+
+      {ready && !editing && (
+        <div className="space-y-5 mb-6">
+          <div>
+            <SectionLabel>Описание</SectionLabel>
+            <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{ready.description || '—'}</p>
+          </div>
+          <div>
+            <SectionLabel>Адрес</SectionLabel>
+            <p className="text-[13px] text-text leading-relaxed">{ready.address || '—'}</p>
+          </div>
+          <div>
+            <SectionLabel>Фото</SectionLabel>
+            <PhotoStrip photos={ready.photos} />
+          </div>
+          <div>
+            <SectionLabel>Активные вакансии{activeVacancies.length > 0 ? ` (${activeVacancies.length})` : ''}</SectionLabel>
+            {activeVacancies.length === 0 && <p className="text-[13px] text-text-faint">Нет активных вакансий</p>}
+            <div className="flex flex-col gap-2">
+              {activeVacancies.map((v) => {
+                const meta = VACANCY_STATUS[v.status] ?? { label: v.status, tone: 'neutral' as const };
+                return (
+                  <div key={v.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-text">{v.positionLabel}</span>
+                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                    </div>
+                    <p className="text-text-faint mt-0.5">{formatDayMonth(new Date(v.date))} · откликов: {v.responseCount}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <SectionLabel>Завершённые вакансии{closedVacancies.length > 0 ? ` (${closedVacancies.length})` : ''}</SectionLabel>
+            {closedVacancies.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}
+            <div className="flex flex-col gap-2">
+              {closedVacancies.map((v) => {
+                const meta = VACANCY_STATUS[v.status] ?? { label: v.status, tone: 'neutral' as const };
+                return (
+                  <div key={v.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-text">{v.positionLabel}</span>
+                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                    </div>
+                    <p className="text-text-faint mt-0.5">{formatDayMonth(new Date(v.date))} · откликов: {v.responseCount}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ready && editing && (
+        <div className="space-y-3 mb-6">
+          <div>
+            <Label>Название заведения</Label>
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Город</Label>
+            <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Адрес</Label>
+            <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Год основания</Label>
+            <Input
+              value={form.foundedYear}
+              onChange={(e) => setForm((f) => ({ ...f, foundedYear: e.target.value.replace(/[^0-9]/g, '') }))}
+              inputMode="numeric"
+            />
+          </div>
+          <div>
+            <Label>Описание</Label>
+            <Textarea rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </div>
+          {formError && <p className="text-[12px] text-danger leading-relaxed">{formError}</p>}
+          <div className="flex gap-2">
+            <Button variant="primary" className="flex-1" disabled={saving} onClick={save}>Сохранить</Button>
+            <Button variant="outline" className="flex-1" disabled={saving} onClick={() => setEditing(false)}>Отмена</Button>
+          </div>
+        </div>
+      )}
+
+      {ready && !editing && (
+        <Button variant="outline" className="w-full mb-2" disabled={!canBlock} onClick={() => setEditing(true)}>
+          Редактировать профиль
+        </Button>
+      )}
+
       <div className="flex flex-col gap-2">
         <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer')}>
           {blocked ? 'Разблокировать' : 'Заблокировать'}

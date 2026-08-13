@@ -59,6 +59,141 @@ adminUserRoutes.get('/employers', requireStaffMiddleware, async (c) => {
   return c.json({ employers: results });
 });
 
+/** Full profile — everything the person themselves filled in, plus their
+ *  application history, for the expanded card in the dashboard. The list
+ *  endpoints above stay thin (just enough for the table row); this is
+ *  only fetched once a specific person is opened. */
+adminUserRoutes.get('/seekers/:id', requireStaffMiddleware, async (c) => {
+  const id = c.req.param('id');
+  const worker = await c.env.DB.prepare('SELECT * FROM workers WHERE id = ?').bind(id).first<{
+    id: number;
+    avatar_data: unknown;
+    photo_url: string | null;
+  }>();
+  if (!worker) return c.json({ error: 'not_found' }, 404);
+
+  const { results: positions } = await c.env.DB.prepare(
+    'SELECT id, position, position_label, months FROM worker_positions WHERE worker_id = ? ORDER BY months DESC',
+  )
+    .bind(id)
+    .all();
+  const { results: photoRows } = await c.env.DB.prepare('SELECT id FROM worker_photos WHERE worker_id = ? ORDER BY position ASC')
+    .bind(id)
+    .all<{ id: number }>();
+  const { results: applications } = await c.env.DB.prepare(
+    `SELECT a.id, a.status, a.work_stage, a.rating, a.cancelled_by, a.cancel_reason, a.created_at,
+            s.position_label, s.date, s.start_hour, s.start_min, co.name as company_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     WHERE a.worker_id = ?
+     ORDER BY a.created_at DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all();
+
+  return c.json({
+    worker: {
+      ...worker,
+      avatar_data: undefined,
+      avatarUrl: worker.avatar_data ? `/media/workers/${id}/avatar` : worker.photo_url,
+    },
+    positions,
+    photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${id}/photos/${p.id}` })),
+    applications,
+  });
+});
+
+adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
+  const id = c.req.param('id');
+  const company = await c.env.DB.prepare('SELECT * FROM companies WHERE id = ?').bind(id).first<{
+    id: number;
+    avatar_data: unknown;
+  }>();
+  if (!company) return c.json({ error: 'not_found' }, 404);
+
+  const { results: photoRows } = await c.env.DB.prepare('SELECT id FROM company_photos WHERE company_id = ? ORDER BY position ASC')
+    .bind(id)
+    .all<{ id: number }>();
+  const { results: vacancies } = await c.env.DB.prepare(
+    `SELECT s.id, s.position_label, s.date, s.status,
+            (SELECT COUNT(*) FROM applications a WHERE a.shift_id = s.id) as response_count
+     FROM shifts s WHERE s.company_id = ? ORDER BY s.created_at DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all();
+
+  return c.json({
+    company: {
+      ...company,
+      avatar_data: undefined,
+      avatarUrl: company.avatar_data ? `/media/companies/${id}/avatar` : null,
+    },
+    photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${id}/photos/${p.id}` })),
+    vacancies,
+  });
+});
+
+/** Admin edits a person's own profile fields directly — same field set as
+ *  their own "edit profile" screen, just driven from the dashboard. Kept
+ *  behind blockUsers (not manageData): editing a typo in someone's name
+ *  isn't the same risk class as hard-deleting their account. */
+adminUserRoutes.patch('/seekers/:id', requirePermission('blockUsers'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const body = await c.req.json<{ name?: string; city?: string; bio?: string; skills?: string; birthdate?: string }>();
+
+  const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(id).first<{ name: string }>();
+  if (!worker) return c.json({ error: 'not_found' }, 404);
+
+  const fields: string[] = [];
+  const binds: unknown[] = [];
+  for (const key of ['name', 'city', 'bio', 'skills', 'birthdate'] as const) {
+    if (body[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      binds.push(body[key]);
+    }
+  }
+  if (fields.length) {
+    binds.push(id);
+    await c.env.DB.prepare(`UPDATE workers SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
+  }
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `отредактировала профиль соискателя ${body.name?.trim() || worker.name}`, 'neutral');
+  return c.json({ ok: true });
+});
+
+adminUserRoutes.patch('/employers/:id', requirePermission('blockUsers'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number }>();
+
+  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(id).first<{ name: string }>();
+  if (!company) return c.json({ error: 'not_found' }, 404);
+
+  const fields: string[] = [];
+  const binds: unknown[] = [];
+  for (const key of ['name', 'address', 'city', 'description'] as const) {
+    if (body[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      binds.push(body[key]);
+    }
+  }
+  if (body.foundedYear !== undefined) {
+    fields.push('founded_year = ?');
+    binds.push(body.foundedYear);
+  }
+  if (fields.length) {
+    binds.push(id);
+    await c.env.DB.prepare(`UPDATE companies SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
+  }
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `отредактировала профиль работодателя ${body.name?.trim() || company.name}`, 'neutral');
+  return c.json({ ok: true });
+});
+
 /** Hard delete — unlike block/unblock, this actually removes the row and,
  *  via ON DELETE CASCADE, everything hanging off it (applications, chats,
  *  notifications, favorites, positions, photos, support threads). Also

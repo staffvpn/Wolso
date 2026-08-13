@@ -19,9 +19,9 @@ export async function provisionWorker(env: Env, user: TelegramUser, name: string
 
   const referralCode = `${(user.username ?? user.first_name).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)}${user.id % 100}`;
   const inserted = await env.DB.prepare(
-    'INSERT INTO workers (telegram_id, name, photo_url, referral_code) VALUES (?, ?, ?, ?) RETURNING id',
+    'INSERT INTO workers (telegram_id, name, photo_url, referral_code, telegram_username) VALUES (?, ?, ?, ?, ?) RETURNING id',
   )
-    .bind(user.id, name, user.photo_url ?? null, referralCode)
+    .bind(user.id, name, user.photo_url ?? null, referralCode, user.username ?? null)
     .first<{ id: number }>();
   worker = inserted!;
   for (const p of DEFAULT_POSITIONS) {
@@ -40,8 +40,8 @@ export async function provisionCompany(env: Env, user: TelegramUser): Promise<nu
   let company = await env.DB.prepare('SELECT id FROM companies WHERE owner_telegram_id = ?').bind(user.id).first<{ id: number }>();
   if (company) return company.id;
 
-  const inserted = await env.DB.prepare('INSERT INTO companies (owner_telegram_id, name) VALUES (?, ?) RETURNING id')
-    .bind(user.id, '')
+  const inserted = await env.DB.prepare('INSERT INTO companies (owner_telegram_id, name, telegram_username) VALUES (?, ?, ?) RETURNING id')
+    .bind(user.id, '', user.username ?? null)
     .first<{ id: number }>();
   return inserted!.id;
 }
@@ -86,6 +86,16 @@ authRoutes.post('/telegram', async (c) => {
       return c.json({ needsRoleChoice: true, telegramUser });
     }
   }
+
+  // Telegram usernames can change — keep the admin dashboard's copy fresh
+  // on every real login instead of only capturing it once at signup.
+  // Harmless no-op against whichever table doesn't have a matching row.
+  c.executionCtx.waitUntil(
+    Promise.all([
+      c.env.DB.prepare('UPDATE workers SET telegram_username = ? WHERE telegram_id = ?').bind(user.username ?? null, user.id).run(),
+      c.env.DB.prepare('UPDATE companies SET telegram_username = ? WHERE owner_telegram_id = ?').bind(user.username ?? null, user.id).run(),
+    ]),
+  );
 
   // This only ever actually provisions a row for pre-existing accounts
   // being backfilled into telegram_accounts for the first time (a brand
