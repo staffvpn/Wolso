@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -68,20 +68,47 @@ function ageFromBirthdate(birthdate?: string): number | null {
   return age;
 }
 
-/** Opens the person's real Telegram account — a username gives a
- *  universal https://t.me link, a bare id falls back to a tg:// deep
- *  link (best-effort, works from clients with Telegram registered as a
- *  protocol handler). */
+/** Opens the person's real Telegram account via a universal https://t.me
+ *  link — only possible when they have a public username. Telegram has no
+ *  way to open an arbitrary person's chat/profile from outside the app by
+ *  numeric id alone, so without a username there's nothing to link to:
+ *  show the id as plain, copyable text instead of a link that would just
+ *  silently fail to open anything. */
 function TelegramLinkRow({ telegramId, telegramUsername }: { telegramId: number; telegramUsername?: string }) {
+  const link = telegramLink(telegramId, telegramUsername);
+  const [copied, setCopied] = useState(false);
+
+  if (link) {
+    return (
+      <a
+        href={link}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent mb-4 hover:underline"
+      >
+        <Send size={13} /> {telegramLabel(telegramId, telegramUsername)}
+      </a>
+    );
+  }
+
+  async function copyId() {
+    await navigator.clipboard.writeText(String(telegramId));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
-    <a
-      href={telegramLink(telegramId, telegramUsername)}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent mb-4 hover:underline"
-    >
-      <Send size={13} /> {telegramLabel(telegramId, telegramUsername)}
-    </a>
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={copyId}
+        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-text-muted hover:text-text transition-colors"
+      >
+        {copied ? <Check size={13} className="text-accent" /> : <Copy size={13} />}
+        {copied ? 'Скопировано' : telegramLabel(telegramId, telegramUsername)}
+      </button>
+      <p className="text-[12px] text-text-faint mt-0.5">Без username Telegram не даёт открыть профиль напрямую — только ID для поиска.</p>
+    </div>
   );
 }
 

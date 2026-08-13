@@ -40,12 +40,14 @@ export function minutesSince(timestamp: string): number {
 }
 
 /** A username gives a universal https://t.me link that opens fine from any
- *  browser or client. Without one (not every account has picked a public
- *  username, or an older row predates us capturing it), fall back to a
- *  tg:// deep link by numeric id — works from clients with Telegram
- *  registered as a protocol handler, best effort otherwise. */
-export function telegramLink(telegramId: number, username?: string | null): string {
-  return username ? `https://t.me/${username}` : `tg://user?id=${telegramId}`;
+ *  browser or client. Without one there is no working link at all —
+ *  Telegram doesn't let you open an arbitrary person's chat/profile from
+ *  outside the app by numeric id alone (the old `tg://user?id=` fallback
+ *  looked like a link but silently did nothing for anyone not already in
+ *  the opener's local Telegram cache/contacts). Return null so callers can
+ *  show the id as plain, copyable text instead of a broken link. */
+export function telegramLink(_telegramId: number, username?: string | null): string | null {
+  return username ? `https://t.me/${username}` : null;
 }
 
 export function telegramLabel(telegramId: number, username?: string | null): string {
