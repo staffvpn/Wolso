@@ -102,6 +102,14 @@ export async function toggleBlockEmployer(id: string): Promise<UserStatus> {
   return status;
 }
 
+export async function deleteSeeker(id: string): Promise<void> {
+  await apiFetch(`/admin/users/seekers/${id}`, { method: 'DELETE' });
+}
+
+export async function deleteEmployer(id: string): Promise<void> {
+  await apiFetch(`/admin/users/employers/${id}`, { method: 'DELETE' });
+}
+
 export async function switchSeekerToEmployer(id: string): Promise<void> {
   await apiFetch(`/admin/users/seekers/${id}/switch-role`, { method: 'POST' });
 }

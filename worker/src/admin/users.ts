@@ -59,6 +59,45 @@ adminUserRoutes.get('/employers', requireStaffMiddleware, async (c) => {
   return c.json({ employers: results });
 });
 
+/** Hard delete — unlike block/unblock, this actually removes the row and,
+ *  via ON DELETE CASCADE, everything hanging off it (applications, chats,
+ *  notifications, favorites, positions, photos, support threads). Also
+ *  clears their role-lock so if this Telegram id ever messages the bot
+ *  again, it onboards clean instead of pointing at a deleted worker. */
+adminUserRoutes.delete('/seekers/:id', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const worker = await c.env.DB.prepare('SELECT name, telegram_id FROM workers WHERE id = ?').bind(id).first<{
+    name: string;
+    telegram_id: number;
+  }>();
+  if (!worker) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare('DELETE FROM workers WHERE id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM telegram_accounts WHERE telegram_id = ?').bind(worker.telegram_id).run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `удалила соискателя ${worker.name}`, 'danger');
+  return c.json({ ok: true });
+});
+
+adminUserRoutes.delete('/employers/:id', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+  const company = await c.env.DB.prepare('SELECT name, owner_telegram_id FROM companies WHERE id = ?').bind(id).first<{
+    name: string;
+    owner_telegram_id: number;
+  }>();
+  if (!company) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare('DELETE FROM companies WHERE id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM telegram_accounts WHERE telegram_id = ?').bind(company.owner_telegram_id).run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `удалила работодателя ${company.name}`, 'danger');
+  return c.json({ ok: true });
+});
+
 adminUserRoutes.post('/seekers/:id/block', requirePermission('blockUsers'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');

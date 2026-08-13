@@ -11,6 +11,7 @@ import { Roles } from './screens/Roles';
 import { AuditLog } from './screens/AuditLog';
 import { Settings } from './screens/Settings';
 import { Support } from './screens/Support';
+import { DataManagement } from './screens/DataManagement';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/finance" element={<Finance />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/audit-log" element={<AuditLog />} />
+              <Route path="/data" element={<DataManagement />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
           </Route>

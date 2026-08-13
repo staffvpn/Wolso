@@ -39,3 +39,7 @@ export async function fetchAllVacancies(): Promise<VacancyRecord[]> {
 export async function closeVacancy(id: string): Promise<void> {
   await apiFetch(`/admin/vacancies/${id}/close`, { method: 'POST' });
 }
+
+export async function deleteVacancy(id: string): Promise<void> {
+  await apiFetch(`/admin/vacancies/${id}`, { method: 'DELETE' });
+}

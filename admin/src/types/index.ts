@@ -6,7 +6,8 @@ export type PermissionKey =
   | 'changeCommission'
   | 'manageTeam'
   | 'transferOwnership'
-  | 'switchUserRole';
+  | 'switchUserRole'
+  | 'manageData';
 
 export type PermissionValue = 'yes' | 'no' | 'confirm';
 

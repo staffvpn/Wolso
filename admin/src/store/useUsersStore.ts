@@ -11,6 +11,8 @@ import {
   revokeTeamAccess,
   switchSeekerToEmployer,
   switchEmployerToSeeker,
+  deleteSeeker,
+  deleteEmployer,
 } from '@/services/usersApi';
 
 interface UsersState {
@@ -25,6 +27,7 @@ interface UsersState {
   inviteMember: (name: string, telegramId: number, roleId: string) => Promise<void>;
   revokeAccess: (memberId: string) => Promise<void>;
   switchRole: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
+  deleteUser: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
 }
 
 export const useUsersStore = create<UsersState>((set, get) => ({
@@ -74,5 +77,15 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     else await switchEmployerToSeeker(id);
     const [seekers, employers] = await Promise.all([fetchSeekers(), fetchEmployers()]);
     set({ seekers, employers });
+  },
+
+  deleteUser: async (id, kind) => {
+    if (kind === 'seeker') {
+      await deleteSeeker(id);
+      set({ seekers: get().seekers.filter((u) => u.id !== id) });
+    } else {
+      await deleteEmployer(id);
+      set({ employers: get().employers.filter((u) => u.id !== id) });
+    }
   },
 }));

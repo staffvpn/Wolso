@@ -19,6 +19,23 @@ adminVacancyRoutes.get('/', requireStaffMiddleware, async (c) => {
   return c.json({ vacancies });
 });
 
+/** Hard delete — cascades to its applications, chats+messages, and
+ *  favorites (see worker/migrations for the FK graph). Unlike /close,
+ *  this removes the row outright rather than just marking it closed. */
+adminVacancyRoutes.delete('/:id', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+
+  const shift = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
+  if (!shift) return c.json({ error: 'not_found' }, 404);
+
+  await c.env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `удалила вакансию «${shift.position_label} · ${shift.company_name}»`, 'danger');
+  return c.json({ ok: true });
+});
+
 adminVacancyRoutes.post('/:id/close', requirePermission('approveVacancies'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');

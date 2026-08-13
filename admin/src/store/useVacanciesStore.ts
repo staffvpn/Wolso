@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { VacancyRecord } from '@/types';
-import { fetchAllVacancies, closeVacancy as closeVacancyApi } from '@/services/vacanciesApi';
+import { fetchAllVacancies, closeVacancy as closeVacancyApi, deleteVacancy as deleteVacancyApi } from '@/services/vacanciesApi';
 
 interface VacanciesState {
   vacancies: VacancyRecord[];
@@ -8,6 +8,7 @@ interface VacanciesState {
   loaded: boolean;
   load: () => Promise<void>;
   closeVacancy: (id: string) => Promise<void>;
+  deleteVacancy: (id: string) => Promise<void>;
 }
 
 export const useVacanciesStore = create<VacanciesState>((set, get) => ({
@@ -24,5 +25,10 @@ export const useVacanciesStore = create<VacanciesState>((set, get) => ({
   closeVacancy: async (id) => {
     set({ vacancies: get().vacancies.map((v) => (v.id === id ? { ...v, status: 'closed' } : v)) });
     await closeVacancyApi(id);
+  },
+
+  deleteVacancy: async (id) => {
+    await deleteVacancyApi(id);
+    set({ vacancies: get().vacancies.filter((v) => v.id !== id) });
   },
 }));

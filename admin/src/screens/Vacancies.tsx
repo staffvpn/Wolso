@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyPanel } from '@/components/EmptyPanel';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { useVacanciesStore } from '@/store/useVacanciesStore';
 import { useCan } from '@/store/useSessionStore';
 import { formatMoney, timeAgo } from '@/lib/format';
@@ -21,10 +22,13 @@ const STATUS_BADGE: Record<VacancyRecord['status'], { label: string; tone: 'acce
 export function Vacancies() {
   const vacancies = useVacanciesStore((s) => s.vacancies);
   const closeVacancy = useVacanciesStore((s) => s.closeVacancy);
+  const deleteVacancy = useVacanciesStore((s) => s.deleteVacancy);
   const load = useVacanciesStore((s) => s.load);
   const canManage = useCan('approveVacancies');
+  const canManageData = useCan('manageData');
   const [status, setStatus] = useState<'all' | VacancyRecord['status']>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     load();
@@ -125,15 +129,36 @@ export function Vacancies() {
                 </div>
               </div>
 
-              {selected.status === 'active' && (
-                <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id)}>
-                  Закрыть вакансию
+              <div className="flex flex-col gap-2">
+                {selected.status === 'active' && (
+                  <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id)}>
+                    Закрыть вакансию
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full text-danger border-danger/30"
+                  disabled={!canManageData}
+                  onClick={() => setDeleting(true)}
+                >
+                  Удалить навсегда
                 </Button>
-              )}
+              </div>
             </div>
           )}
         </Card>
       </div>
+
+      {selected && (
+        <ConfirmModal
+          open={deleting}
+          onClose={() => setDeleting(false)}
+          title="Удалить вакансию?"
+          description={`«${selected.position} · ${selected.companyName}» вместе со всеми откликами и чатами по ней удаляется без возможности восстановить.`}
+          confirmLabel="Удалить"
+          onConfirm={() => deleteVacancy(selected.id)}
+        />
+      )}
     </div>
   );
 }

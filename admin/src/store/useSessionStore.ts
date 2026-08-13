@@ -82,6 +82,7 @@ const FALLBACK_ROLE: RoleDef = {
     manageTeam: 'no',
     transferOwnership: 'no',
     switchUserRole: 'no',
+    manageData: 'no',
   },
 };
 

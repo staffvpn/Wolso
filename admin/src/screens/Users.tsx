@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Select } from '@/components/ui/Select';
 import { Input, Label } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useRolesStore } from '@/store/useRolesStore';
@@ -264,9 +265,12 @@ function TeamDetail({ member }: { member: TeamMember }) {
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
   const switchRole = useUsersStore((s) => s.switchRole);
+  const deleteUser = useUsersStore((s) => s.deleteUser);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
+  const canManageData = useCan('manageData');
   const blocked = user.status === 'suspended';
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <div>
@@ -291,7 +295,18 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'seeker')}>
           Переключить на работодателя
         </Button>
+        <Button variant="outline" className="w-full text-danger border-danger/30" disabled={!canManageData} onClick={() => setDeleting(true)}>
+          Удалить навсегда
+        </Button>
       </div>
+      <ConfirmModal
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        title="Удалить соискателя?"
+        description={`${user.name} и вся его история (отклики, чаты, уведомления, избранное) удаляются без возможности восстановить.`}
+        confirmLabel="Удалить"
+        onConfirm={() => deleteUser(user.id, 'seeker')}
+      />
     </div>
   );
 }
@@ -299,9 +314,12 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
 function EmployerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
   const switchRole = useUsersStore((s) => s.switchRole);
+  const deleteUser = useUsersStore((s) => s.deleteUser);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
+  const canManageData = useCan('manageData');
   const blocked = user.status === 'suspended';
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <div>
@@ -325,7 +343,18 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
         <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'employer')}>
           Переключить на соискателя
         </Button>
+        <Button variant="outline" className="w-full text-danger border-danger/30" disabled={!canManageData} onClick={() => setDeleting(true)}>
+          Удалить навсегда
+        </Button>
       </div>
+      <ConfirmModal
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        title="Удалить работодателя?"
+        description={`${user.name} и вся его история (вакансии, отклики, чаты, уведомления) удаляются без возможности восстановить.`}
+        confirmLabel="Удалить"
+        onConfirm={() => deleteUser(user.id, 'employer')}
+      />
     </div>
   );
 }
