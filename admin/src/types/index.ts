@@ -134,6 +134,30 @@ export interface EmployerDetail {
   vacancies: EmployerVacancy[];
 }
 
+/** An employer's profile awaiting (or already given) an admin decision on
+ *  whether the legal entity behind it looks real — separate from vacancy
+ *  moderation, and from the plain "is the profile filled in" check. */
+export interface EmployerVerification {
+  id: string;
+  name: string;
+  inn?: string;
+  city: string;
+  address?: string;
+  description: string;
+  foundedYear?: number;
+  avatarUrl?: string;
+  telegramId: number;
+  telegramUsername?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  /** Research notes an AI web search turned up — informational only, the
+   *  admin still makes the actual call. Undefined until a check has run
+   *  (e.g. no ANTHROPIC_API_KEY configured, or the check hasn't fired yet). */
+  aiSummary?: string;
+  aiCheckedAt?: string;
+  createdAt: string;
+}
+
 export type PayoutStatus = 'paid' | 'processing' | 'dispute';
 
 export interface Transaction {

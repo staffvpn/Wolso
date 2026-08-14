@@ -20,6 +20,7 @@ import { adminDashboardRoutes } from './admin/dashboard';
 import { adminVacancyRoutes } from './admin/vacancies';
 import { adminSupportRoutes } from './admin/support';
 import { adminDataRoutes } from './admin/data';
+import { adminVerificationRoutes } from './admin/verification';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -52,6 +53,7 @@ app.route('/admin/dashboard', adminDashboardRoutes);
 app.route('/admin/vacancies', adminVacancyRoutes);
 app.route('/admin/support', adminSupportRoutes);
 app.route('/admin/data', adminDataRoutes);
+app.route('/admin/verification', adminVerificationRoutes);
 
 app.onError((err, c) => {
   console.error(err);

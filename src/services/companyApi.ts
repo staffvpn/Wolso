@@ -15,6 +15,13 @@ export interface CompanyApiRow {
   avatarUrl: string | null;
   profileComplete?: boolean;
   profileCompletion?: number;
+  /** Only present on the owner's own `/employer/me` response — a company
+   *  row embedded elsewhere (e.g. a worker's favorites) never carries
+   *  this, since it's nobody else's business. */
+  inn?: string | null;
+  verificationStatus?: string;
+  rejectionReason?: string | null;
+  aiSummary?: string | null;
 }
 
 interface CompanyResponse {
@@ -41,6 +48,10 @@ export function fromApiCompanyRow(c: CompanyApiRow): Company {
     avatarUrl: resolveMediaUrl(c.avatarUrl),
     profileComplete: c.profileComplete,
     profileCompletion: c.profileCompletion,
+    inn: c.inn ?? undefined,
+    verificationStatus: c.verificationStatus as Company['verificationStatus'],
+    rejectionReason: c.rejectionReason ?? undefined,
+    aiSummary: c.aiSummary ?? undefined,
   };
 }
 
@@ -62,6 +73,7 @@ export interface CompanyUpdate {
   city?: string;
   description?: string;
   foundedYear?: number;
+  inn?: string;
 }
 
 export async function updateMyCompany(update: CompanyUpdate): Promise<Company> {

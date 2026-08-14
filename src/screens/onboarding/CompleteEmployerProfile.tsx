@@ -8,6 +8,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { SectionLabel } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
 import { useCompanyStore } from '@/store/useCompanyStore';
+import { ApiError } from '@/lib/apiClient';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 
@@ -15,8 +16,11 @@ const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
 
 /** Shared by both the forced onboarding gate (no back button) and the
- *  normal "edit profile" route (/e/profile/edit). */
-export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
+ *  normal "edit profile" route (/e/profile/edit). `rejectionReason` is set
+ *  when this is shown because admin verification failed — same form,
+ *  fixing it and saving resubmits automatically (see the worker-side
+ *  PATCH /employer/me). */
+export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gate?: boolean; rejectionReason?: string }) {
   const navigate = useNavigate();
   const company = useCompanyStore((s) => s.company);
   const loaded = useCompanyStore((s) => s.loaded);
@@ -31,6 +35,7 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
   const [city, setCity] = useState('');
   const [description, setDescription] = useState('');
   const [foundedYear, setFoundedYear] = useState('');
+  const [inn, setInn] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -48,16 +53,21 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
     setCity(company.city ?? '');
     setDescription(company.description ?? '');
     setFoundedYear(company.foundedYear ? String(company.foundedYear) : '');
+    setInn(company.inn ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
   if (!company) return null;
+
+  const innDigits = inn.trim();
+  const innValid = /^\d{10}$|^\d{12}$/.test(innDigits);
 
   const missing: string[] = [];
   if (!name.trim()) missing.push('название');
   if (!description.trim()) missing.push('описание');
   if (!foundedYear) missing.push('год основания');
   if (!company.avatarUrl) missing.push('фото');
+  if (!innDigits) missing.push('ИНН');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -87,12 +97,23 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
       setError(`Заполните: ${missing.join(', ')}`);
       return;
     }
+    if (!innValid) {
+      setError('ИНН должен состоять из 10 цифр (для организации) или 12 цифр (для ИП)');
+      return;
+    }
     setSaving(true);
     try {
-      await updateCompany({ name: name.trim(), address: address.trim(), city: city.trim(), description: description.trim(), foundedYear: Number(foundedYear) });
+      await updateCompany({
+        name: name.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        description: description.trim(),
+        foundedYear: Number(foundedYear),
+        inn: innDigits,
+      });
       if (!gate) navigate(-1);
-    } catch {
-      setError('Не получилось сохранить — попробуйте ещё раз');
+    } catch (err) {
+      setError(err instanceof ApiError && err.code === 'invalid_inn' ? 'Некорректный ИНН — проверьте, что указали верно' : 'Не получилось сохранить — попробуйте ещё раз');
     } finally {
       setSaving(false);
     }
@@ -112,10 +133,19 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
         {gate && (
           <div className="mt-2 mb-5">
-            <h1 className="text-[22px] font-extrabold leading-tight">Расскажите о заведении</h1>
+            <h1 className="text-[22px] font-extrabold leading-tight">
+              {rejectionReason ? 'Проверка не пройдена' : 'Расскажите о заведении'}
+            </h1>
             <p className="text-[14px] text-text-muted mt-1 leading-relaxed">
-              Соискатели видят это в карточке смены.
+              {rejectionReason ? 'Исправьте анкету и отправьте на повторную проверку.' : 'Соискатели видят это в карточке смены.'}
             </p>
+          </div>
+        )}
+
+        {rejectionReason && (
+          <div className="rounded-2xl bg-danger-soft border border-danger/20 p-4 mb-6">
+            <p className="text-[13px] font-semibold text-danger mb-1">Причина отказа</p>
+            <p className="text-[13px] text-danger leading-relaxed">{rejectionReason}</p>
           </div>
         )}
 
@@ -142,6 +172,23 @@ export function CompleteEmployerProfile({ gate = false }: { gate?: boolean }) {
               className={FIELD_CLASS}
               required
             />
+          </div>
+
+          <div>
+            <SectionLabel>
+              ИНН <span className="text-danger">*</span>
+            </SectionLabel>
+            <input
+              value={inn}
+              onChange={(e) => setInn(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="10 или 12 цифр"
+              inputMode="numeric"
+              className={FIELD_CLASS}
+              required
+            />
+            <p className="text-[12px] text-text-faint mt-1.5 leading-relaxed">
+              Мы запрашиваем ИНН, чтобы убедиться, что такое юридическое лицо действительно существует — это часть проверки перед публикацией вакансий.
+            </p>
           </div>
 
           <div>

@@ -24,3 +24,7 @@ database_id = "3bd49b64-c1ac-494a-a747-b5a02d421b59"
 #   BOT_TOKEN          — the Telegram bot token from @BotFather
 #   SESSION_SECRET      — any long random string, used to sign session tokens
 #   OWNER_TELEGRAM_ID   — your own numeric Telegram user id, to bootstrap the first Owner
+#   ANTHROPIC_API_KEY   — optional; powers the AI legal-entity check in employer
+#                          verification (see src/lib/aiVerification.ts). Without it,
+#                          verification still works as a purely human review in the
+#                          admin dashboard — the AI summary just never populates.

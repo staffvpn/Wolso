@@ -28,6 +28,17 @@ export interface Company {
   profileComplete?: boolean;
   profileCompletion?: number;
   photos?: { id: string; url: string }[];
+  /** ИНН — required to submit for verification (see verificationStatus).
+   *  Only present on the owner's own `/employer/me` response. */
+  inn?: string;
+  /** Admin has to approve a complete profile before it can publish
+   *  vacancies or browse candidates — see VerificationGate. Only present
+   *  on the owner's own `/employer/me` response. */
+  verificationStatus?: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  /** Research notes an AI web search turned up for the admin moderating
+   *  this profile — informational only, never shown to the employer. */
+  aiSummary?: string;
 }
 
 export type ShiftUrgency = 'normal' | 'urgent';

@@ -11,6 +11,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply wolso --remote"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "hono": "^4.6.14"
   },
   "devDependencies": {

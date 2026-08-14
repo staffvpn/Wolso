@@ -6,6 +6,7 @@ import { AuthGate } from './components/AuthGate';
 import { Dashboard } from './screens/Dashboard';
 import { Users } from './screens/Users';
 import { Vacancies } from './screens/Vacancies';
+import { Verification } from './screens/Verification';
 import { Finance } from './screens/Finance';
 import { Roles } from './screens/Roles';
 import { AuditLog } from './screens/AuditLog';
@@ -24,6 +25,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/vacancies" element={<Vacancies />} />
+              <Route path="/verification" element={<Verification />} />
               <Route path="/support" element={<Support />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/roles" element={<Roles />} />

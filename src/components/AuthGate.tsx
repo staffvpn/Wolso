@@ -10,6 +10,7 @@ import { Logo } from './ui/Logo';
 import { Welcome } from '@/screens/onboarding/Welcome';
 import { CompleteWorkerProfile } from '@/screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from '@/screens/onboarding/CompleteEmployerProfile';
+import { EmployerVerificationPending } from '@/screens/onboarding/EmployerVerificationPending';
 import { ShiftCheckout } from '@/screens/worker/ShiftCheckout';
 
 function Spinner({ label }: { label: string }) {
@@ -102,6 +103,31 @@ function EmployerProfileGate({ children }: { children: ReactNode }) {
   if (!loaded) return <Spinner label="Загружаем профиль…" />;
   if (error) return <LoadError onRetry={load} />;
   if (!complete) return <CompleteEmployerProfile gate />;
+  return <EmployerVerificationGate>{children}</EmployerVerificationGate>;
+}
+
+/** A complete profile still isn't enough to publish vacancies or browse
+ *  candidates — an admin has to approve it first (see requireVerifiedCompany
+ *  on the worker side, and the dashboard's verification queue). A rejection
+ *  reuses the same mandatory-completion form, with the reason shown, so
+ *  fixing it up and saving resubmits in one place — same treatment as an
+ *  incomplete profile gets. */
+function EmployerVerificationGate({ children }: { children: ReactNode }) {
+  const status = useCompanyStore((s) => s.company?.verificationStatus);
+  const rejectionReason = useCompanyStore((s) => s.company?.rejectionReason);
+  const load = useCompanyStore((s) => s.load);
+
+  // Nothing pushes verification decisions to the client — poll while
+  // waiting so approval shows up without the employer having to relaunch
+  // the app.
+  useEffect(() => {
+    if (status !== 'pending') return;
+    const interval = setInterval(load, 20000);
+    return () => clearInterval(interval);
+  }, [status, load]);
+
+  if (status === 'rejected') return <CompleteEmployerProfile gate rejectionReason={rejectionReason} />;
+  if (status === 'pending') return <EmployerVerificationPending />;
   return <>{children}</>;
 }
 

@@ -5,6 +5,7 @@ import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../li
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
+import { verifyCompanyWithAI } from '../lib/aiVerification';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -17,20 +18,29 @@ interface CompanyRow {
   description: string;
   founded_year: number | null;
   avatar_data: ArrayBuffer | null;
+  inn: string | null;
+  verification_status: string;
+  verification_reason: string | null;
+  ai_verification_summary: string | null;
 }
 
 /** Every field on this list must be present before a company profile counts
  *  as "complete" — see ProfileGate on the client. There's no Telegram photo
  *  fallback for companies (unlike workers), so the avatar has to be
- *  uploaded here. No moderation gate beyond this — filling the profile in
- *  is the only thing standing between an employer and publishing. */
+ *  uploaded here. Completing the profile isn't the whole gate anymore —
+ *  see verification_status below: a complete-but-unverified employer still
+ *  can't publish vacancies or browse candidates until an admin approves it. */
 function companyIsComplete(company: CompanyRow) {
-  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data];
+  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data, !!company.inn];
   return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
 }
 
 async function loadCompanyProfile(env: Env, companyId: number) {
-  const company = await env.DB.prepare('SELECT id, name, address, city, description, founded_year, avatar_data FROM companies WHERE id = ?')
+  const company = await env.DB.prepare(
+    `SELECT id, name, address, city, description, founded_year, avatar_data, inn,
+            verification_status, verification_reason, ai_verification_summary
+     FROM companies WHERE id = ?`,
+  )
     .bind(companyId)
     .first<CompanyRow>();
   if (!company) return null;
@@ -48,9 +58,24 @@ async function loadCompanyProfile(env: Env, companyId: number) {
       avatarUrl: company.avatar_data ? `/media/companies/${company.id}/avatar` : null,
       profileComplete: complete,
       profileCompletion: percent,
+      verificationStatus: company.verification_status,
+      rejectionReason: company.verification_reason,
+      aiSummary: company.ai_verification_summary,
     },
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${companyId}/photos/${p.id}` })),
   };
+}
+
+/** Gate for publishing a vacancy or browsing worker anketas — both require
+ *  a complete profile *and* admin approval, not just completeness. Kept
+ *  separate from companyIsComplete since a rejected/pending-but-complete
+ *  profile is a different reason to block than an unfinished one, and the
+ *  client shows a different screen for each (see ProfileGate/VerificationGate). */
+async function requireVerifiedCompany(env: Env, companyId: number): Promise<boolean> {
+  const row = await env.DB.prepare('SELECT verification_status FROM companies WHERE id = ?').bind(companyId).first<{
+    verification_status: string;
+  }>();
+  return row?.verification_status === 'approved';
 }
 
 employerRoutes.get('/me', async (c) => {
@@ -61,10 +86,28 @@ employerRoutes.get('/me', async (c) => {
   return c.json(profile);
 });
 
+/** ИНН is 10 digits for a legal entity (ООО etc.) or 12 for a sole
+ *  proprietor (ИП) — the two real lengths in Russia's registry. */
+function isValidInn(inn: string): boolean {
+  return /^\d{10}$|^\d{12}$/.test(inn);
+}
+
 employerRoutes.patch('/me', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number }>();
+  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number; inn?: string }>();
+
+  if (body.inn !== undefined && body.inn !== '' && !isValidInn(body.inn.trim())) {
+    return c.json({ error: 'invalid_inn' }, 400);
+  }
+
+  const before = await c.env.DB.prepare(
+    'SELECT name, address, city, description, founded_year, avatar_data, inn, verification_status FROM companies WHERE id = ?',
+  )
+    .bind(session.companyId)
+    .first<CompanyRow>();
+  if (!before) return c.json({ error: 'not_found' }, 404);
+  const wasComplete = companyIsComplete(before).complete;
 
   const fields: string[] = [];
   const binds: unknown[] = [];
@@ -78,9 +121,51 @@ employerRoutes.patch('/me', async (c) => {
     fields.push('founded_year = ?');
     binds.push(body.foundedYear);
   }
+  if (body.inn) {
+    fields.push('inn = ?');
+    binds.push(body.inn.trim());
+  }
   if (fields.length) {
     binds.push(session.companyId);
     await c.env.DB.prepare(`UPDATE companies SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
+  }
+
+  // Send it for (re)verification the first time the profile becomes
+  // complete, or after fixing it up following a rejection — not on every
+  // edit an already-approved employer makes, so tweaking a description
+  // doesn't send a working account back into the moderation queue.
+  const after = await c.env.DB.prepare(
+    'SELECT name, address, city, description, founded_year, avatar_data, inn, verification_status FROM companies WHERE id = ?',
+  )
+    .bind(session.companyId)
+    .first<CompanyRow>();
+  const isComplete = after ? companyIsComplete(after).complete : false;
+  const justCompleted = isComplete && !wasComplete;
+  const resubmittingAfterRejection = isComplete && before.verification_status === 'rejected';
+  if (after && (justCompleted || resubmittingAfterRejection)) {
+    await c.env.DB.prepare(
+      "UPDATE companies SET verification_status = 'pending', verification_reason = NULL WHERE id = ?",
+    )
+      .bind(session.companyId)
+      .run();
+    c.executionCtx.waitUntil(
+      (async () => {
+        const summary = await verifyCompanyWithAI(c.env, {
+          id: session.companyId,
+          name: after.name,
+          inn: after.inn,
+          city: after.city,
+          address: after.address,
+        });
+        if (summary) {
+          await c.env.DB.prepare(
+            "UPDATE companies SET ai_verification_summary = ?, ai_verification_checked_at = datetime('now') WHERE id = ?",
+          )
+            .bind(summary, session.companyId)
+            .run();
+        }
+      })(),
+    );
   }
 
   const profile = await loadCompanyProfile(c.env, session.companyId);
@@ -149,6 +234,7 @@ employerRoutes.get('/vacancies', async (c) => {
 employerRoutes.post('/vacancies', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
+  if (!(await requireVerifiedCompany(c.env, session.companyId))) return c.json({ error: 'not_verified' }, 403);
 
   const body = await c.req.json<{
     position: string;
@@ -400,6 +486,7 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
 employerRoutes.post('/vacancies/:shiftId/invite/:workerId', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
+  if (!(await requireVerifiedCompany(c.env, session.companyId))) return c.json({ error: 'not_verified' }, 403);
   const { shiftId, workerId } = c.req.param();
 
   const shift = await c.env.DB.prepare("SELECT id, position_label FROM shifts WHERE id = ? AND company_id = ? AND status = 'active'")
@@ -571,6 +658,7 @@ const PASS_COOLDOWN_DAYS = 1;
 employerRoutes.get('/workers', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
+  if (!(await requireVerifiedCompany(c.env, session.companyId))) return c.json({ error: 'not_verified' }, 403);
 
   const positions = (c.req.query('positions') ?? '').split(',').filter(Boolean);
   if (positions.length === 0) return c.json({ workers: [] });
