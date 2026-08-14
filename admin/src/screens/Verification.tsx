@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Send, Sparkles, RefreshCw, Check, X, BadgeCheck, Copy } from 'lucide-react';
+import { Send, FileSearch, RefreshCw, Check, X, BadgeCheck, Copy, ExternalLink } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -60,8 +60,8 @@ export function Verification() {
                   </p>
                 </div>
                 {e.aiSummary && (
-                  <span className="shrink-0 text-accent" title="Есть заключение ИИ">
-                    <Sparkles size={14} />
+                  <span className="shrink-0 text-accent" title="Есть данные из ЕГРЮЛ/ЕГРИП">
+                    <FileSearch size={14} />
                   </span>
                 )}
                 <span className="shrink-0 text-[12px] text-text-faint">{timeAgo(minutesSince(e.createdAt))}</span>
@@ -173,7 +173,11 @@ function EmployerDetail({ employer, onDone }: { employer: EmployerVerification; 
     try {
       await recheck(employer.id);
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 503 ? 'ИИ-проверка недоступна — добавьте ANTHROPIC_API_KEY секретом воркера' : 'Не получилось запросить проверку');
+      setError(
+        err instanceof ApiError && err.status === 503
+          ? 'Реестр ФНС не ответил — попробуйте ещё раз чуть позже или проверьте вручную по ссылке ниже'
+          : 'Не получилось запросить проверку',
+      );
     }
   }
 
@@ -211,7 +215,7 @@ function EmployerDetail({ employer, onDone }: { employer: EmployerVerification; 
         <div className="rounded-xl bg-surface-2 p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint flex items-center gap-1.5">
-              <Sparkles size={13} className="text-accent" /> Заключение ИИ
+              <FileSearch size={13} className="text-accent" /> Данные ЕГРЮЛ/ЕГРИП
             </p>
             <Button variant="outline" className="!h-7 !px-2.5 !text-[12px]" disabled={rechecking === employer.id} onClick={doRecheck}>
               <RefreshCw size={12} className={rechecking === employer.id ? 'animate-spin' : ''} /> {employer.aiSummary ? 'Обновить' : 'Запросить'}
@@ -221,8 +225,18 @@ function EmployerDetail({ employer, onDone }: { employer: EmployerVerification; 
             <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{employer.aiSummary}</p>
           ) : (
             <p className="text-[13px] text-text-faint leading-relaxed">
-              Пока ничего не найдено — нажмите «Запросить», чтобы поискать компанию в открытых источниках. Это только справочная информация, решение всё равно принимаете вы.
+              Пока ничего не найдено — нажмите «Запросить», чтобы автоматически проверить ИНН в реестре ФНС (egrul.nalog.ru). Это только справочная информация, решение всё равно принимаете вы.
             </p>
+          )}
+          {employer.inn && (
+            <a
+              href={`https://www.rusprofile.ru/search?query=${encodeURIComponent(employer.inn)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-accent mt-2.5 hover:underline"
+            >
+              Проверить вручную на rusprofile.ru <ExternalLink size={11} />
+            </a>
           )}
         </div>
       </div>

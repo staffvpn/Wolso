@@ -5,10 +5,6 @@ export interface Env {
   BOT_TOKEN: string;
   SESSION_SECRET: string;
   OWNER_TELEGRAM_ID?: string;
-  /** Optional — powers the AI legal-entity check on employer verification
-   *  (see lib/aiVerification.ts). Without it, verification still works as
-   *  a purely human review; the AI summary is just never populated. */
-  ANTHROPIC_API_KEY?: string;
 }
 
 export type PermissionKey =

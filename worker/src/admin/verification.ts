@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff } from '../middleware/auth';
 import { sendTelegramMessage } from '../lib/telegramBot';
-import { verifyCompanyWithAI } from '../lib/aiVerification';
+import { lookupInn } from '../lib/innLookup';
 
 export const adminVerificationRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminVerificationRoutes.use('*', attachSession);
@@ -60,21 +60,20 @@ adminVerificationRoutes.get('/employers', requirePermission('approveVacancies'),
 });
 
 /** Manual re-run — for when the automatic check (fired at profile
- *  completion) failed, or an admin wants a fresh look before deciding.
- *  Runs synchronously so the summary is ready by the time this returns. */
+ *  completion) didn't turn up anything useful, or an admin wants a fresh
+ *  look before deciding. Runs synchronously so the result is ready by the
+ *  time this returns. */
 adminVerificationRoutes.post('/employers/:id/recheck', requirePermission('approveVacancies'), async (c) => {
   const id = c.req.param('id');
-  const company = await c.env.DB.prepare('SELECT id, name, inn, city, address FROM companies WHERE id = ?').bind(id).first<{
+  const company = await c.env.DB.prepare('SELECT id, name, inn FROM companies WHERE id = ?').bind(id).first<{
     id: number;
     name: string;
     inn: string | null;
-    city: string;
-    address: string | null;
   }>();
   if (!company) return c.json({ error: 'not_found' }, 404);
 
-  const summary = await verifyCompanyWithAI(c.env, company);
-  if (!summary) return c.json({ error: 'ai_unavailable' }, 503);
+  const summary = await lookupInn(company);
+  if (!summary) return c.json({ error: 'lookup_unavailable' }, 503);
 
   await c.env.DB.prepare("UPDATE companies SET ai_verification_summary = ?, ai_verification_checked_at = datetime('now') WHERE id = ?")
     .bind(summary, id)

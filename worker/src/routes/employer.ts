@@ -5,7 +5,7 @@ import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../li
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
-import { verifyCompanyWithAI } from '../lib/aiVerification';
+import { lookupInn } from '../lib/innLookup';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -150,13 +150,7 @@ employerRoutes.patch('/me', async (c) => {
       .run();
     c.executionCtx.waitUntil(
       (async () => {
-        const summary = await verifyCompanyWithAI(c.env, {
-          id: session.companyId,
-          name: after.name,
-          inn: after.inn,
-          city: after.city,
-          address: after.address,
-        });
+        const summary = await lookupInn({ id: session.companyId, name: after.name, inn: after.inn });
         if (summary) {
           await c.env.DB.prepare(
             "UPDATE companies SET ai_verification_summary = ?, ai_verification_checked_at = datetime('now') WHERE id = ?",
