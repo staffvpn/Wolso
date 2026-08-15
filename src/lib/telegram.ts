@@ -10,8 +10,24 @@ export function getTelegram() {
 
 export const isInTelegram = () => Boolean(getTelegram()?.initData);
 
+/** Telegram's WebView can still let someone pinch the whole app out of its
+ *  frame even with the viewport meta locked down and `touch-action: pan-y`
+ *  set — iOS has ignored `user-scalable=no` since iOS 10, and touch-action
+ *  isn't always honored inside Telegram's wrapper either. `gesturestart`/
+ *  `gesturechange` are the WebKit-only events the native pinch gesture
+ *  fires before it starts resizing anything, so blocking those stops it
+ *  at the source instead of fighting the zoomed-in result after the fact. */
+function lockZoom() {
+  const prevent = (e: Event) => e.preventDefault();
+  document.addEventListener('gesturestart', prevent);
+  document.addEventListener('gesturechange', prevent);
+  document.addEventListener('gestureend', prevent);
+}
+
 /** Call once, as early as possible (main.tsx). */
 export function bootstrapTelegram() {
+  lockZoom();
+
   const tg = getTelegram();
   if (!tg) return;
 
