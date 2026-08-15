@@ -9,14 +9,11 @@ import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
 import { FEATURES } from '@/lib/features';
 import { formatExperience } from '@/lib/format';
-import { addToHomeScreen, hapticSelect } from '@/lib/telegram';
-import { useHomeScreenStatus } from '@/hooks/useHomeScreenStatus';
 
 export function WorkerProfileScreen() {
   const navigate = useNavigate();
   const profile = useProfileStore();
   const { positions, loaded, load } = profile;
-  const homeScreenStatus = useHomeScreenStatus();
 
   useEffect(() => {
     if (!loaded) load();
@@ -98,23 +95,6 @@ export function WorkerProfileScreen() {
           </div>
         </Card>
       </div>
-
-      {(homeScreenStatus === 'unknown' || homeScreenStatus === 'missed') && (
-        <div className="mt-3">
-          <Card className="px-1">
-            <div className="px-3">
-              <ListRow
-                label="Добавить на экран «Домой»"
-                showChevron={false}
-                onClick={() => {
-                  hapticSelect();
-                  addToHomeScreen();
-                }}
-              />
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

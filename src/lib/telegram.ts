@@ -68,30 +68,6 @@ export function getTelegramUser() {
   return getTelegram()?.initDataUnsafe.user;
 }
 
-export type HomeScreenStatus = 'unsupported' | 'unknown' | 'added' | 'missed';
-
-/** Asks the Telegram client itself whether Wolso is already pinned to the
- *  home screen — 'unsupported' on older clients / desktop, 'unknown' if
- *  never offered, 'missed' if the user dismissed the prompt before,
- *  'added' if it's already there. Resolves via callback since the native
- *  bridge is async even though the check itself is instant. */
-export function checkHomeScreenStatus(cb: (status: HomeScreenStatus) => void) {
-  const tg = getTelegram();
-  if (!tg?.checkHomeScreenStatus) {
-    cb('unsupported');
-    return;
-  }
-  tg.checkHomeScreenStatus(cb);
-}
-
-/** Triggers Telegram's native "add to home screen" confirmation sheet —
- *  same result as the user finding it themselves in the ⋮ menu, just one
- *  tap away from inside the app. No-ops silently on clients that don't
- *  support it yet (caller should hide the button via checkHomeScreenStatus). */
-export function addToHomeScreen() {
-  getTelegram()?.addToHomeScreen?.();
-}
-
 export function tgBackButton(onBack: (() => void) | null) {
   const tg = getTelegram();
   if (!tg) return;

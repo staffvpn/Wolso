@@ -96,12 +96,6 @@ interface TelegramWebApp {
   showAlert?(message: string, cb?: () => void): void;
   showConfirm?(message: string, cb?: (ok: boolean) => void): void;
   sendData(data: string): void;
-  isVersionAtLeast?(version: string): boolean;
-  // Bot API 8.0 — programmatic "add to home screen" prompt, so a Mini App
-  // can offer its own install button instead of relying on users to find
-  // it in Telegram's own ⋮ menu.
-  addToHomeScreen?(): void;
-  checkHomeScreenStatus?(cb: (status: 'unsupported' | 'unknown' | 'added' | 'missed') => void): void;
 }
 
 declare global {

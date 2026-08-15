@@ -9,8 +9,6 @@ import { ListRow } from '@/components/ui/ListRow';
 import { useCompanyStore } from '@/store/useCompanyStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { FEATURES } from '@/lib/features';
-import { addToHomeScreen, hapticSelect } from '@/lib/telegram';
-import { useHomeScreenStatus } from '@/hooks/useHomeScreenStatus';
 
 export function EmployerProfileScreen() {
   const navigate = useNavigate();
@@ -18,7 +16,6 @@ export function EmployerProfileScreen() {
   const loadCompany = useCompanyStore((s) => s.load);
   const vacancies = useEmployerStore((s) => s.vacancies);
   const candidates = useEmployerStore((s) => s.candidates);
-  const homeScreenStatus = useHomeScreenStatus();
 
   useEffect(() => {
     if (!company) loadCompany();
@@ -96,23 +93,6 @@ export function EmployerProfileScreen() {
           </div>
         </Card>
       </div>
-
-      {(homeScreenStatus === 'unknown' || homeScreenStatus === 'missed') && (
-        <div className="mt-3">
-          <Card className="px-1">
-            <div className="px-3">
-              <ListRow
-                label="Добавить на экран «Домой»"
-                showChevron={false}
-                onClick={() => {
-                  hapticSelect();
-                  addToHomeScreen();
-                }}
-              />
-            </div>
-          </Card>
-        </div>
-      )}
 
       <div className="mt-4">
         <Badge tone="neutral" className="w-full justify-center py-2.5">
