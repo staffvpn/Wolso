@@ -75,3 +75,10 @@ src/
                  не бизнес-данные
   lib/           telegram.ts, apiClient.ts, features.ts, форматирование, cn()
 ```
+
+## Другие приложения в репозитории
+
+- **`idea-analyzer/`** — «Разнеси мою идею», отдельный Telegram Mini App
+  для разбора бизнес-идей (не связан с Wolso). Свой фронтенд, свой
+  Cloudflare Worker, своя монетизация через Telegram Stars — см.
+  `idea-analyzer/README.md`.

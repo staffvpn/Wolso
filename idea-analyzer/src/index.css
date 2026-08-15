@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand — violet → pink, distinct from Wolso's green so the two mini apps
+     never look like the same product at a glance. */
+  --color-accent: #8b5cf6;
+  --color-accent-dim: #7042d6;
+  --color-accent-soft: rgba(139, 92, 246, 0.16);
+  --color-accent-fg: #ffffff;
+  --color-accent-2: #ec4899;
+
+  /* Mode colors — each of the four analysis modes gets its own identity,
+     reused across chips, score gauge, section icons. */
+  --color-praise: #34d17c;
+  --color-praise-soft: rgba(52, 209, 124, 0.16);
+  --color-criticize: #f5a623;
+  --color-criticize-soft: rgba(245, 166, 35, 0.16);
+  --color-destroy: #ef4d5e;
+  --color-destroy-soft: rgba(239, 77, 94, 0.16);
+  --color-monetize: #fbbf24;
+  --color-monetize-soft: rgba(251, 191, 36, 0.16);
+
+  /* Surfaces (dark-first, slight purple tint) */
+  --color-bg: #0b0a12;
+  --color-bg-elevated: #131226;
+  --color-surface: #17162b;
+  --color-surface-2: #1e1c35;
+  --color-surface-hover: #262444;
+  --color-border: #2a2846;
+  --color-border-soft: #201f38;
+
+  /* Text */
+  --color-text: #f5f4fb;
+  --color-text-muted: #a29fc2;
+  --color-text-faint: #706d92;
+
+  /* Semantic */
+  --color-danger: #ef4d5e;
+  --color-danger-soft: rgba(239, 77, 94, 0.14);
+  --color-warning: #e8b23f;
+  --color-warning-soft: rgba(232, 178, 63, 0.14);
+
+  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --radius-card: 1.25rem;
+  --radius-sheet: 1.5rem;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#root {
+  max-width: 560px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+/*
+ * --tg-safe-top / --tg-safe-bottom are set from JS (see src/lib/telegram.ts)
+ * once the Telegram bridge reports its insets. The env() fallback covers
+ * plain-browser / pre-bridge rendering.
+ */
+.safe-top {
+  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+}
+.safe-bottom {
+  padding-bottom: var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px));
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-2) 37%, var(--color-surface) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(3deg); }
+}
+.float-slow {
+  animation: float-slow 5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.pulse-glow {
+  animation: pulse-glow 2.2s ease-in-out infinite;
+}

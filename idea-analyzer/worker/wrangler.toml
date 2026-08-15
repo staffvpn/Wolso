@@ -1,0 +1,23 @@
+name = "idea-analyzer-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# CORS origin the API accepts requests from. Update once you know the real
+# Pages URL (or a custom domain) — see src/index.ts.
+[vars]
+APP_ORIGIN = "https://idea-analyzer.pages.dev"
+
+# Created with: wrangler d1 create idea-analyzer
+# Paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "idea-analyzer"
+database_id = "REPLACE_ME"
+
+# Secrets (never put these here — set with `wrangler secret put <NAME>`):
+#   BOT_TOKEN          — the Telegram bot token from @BotFather
+#   WEBHOOK_SECRET      — random string, checked against the header Telegram
+#                         sends when secret_token is set on setWebhook
+#   ANTHROPIC_API_KEY   — optional. Without it, /analyze falls back to a
+#                         built-in rule-based generator (see lib/analysis.ts)
