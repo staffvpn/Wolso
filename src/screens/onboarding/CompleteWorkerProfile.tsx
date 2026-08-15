@@ -17,6 +17,24 @@ import type { Position } from '@/types';
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
 
+// Wolso is 18+ — nobody younger can pick a birthdate at all, in the
+// picker or by typing one in.
+function maxBirthdate() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d.toISOString().slice(0, 10);
+}
+
+function isAtLeast18(birthdate: string) {
+  const dob = new Date(birthdate);
+  if (Number.isNaN(dob.getTime())) return false;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return age >= 18;
+}
+
 /** Shared by both the forced onboarding gate (no back button, no header
  *  chrome) and the normal "edit profile" route (/w/profile/edit). */
 export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
@@ -60,6 +78,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   if (!bio.trim()) missing.push('о себе');
   if (!skills.trim()) missing.push('навыки');
   if (!birthdate) missing.push('дата рождения');
+  const underage = !!birthdate && !isAtLeast18(birthdate);
   if (!profile.avatarUrl) missing.push('фото');
   if (profile.positions.length === 0) missing.push('опыт работы');
 
@@ -112,6 +131,10 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     setError(null);
     if (missing.length > 0) {
       setError(`Заполните: ${missing.join(', ')}`);
+      return;
+    }
+    if (underage) {
+      setError('Wolso доступен только совершеннолетним — с 18 лет');
       return;
     }
     setSaving(true);
@@ -178,8 +201,18 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
 
           <div>
             <SectionLabel>Дата рождения</SectionLabel>
-            <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={FIELD_CLASS} />
-            <p className="text-[12px] text-text-faint mt-1.5">Работодателям виден только возраст, не дата</p>
+            <input
+              type="date"
+              value={birthdate}
+              max={maxBirthdate()}
+              onChange={(e) => setBirthdate(e.target.value)}
+              className={FIELD_CLASS}
+            />
+            {underage ? (
+              <p className="text-[12px] text-danger mt-1.5">Wolso доступен только совершеннолетним — с 18 лет</p>
+            ) : (
+              <p className="text-[12px] text-text-faint mt-1.5">Работодателям виден только возраст, не дата</p>
+            )}
           </div>
 
           <div>

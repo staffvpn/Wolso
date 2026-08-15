@@ -190,6 +190,23 @@ function ShiftDetailOverlay({
       transition={{ type: 'spring', stiffness: 420, damping: 40 }}
       className="absolute inset-0 z-[300] bg-bg flex flex-col safe-top safe-bottom"
     >
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1 shrink-0">
+        <IconButton size={40} onClick={onClose} aria-label="Назад">
+          <ChevronLeft size={20} />
+        </IconButton>
+        <span className="flex-1" />
+        <IconButton
+          size={40}
+          onClick={() => {
+            hapticSelect();
+            toggleFavorite(shift.id);
+          }}
+          aria-label="В избранное"
+        >
+          <Heart size={18} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-text-muted')} />
+        </IconButton>
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
         <div className="relative h-56 shrink-0 bg-surface-2 overflow-hidden">
           {hasPhotos ? (
@@ -207,24 +224,6 @@ function ShiftDetailOverlay({
               ))}
             </div>
           )}
-
-          <div className="absolute inset-x-0 top-0 flex items-center gap-2 px-3 safe-top">
-            <IconButton size={40} onClick={onClose} aria-label="Назад" className="bg-black/30 border-none text-white">
-              <ChevronLeft size={20} />
-            </IconButton>
-            <span className="flex-1" />
-            <IconButton
-              size={40}
-              onClick={() => {
-                hapticSelect();
-                toggleFavorite(shift.id);
-              }}
-              aria-label="В избранное"
-              className="bg-black/30 border-none"
-            >
-              <Heart size={18} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-white')} />
-            </IconButton>
-          </div>
 
           {hasPhotos && photos.length > 1 && (
             <>

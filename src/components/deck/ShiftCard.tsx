@@ -66,7 +66,7 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
             toggleFavorite(shift.id);
           }}
           aria-label="В избранное"
-          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/30 backdrop-blur flex items-center justify-center"
+          className="absolute top-3 right-3 z-10 h-9 w-9 rounded-full bg-black/30 backdrop-blur flex items-center justify-center"
         >
           <Heart size={17} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-white')} />
         </button>

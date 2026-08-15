@@ -126,6 +126,18 @@ export function VacancyDetail() {
                       <p className="font-semibold text-[14px] truncate">{c.name}</p>
                       <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
                     </div>
+                    {c.status === 'invited' && <Badge tone="neutral">Ждём подтверждения</Badge>}
+                    {isClosed && <Badge tone="accent">Смена закрыта</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-4">
+                    {!isClosed && c.status !== 'invited' && shiftIsPast && (
+                      <Button size="md" className="flex-1" onClick={() => setClosing(c)}>
+                        <Check size={14} /> Закрыть смену
+                      </Button>
+                    )}
+                    {!isClosed && c.status !== 'invited' && !shiftIsPast && (
+                      <Badge tone="neutral" className="flex-1 !py-2.5 justify-center">Смена ещё впереди</Badge>
+                    )}
                     <Button variant="dark" size="icon" onClick={() => openChatFor(c)} aria-label="Написать">
                       <Mail size={16} />
                     </Button>
@@ -133,19 +145,6 @@ export function VacancyDetail() {
                       <IconButton size={40} onClick={() => setCancelling(c)} aria-label="Отменить">
                         <XCircle size={17} className="text-danger" />
                       </IconButton>
-                    )}
-                  </div>
-                  <div className="mt-3">
-                    {c.status === 'invited' ? (
-                      <Badge tone="neutral">Ждём подтверждения от сотрудника</Badge>
-                    ) : isClosed ? (
-                      <Badge tone="accent">Смена закрыта</Badge>
-                    ) : shiftIsPast ? (
-                      <Button size="md" fullWidth onClick={() => setClosing(c)}>
-                        <Check size={14} /> Закрыть смену
-                      </Button>
-                    ) : (
-                      <Badge tone="neutral">Смена ещё впереди</Badge>
                     )}
                   </div>
                 </Card>

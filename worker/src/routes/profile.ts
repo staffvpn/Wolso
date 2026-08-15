@@ -91,6 +91,13 @@ profileRoutes.patch('/', async (c) => {
     skills?: string;
   }>();
 
+  // App is 18+ — reject a birthdate that implies under-18 rather than just
+  // relying on the client's <input max>, which is trivial to bypass.
+  if (body.birthdate !== undefined && body.birthdate) {
+    const age = ageFrom(body.birthdate);
+    if (age === null || age < 18) return c.json({ error: 'underage' }, 400);
+  }
+
   const fields: string[] = [];
   const binds: unknown[] = [];
   for (const key of ['city', 'name', 'bio', 'birthdate', 'skills'] as const) {
