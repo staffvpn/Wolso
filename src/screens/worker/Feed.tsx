@@ -208,7 +208,7 @@ function ShiftDetailOverlay({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        <div className="relative h-56 shrink-0 bg-surface-2 overflow-hidden">
+        <div className="relative h-80 shrink-0 bg-surface-2 overflow-hidden">
           {hasPhotos ? (
             <SafeImage key={photos[photoIndex]} src={photos[photoIndex]} alt={company.name} className="h-full w-full object-cover" />
           ) : (

@@ -45,7 +45,7 @@ export function CandidateDetailOverlay({
 
       <div className="flex-1 min-h-0 px-5 pb-4">
         <div className="h-full rounded-card overflow-hidden border border-border-soft">
-          <CandidateCard candidate={candidate} />
+          <CandidateCard candidate={candidate} tall />
         </div>
       </div>
 

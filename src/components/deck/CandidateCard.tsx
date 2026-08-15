@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn';
  *  the avatar + portfolio photos, everything else scrolls for the rest of
  *  the anketa (bio, skills). Shared by the applicant queue (Candidate) and
  *  the "find staff" browse deck (WorkerListing) — both are CandidateProfile. */
-export function CandidateCard({ candidate }: { candidate: CandidateProfile }) {
+export function CandidateCard({ candidate, tall = false }: { candidate: CandidateProfile; tall?: boolean }) {
   const [index, setIndex] = useState(0);
   const photos = candidate.photos;
   const hasPhotos = photos.length > 0;
@@ -23,7 +23,7 @@ export function CandidateCard({ candidate }: { candidate: CandidateProfile }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="relative h-[42%] shrink-0 bg-surface-2 overflow-hidden">
+      <div className={cn('relative shrink-0 bg-surface-2 overflow-hidden', tall ? 'h-[58%]' : 'h-[42%]')}>
         {hasPhotos ? (
           <SafeImage key={photos[index]} src={photos[index]} alt={candidate.name} className="h-full w-full object-cover" />
         ) : (
