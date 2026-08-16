@@ -150,10 +150,6 @@
     .btn-sm { padding: 9px 13px; font-size: 12.5px; }
     .nav .cta-full { display: none; }
     .nav .cta-short { display: inline; }
-    /* 300px-wide phone mockup vs. ~290px of content width on the
-       narrowest phones — scale it down a touch so it sits fully
-       inside its column instead of bleeding past the edges. */
-    .phone-stage { transform: scale(0.86); margin: -42px 0; }
   }
 
   /* ---------------- Nav ---------------- */
@@ -173,7 +169,7 @@
   @media (max-width: 780px) { .nav-links a.hide-mobile { display: none; } }
 
   /* ---------------- Hero ---------------- */
-  .hero { padding: 72px 0 40px; position: relative; }
+  .hero { padding: 72px 0 40px; position: relative; overflow: hidden; }
   .hero::before {
     content: "";
     position: absolute;
@@ -185,6 +181,7 @@
     z-index: -1;
   }
   .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+  .hero-grid > div { min-width: 0; }
   @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 44px; } }
 
   .hero h1 {
@@ -203,10 +200,10 @@
   .hero-fine svg { width: 13px; height: 13px; color: var(--accent-dim); }
 
   /* ---------------- Phone / demo card ---------------- */
-  .phone-stage { display: flex; justify-content: center; perspective: 1400px; }
+  .phone-stage { display: flex; justify-content: center; perspective: 1400px; min-width: 0; }
   .phone {
-    width: 300px;
-    height: 610px;
+    width: min(300px, 78vw);
+    aspect-ratio: 300 / 610;
     border-radius: 42px;
     background: linear-gradient(160deg, #17191700, #050605);
     border: 10px solid #050605;
