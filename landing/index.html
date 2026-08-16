@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wolso — смены рядом, прямо в Telegram</title>
+<meta name="description" content="Wolso — маркетплейс подработок внутри Telegram. Свайпнул смену, договорился в чате, вышел работать. Без резюме и скачивания приложений." />
+<meta name="theme-color" content="#0a0b0a" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0b0a'/%3E%3Cpath d='M8 11 L13 21 L16 14 L19 21 L24 11' stroke='%2334d17c' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0a0b0a;
+    --bg-soft: #0d0f0e;
+    --surface: #141716;
+    --surface-2: #1b1e1c;
+    --border: #262a27;
+    --border-soft: #1c1f1d;
+    --text: #f4f6f4;
+    --text-muted: #9aa39c;
+    --text-faint: #6c756e;
+    --accent: #34d17c;
+    --accent-dim: #1f8f56;
+    --accent-soft: rgba(52, 209, 124, 0.14);
+    --amber: #e8b23f;
+    --amber-soft: rgba(232, 178, 63, 0.14);
+    --danger: #ef4d5e;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+
+  img, svg { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .band { padding: 96px 0; }
+  @media (max-width: 720px) { .band { padding: 64px 0; } }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  p { text-wrap: pretty; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 15px;
+    border-radius: 14px;
+    padding: 15px 26px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--accent);
+    color: #06170e;
+    box-shadow: 0 16px 32px -16px rgba(52, 209, 124, 0.55);
+  }
+  .btn-primary:hover { background: #3fe08a; }
+  .btn-ghost {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { border-color: var(--accent-dim); }
+  .btn-sm { padding: 11px 18px; font-size: 13.5px; border-radius: 11px; }
+
+  /* ---------------- Nav ---------------- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(10, 11, 10, 0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; max-width: 1120px; margin: 0 auto; }
+  .wordmark { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; }
+  .wordmark svg { width: 22px; height: 22px; }
+  .nav-links { display: flex; align-items: center; gap: 28px; font-size: 14px; color: var(--text-muted); }
+  .nav-links a:hover { color: var(--text); }
+  @media (max-width: 780px) { .nav-links a.hide-mobile { display: none; } }
+
+  /* ---------------- Hero ---------------- */
+  .hero { padding: 72px 0 40px; position: relative; }
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -120px; left: 50%;
+    width: 900px; height: 500px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse 50% 50% at 50% 0%, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 44px; } }
+
+  .hero h1 {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 18px 0 20px;
+  }
+  @media (max-width: 720px) { .hero h1 { font-size: 38px; } }
+  .hero h1 .accent { color: var(--accent); }
+  .hero-sub { font-size: 18px; line-height: 1.55; color: var(--text-muted); max-width: 46ch; margin: 0 0 30px; }
+  .hero-ctas { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .hero-fine { font-size: 12.5px; color: var(--text-faint); display: flex; gap: 14px; flex-wrap: wrap; }
+  .hero-fine span { display: inline-flex; align-items: center; gap: 6px; }
+  .hero-fine svg { width: 13px; height: 13px; color: var(--accent-dim); }
+
+  /* ---------------- Phone / demo card ---------------- */
+  .phone-stage { display: flex; justify-content: center; perspective: 1400px; }
+  .phone {
+    width: 300px;
+    height: 610px;
+    border-radius: 42px;
+    background: linear-gradient(160deg, #17191700, #050605);
+    border: 10px solid #050605;
+    box-shadow: 0 50px 90px -35px rgba(0,0,0,0.75), 0 0 0 1px #1d201f;
+    position: relative;
+    overflow: hidden;
+    transform: rotate(3deg);
+  }
+  .phone-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 26px; background: #050605; border-radius: 0 0 16px 16px; z-index: 5;
+  }
+  .phone-screen {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    padding: 44px 14px 20px;
+    display: flex; flex-direction: column;
+  }
+  .phone-app-header { font-size: 11px; color: var(--text-faint); text-align: center; margin-bottom: 10px; font-weight: 600; letter-spacing: 0.02em; }
+
+  .deck { position: relative; flex: 1; }
+  .demo-card {
+    position: absolute; inset: 0;
+    border-radius: 22px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    box-shadow: 0 20px 40px -22px rgba(0,0,0,0.6);
+  }
+  .demo-card:active { cursor: grabbing; }
+  .demo-card.behind { z-index: 1; filter: brightness(0.82); transform: scale(0.95) translateY(10px); }
+  .demo-card.front { z-index: 2; }
+
+  .demo-photo {
+    height: 46%;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .demo-photo .badge-init {
+    width: 64px; height: 64px; border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 26px; color: #06170e;
+  }
+  .demo-photo .grad-fill { position: absolute; inset: 0; }
+  .demo-chip-row { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; }
+  .demo-chip {
+    font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
+    background: rgba(10,11,10,0.55); color: #fff; backdrop-filter: blur(4px);
+  }
+  .demo-photo .name-overlay {
+    position: absolute; left: 12px; right: 12px; bottom: 10px; color: #fff;
+  }
+  .demo-photo .name-overlay p:first-child { font-weight: 800; font-size: 15px; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .demo-photo .name-overlay p:last-child { font-size: 11px; margin: 2px 0 0; opacity: 0.85; }
+  .demo-photo::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.55));
+  }
+
+  .demo-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .demo-price { font-size: 22px; font-weight: 800; }
+  .demo-price span { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .demo-meta { font-size: 11.5px; color: var(--text-faint); }
+
+  .swipe-flag {
+    position: absolute; top: 20px;
+    font-family: ui-monospace, monospace;
+    font-weight: 800; font-size: 15px;
+    padding: 6px 12px; border-radius: 8px;
+    border: 2.5px solid; opacity: 0;
+    transform: rotate(-14deg);
+    letter-spacing: 0.05em;
+    z-index: 3;
+  }
+  .swipe-flag.like { right: 16px; color: var(--accent); border-color: var(--accent); transform: rotate(10deg); }
+  .swipe-flag.pass { left: 16px; color: var(--text-faint); border-color: var(--text-faint); transform: rotate(-10deg); }
+
+  .demo-hint {
+    text-align: center; font-size: 11px; color: var(--text-faint); margin-top: 10px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .demo-hint svg { width: 13px; height: 13px; animation: nudge 1.8s ease-in-out infinite; }
+  @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+
+  /* ---------------- Section shells ---------------- */
+  .band-soft { background: var(--bg-soft); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+  .section-head { max-width: 620px; margin: 0 0 48px; }
+  .section-head h2 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-top: 14px; }
+  @media (max-width: 720px) { .section-head h2 { font-size: 27px; } }
+  .section-head p { font-size: 16px; color: var(--text-muted); margin-top: 12px; line-height: 1.6; }
+
+  /* ---------------- Steps ---------------- */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  @media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 20px;
+    padding: 26px;
+    position: relative;
+  }
+  .step-num {
+    font-family: ui-monospace, monospace;
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+  }
+  .step-num .line { flex: 1; height: 1px; background: var(--border); }
+  .step h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .step p { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin: 0; }
+  .step-icon { width: 34px; height: 34px; color: var(--accent); margin-bottom: 14px; }
+
+  /* ---------------- Audience split ---------------- */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+  .aud-card {
+    border-radius: 24px;
+    padding: 32px;
+    border: 1px solid var(--border-soft);
+    display: flex; flex-direction: column;
+  }
+  .aud-card.worker { background: linear-gradient(160deg, var(--surface), var(--bg-soft)); }
+  .aud-card.employer { background: linear-gradient(160deg, var(--surface), var(--bg-soft)); border-color: rgba(232,178,63,0.2); }
+  .aud-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .aud-card.worker .aud-tag { color: var(--accent); }
+  .aud-card.employer .aud-tag { color: var(--amber); }
+  .aud-card h3 { font-size: 24px; font-weight: 800; margin: 10px 0 18px; letter-spacing: -0.01em; }
+  .aud-list { list-style: none; margin: 0 0 26px; padding: 0; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .aud-list li { display: flex; gap: 10px; font-size: 14.5px; color: var(--text-muted); line-height: 1.5; }
+  .aud-list svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; }
+  .aud-card.worker .aud-list svg { color: var(--accent); }
+  .aud-card.employer .aud-list svg { color: var(--amber); }
+  .btn-amber { background: var(--amber); color: #241a04; box-shadow: 0 16px 32px -16px rgba(232,178,63,0.5); }
+  .btn-amber:hover { background: #f0c25c; }
+
+  /* ---------------- Features ---------------- */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .features { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    padding: 24px;
+    border-radius: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+  }
+  .feature-icon {
+    width: 38px; height: 38px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .feature-icon svg { width: 19px; height: 19px; }
+  .feature h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 7px; }
+  .feature p { font-size: 13.5px; color: var(--text-muted); line-height: 1.55; margin: 0; }
+
+  /* ---------------- Final CTA ---------------- */
+  .final-cta {
+    border-radius: 28px;
+    background: linear-gradient(150deg, var(--surface), var(--bg-soft));
+    border: 1px solid var(--border-soft);
+    padding: 64px 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .final-cta::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 80% at 50% 100%, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .final-cta h2 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; max-width: 22ch; margin: 0 auto 14px; }
+  @media (max-width: 720px) { .final-cta { padding: 48px 22px; } .final-cta h2 { font-size: 25px; } }
+  .final-cta p { color: var(--text-muted); font-size: 15.5px; margin: 0 0 30px; }
+
+  /* ---------------- Footer ---------------- */
+  footer { border-top: 1px solid var(--border-soft); padding: 40px 0; }
+  .foot-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .foot-word { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+  .foot-word svg { width: 17px; height: 17px; }
+  .foot-note { font-size: 12.5px; color: var(--text-faint); }
+  .foot-links { display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); }
+
+  [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  [data-reveal].in { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a href="#top" class="wordmark">
+      <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="var(--bg)"/><path d="M8 11 L13 21 L16 14 L19 21 L24 11" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Wolso
+    </a>
+    <nav class="nav-links">
+      <a href="#how" class="hide-mobile">Как это работает</a>
+      <a href="#audience" class="hide-mobile">Кому подходит</a>
+      <a href="#features" class="hide-mobile">Возможности</a>
+      <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary btn-sm" data-cta>Открыть в Telegram</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Telegram mini app · 18+</span>
+        <h1>Листай смены,<br>а не резюме<span class="accent">.</span></h1>
+        <p class="hero-sub">Wolso — маркетплейс подработок внутри Telegram. Свайпнул понравившуюся смену, договорился с работодателем в чате, вышел работать. Без анкет на сорок полей и без скачивания ещё одного приложения.</p>
+        <div class="hero-ctas">
+          <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary" data-cta>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21.5 3 2.5 10.6c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.5.8 1.1.8s.8-.2 1.1-.6l2.6-2.5 5.1 3.8c.9.5 1.6.3 1.9-.9l3.4-16c.4-1.4-.5-2-1.9-1.4Z" fill="currentColor"/></svg>
+            Открыть Wolso в Telegram
+          </a>
+          <a href="#how" class="btn btn-ghost">Как это работает</a>
+        </div>
+        <div class="hero-fine">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Бесплатно для соискателей</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Без установки — прямо в Telegram</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>18+</span>
+        </div>
+      </div>
+
+      <div class="phone-stage">
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <p class="phone-app-header">Wolso · Лента смен</p>
+            <div class="deck" id="deck"></div>
+            <p class="demo-hint">Потяни карточку в сторону<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band-soft" id="how">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Как это работает</span>
+        <h2>От открытого бота до первой смены — три шага</h2>
+      </div>
+      <div class="steps">
+        <div class="step" data-reveal>
+          <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.5 3 2.5 10.6c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.5.8 1.1.8s.8-.2 1.1-.6l2.6-2.5 5.1 3.8c.9.5 1.6.3 1.9-.9l3.4-16c.4-1.4-.5-2-1.9-1.4Z"/></svg>
+          <div class="step-num">01<span class="line"></span></div>
+          <h3>Открой бота</h3>
+          <p>Вход через свой Telegram-аккаунт — без пароля, почты и ожидания смс с кодом.</p>
+        </div>
+        <div class="step" data-reveal>
+          <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4v16M16 4v16M4 8l4-4 4 4M20 16l-4 4-4-4"/></svg>
+          <div class="step-num">02<span class="line"></span></div>
+          <h3>Смахни смену</h3>
+          <p>Вправо — откликнуться, влево — пропустить. Видно город, оплату, часы и фото места сразу в карточке.</p>
+        </div>
+        <div class="step" data-reveal>
+          <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>
+          <div class="step-num">03<span class="line"></span></div>
+          <h3>Договорись в чате</h3>
+          <p>Работодатель отвечает прямо в Telegram — без звонков на незнакомые номера и потерянных резюме.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="audience">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Кому подходит</span>
+        <h2>Две стороны — один свайп</h2>
+      </div>
+      <div class="split">
+        <div class="aud-card worker" data-reveal>
+          <span class="aud-tag">Ищете подработку</span>
+          <h3>Для соискателей</h3>
+          <ul class="aud-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Без резюме и сопроводительных — только анкета один раз</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Смены рядом с домом, в том числе на сегодня и завтра</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Чат с работодателем открывается сразу после отклика</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Рейтинг и отзывы после каждой смены — видно, куда стоит идти</li>
+          </ul>
+          <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary" data-cta>Смотреть смены</a>
+        </div>
+        <div class="aud-card employer" data-reveal>
+          <span class="aud-tag">Ищете сотрудников</span>
+          <h3>Для работодателей</h3>
+          <ul class="aud-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Публикация смены за пару минут, без сайтов и форм</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Отклики от живых кандидатов с анкетой и опытом</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Сами выбираете и приглашаете — решение всегда за вами</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Компанию проверяем по ИНН, прежде чем пускать на площадку</li>
+          </ul>
+          <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-amber" data-cta>Разместить вакансию</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band-soft" id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Возможности</span>
+        <h2>Всё нужное для смены — без лишнего</h2>
+      </div>
+      <div class="features">
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4v16M16 4v16M4 8l4-4 4 4M20 16l-4 4-4-4"/></svg></div>
+          <h3>Свайп вместо анкет</h3>
+          <p>Одна анкета один раз — дальше просто листаешь смены, как ленту.</p>
+        </div>
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H8l-4 4V4Z"/></svg></div>
+          <h3>Чат прямо в Telegram</h3>
+          <p>Никаких сторонних мессенджеров и звонков с незнакомых номеров.</p>
+        </div>
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>Проверка работодателей</h3>
+          <p>Прежде чем публиковать вакансии, сверяем компанию по ИНН в реестре ФНС.</p>
+        </div>
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 9 8l-6.5 1 4.7 4.6L6 20l6-3.3 6 3.3-1.2-6.4L21.5 9 15 8Z" stroke-linejoin="round"/></svg></div>
+          <h3>Рейтинги и отзывы</h3>
+          <p>После каждой смены обе стороны оставляют отзыв — репутация видна сразу.</p>
+        </div>
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+          <h3>Уведомления в боте</h3>
+          <p>Отклик, приглашение, отмена — обо всём напишет бот, ничего не потеряется.</p>
+        </div>
+        <div class="feature" data-reveal>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <h3>Только 18+</h3>
+          <p>Осознанный подход к тому, кого мы пускаем на площадку — с обеих сторон.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="final-cta" data-reveal>
+        <span class="eyebrow">Готовы?</span>
+        <h2>Следующая смена уже пролистывается мимо</h2>
+        <p>Открой Wolso в Telegram — на первый отклик уйдёт меньше минуты.</p>
+        <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary" data-cta>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21.5 3 2.5 10.6c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.5.8 1.1.8s.8-.2 1.1-.6l2.6-2.5 5.1 3.8c.9.5 1.6.3 1.9-.9l3.4-16c.4-1.4-.5-2-1.9-1.4Z" fill="currentColor"/></svg>
+          Открыть Wolso
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-row">
+    <div>
+      <div class="foot-word">
+        <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="var(--bg)"/><path d="M8 11 L13 21 L16 14 L19 21 L24 11" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Wolso
+      </div>
+      <p class="foot-note" style="margin-top:6px;">Смены рядом. Прямо в Telegram.</p>
+    </div>
+    <div class="foot-links">
+      <a href="#how">Как это работает</a>
+      <a href="https://t.me/wolsoapp" target="_blank" rel="noreferrer" data-channel>Канал с новостями</a>
+      <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" data-cta>Открыть бота</a>
+    </div>
+  </div>
+  <div class="wrap">
+    <p class="foot-note" style="margin-top:24px;">18+ · Все вакансии проходят проверку перед публикацией.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // ---- Single source of truth for every CTA on the page. ----
+  var BOT_LINK = "https://t.me/wolsoappbot";
+  var CHANNEL_LINK = "https://t.me/wolsoapp";
+  document.querySelectorAll('[data-cta]').forEach(function (el) { el.href = BOT_LINK; el.target = '_blank'; el.rel = 'noreferrer'; });
+  document.querySelectorAll('[data-channel]').forEach(function (el) { el.href = CHANNEL_LINK; el.target = '_blank'; el.rel = 'noreferrer'; });
+
+  // ---- Reveal-on-scroll ----
+  var reveal = document.querySelectorAll('[data-reveal]');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.15 });
+    reveal.forEach(function (el) { io.observe(el); });
+  } else {
+    reveal.forEach(function (el) { el.classList.add('in'); });
+  }
+
+  // ---- Interactive swipe demo ----
+  var DEMOS = [
+    { init: 'П', color1: '#34d17c', color2: '#1f8f56', title: 'Просвет Кофе', sub: 'Бариста · 1.2 км', chips: ['Сегодня 14:00', '6 часов'], price: '2 100 ₽', unit: '350 ₽/ч' },
+    { init: 'М', color1: '#e8b23f', color2: '#b9860f', title: 'Мама Раша', sub: 'Повар · 900 м', chips: ['Завтра 10:00', '8 часов'], price: '3 200 ₽', unit: '400 ₽/ч' },
+    { init: 'Л', color1: '#4d9bef', color2: '#2c6fc2', title: 'Лаунж Бар №9', sub: 'Официант · 2.4 км', chips: ['Сегодня 18:00', '5 часов'], price: '2 750 ₽', unit: '550 ₽/ч' }
+  ];
+  var deck = document.getElementById('deck');
+  var order = [0, 1, 2];
+
+  function cardHTML(d) {
+    return (
+      '<div class="demo-photo">' +
+        '<div class="grad-fill" style="background:linear-gradient(150deg,' + d.color1 + ',' + d.color2 + ')"></div>' +
+        '<div class="demo-chip-row"><span class="demo-chip">' + d.chips[0] + '</span><span class="demo-chip">' + d.chips[1] + '</span></div>' +
+        '<div class="badge-init" style="background:rgba(255,255,255,0.9)">' + d.init + '</div>' +
+        '<div class="name-overlay"><p>' + d.title + '</p><p>' + d.sub + '</p></div>' +
+      '</div>' +
+      '<div class="demo-body">' +
+        '<div class="demo-price">' + d.price + ' <span>за смену · ' + d.unit + '</span></div>' +
+        '<div class="demo-meta">Оплата в день смены · питание включено</div>' +
+      '</div>' +
+      '<span class="swipe-flag like">ОТКЛИК</span>' +
+      '<span class="swipe-flag pass">СКИП</span>'
+    );
+  }
+
+  function renderDeck() {
+    deck.innerHTML = '';
+    order.slice(0, 2).forEach(function (idx, i) {
+      var d = DEMOS[idx];
+      var card = document.createElement('div');
+      card.className = 'demo-card ' + (i === 0 ? 'front' : 'behind');
+      card.innerHTML = cardHTML(d);
+      deck.appendChild(card);
+      if (i === 0) wireDrag(card);
+    });
+  }
+
+  function cycle() {
+    order.push(order.shift());
+    renderDeck();
+  }
+
+  function wireDrag(card) {
+    var startX = 0, dx = 0, dragging = false;
+    var likeFlag = card.querySelector('.swipe-flag.like');
+    var passFlag = card.querySelector('.swipe-flag.pass');
+
+    function down(clientX) { dragging = true; startX = clientX; card.style.transition = 'none'; }
+    function move(clientX) {
+      if (!dragging) return;
+      dx = clientX - startX;
+      var rot = dx / 14;
+      card.style.transform = 'translateX(' + dx + 'px) rotate(' + rot + 'deg)';
+      var pct = Math.min(Math.abs(dx) / 90, 1);
+      if (dx > 0) { likeFlag.style.opacity = pct; passFlag.style.opacity = 0; }
+      else { passFlag.style.opacity = pct; likeFlag.style.opacity = 0; }
+    }
+    function up() {
+      if (!dragging) return;
+      dragging = false;
+      card.style.transition = 'transform 0.4s cubic-bezier(.2,.8,.2,1)';
+      if (Math.abs(dx) > 90) {
+        var flyX = dx > 0 ? 520 : -520;
+        card.style.transform = 'translateX(' + flyX + 'px) rotate(' + (dx > 0 ? 26 : -26) + 'deg)';
+        card.style.opacity = '0';
+        setTimeout(cycle, 320);
+      } else {
+        card.style.transform = 'translateX(0) rotate(0)';
+        likeFlag.style.opacity = 0;
+        passFlag.style.opacity = 0;
+      }
+      dx = 0;
+    }
+
+    card.addEventListener('pointerdown', function (e) { card.setPointerCapture(e.pointerId); down(e.clientX); });
+    card.addEventListener('pointermove', function (e) { move(e.clientX); });
+    card.addEventListener('pointerup', up);
+    card.addEventListener('pointercancel', up);
+  }
+
+  renderDeck();
+
+  // Idle nudge so a visitor who never touches the phone still sees the mechanic once.
+  setTimeout(function () {
+    var front = deck.querySelector('.demo-card.front');
+    if (!front) return;
+    front.style.transition = 'transform 0.5s ease';
+    front.style.transform = 'translateX(26px) rotate(4deg)';
+    setTimeout(function () { front.style.transform = 'translateX(0) rotate(0)'; }, 380);
+  }, 1600);
+})();
+</script>
+</body>
+</html>
