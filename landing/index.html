@@ -209,12 +209,22 @@
   .phone-screen {
     position: absolute; inset: 0;
     background: var(--bg);
-    padding: 44px 14px 20px;
+    padding-top: 32px;
     display: flex; flex-direction: column;
   }
-  .phone-app-header { font-size: 11px; color: var(--text-faint); text-align: center; margin-bottom: 10px; font-weight: 600; letter-spacing: 0.02em; }
+  .phone-topbar {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px 11px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .phone-topbar .tg-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+  .phone-topbar .tg-title img { height: 14px; width: auto; }
+  .phone-topbar .tg-dots { display: flex; gap: 3px; }
+  .phone-topbar .tg-dots span { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); }
 
-  .deck { position: relative; flex: 1; }
+  .deck-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 0; position: relative; }
+  .deck { position: relative; flex: 1; min-height: 0; }
   .demo-card {
     position: absolute; inset: 0;
     border-radius: 22px;
@@ -238,18 +248,24 @@
     flex-shrink: 0;
   }
   .demo-photo .badge-init {
-    width: 64px; height: 64px; border-radius: 20px;
+    width: 44px; height: 44px; border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 26px; color: #06170e;
+    font-weight: 800; font-size: 18px; color: #06170e;
+    position: absolute; right: 10px; bottom: 10px;
+    box-shadow: 0 6px 16px -6px rgba(0,0,0,0.5);
   }
-  .demo-photo .grad-fill { position: absolute; inset: 0; }
+  .demo-photo img.photo-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    filter: saturate(0.55) contrast(1.08) brightness(0.9);
+  }
+  .demo-photo .tint { position: absolute; inset: 0; mix-blend-mode: color; opacity: 0.85; }
   .demo-chip-row { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; }
   .demo-chip {
     font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
     background: rgba(10,11,10,0.55); color: #fff; backdrop-filter: blur(4px);
   }
   .demo-photo .name-overlay {
-    position: absolute; left: 12px; right: 12px; bottom: 10px; color: #fff;
+    position: absolute; left: 12px; right: 64px; bottom: 10px; color: #fff;
   }
   .demo-photo .name-overlay p:first-child { font-weight: 800; font-size: 15px; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
   .demo-photo .name-overlay p:last-child { font-size: 11px; margin: 2px 0 0; opacity: 0.85; }
@@ -277,11 +293,46 @@
   .swipe-flag.pass { left: 16px; color: var(--text-faint); border-color: var(--text-faint); transform: rotate(-10deg); }
 
   .demo-hint {
-    text-align: center; font-size: 11px; color: var(--text-faint); margin-top: 10px;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center; font-size: 11px; color: var(--text-faint); margin: 10px 0;
+    display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;
   }
   .demo-hint svg { width: 13px; height: 13px; animation: nudge 1.8s ease-in-out infinite; }
   @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+
+  .phone-tabbar {
+    flex-shrink: 0;
+    display: flex;
+    border-top: 1px solid var(--border-soft);
+    background: var(--bg-soft);
+    padding: 8px 2px 12px;
+  }
+  .ptab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--text-faint); font-family: var(--font-body);
+    font-size: 9px; font-weight: 600; padding: 2px 0; cursor: default;
+  }
+  .ptab svg { width: 17px; height: 17px; }
+  .ptab.active { color: var(--accent); }
+
+  .phone-toast {
+    position: absolute; top: 44px; right: 10px; max-width: 172px;
+    background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 14px; padding: 9px 13px;
+    font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.35;
+    box-shadow: 0 16px 34px -14px rgba(0,0,0,0.7);
+    display: flex; align-items: center; gap: 8px;
+    transform: translateX(28px) scale(0.9); opacity: 0;
+    transition: transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.45s ease;
+    z-index: 12; pointer-events: none;
+  }
+  .phone-toast.show { transform: translateX(0) scale(1); opacity: 1; }
+  .phone-toast .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .phone { transition: transform 0.25s ease-out; will-change: transform; }
+  @media (prefers-reduced-motion: reduce) { .phone { transition: none; } }
 
   /* ---------------- Section shells ---------------- */
   .band-soft { background: var(--bg-soft); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
@@ -353,6 +404,37 @@
   .feature h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 7px; }
   .feature p { font-size: 13.5px; color: var(--text-muted); line-height: 1.55; margin: 0; }
 
+  /* ---------------- News/channel block ---------------- */
+  .news-block {
+    display: grid; grid-template-columns: 1fr 0.85fr; align-items: center; gap: 40px;
+    background: linear-gradient(160deg, var(--surface), var(--bg-soft));
+    border: 1px solid var(--border-soft);
+    border-radius: 28px;
+    padding: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .news-block::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 55% 65% at 88% 30%, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+  }
+  @media (max-width: 860px) {
+    .news-block { grid-template-columns: 1fr; padding: 36px 24px; text-align: center; }
+    .news-art { order: -1; }
+  }
+  .news-copy h2 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 14px; }
+  @media (max-width: 720px) { .news-copy h2 { font-size: 24px; } }
+  .news-copy > p { color: var(--text-muted); font-size: 15px; line-height: 1.65; margin: 0 0 22px; max-width: 46ch; }
+  @media (max-width: 860px) { .news-copy > p { margin-left: auto; margin-right: auto; } }
+  .news-list { list-style: none; padding: 0; margin: 0 0 28px; display: flex; flex-direction: column; gap: 11px; }
+  @media (max-width: 860px) { .news-list { align-items: center; } }
+  .news-list li { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--text-muted); }
+  .news-list svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+  .news-art { display: flex; justify-content: center; }
+  .news-art img { width: 100%; max-width: 400px; }
+
   /* ---------------- Final CTA ---------------- */
   .final-cta {
     border-radius: 28px;
@@ -423,13 +505,26 @@
         </div>
       </div>
 
-      <div class="phone-stage">
-        <div class="phone">
+      <div class="phone-stage" id="phoneStage">
+        <div class="phone" id="phone">
           <div class="phone-notch"></div>
+          <div class="phone-toast" id="toast"><span class="dot"></span><span id="toastText"></span></div>
           <div class="phone-screen">
-            <p class="phone-app-header">Wolso · Лента смен</p>
-            <div class="deck" id="deck"></div>
-            <p class="demo-hint">Потяни карточку в сторону<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></p>
+            <div class="phone-topbar">
+              <span class="tg-title"><img src="logo.png" alt="" />Wolso</span>
+              <span class="tg-dots"><span></span><span></span><span></span></span>
+            </div>
+            <div class="deck-wrap">
+              <div class="deck" id="deck"></div>
+              <p class="demo-hint">Потяни карточку в сторону<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></p>
+            </div>
+            <div class="phone-tabbar">
+              <button class="ptab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Лента</button>
+              <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Отклики</button>
+              <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="16" cy="15" r="3"/><path d="M16 14v1.3l.9.7"/></svg>Смены</button>
+              <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>Чаты</button>
+              <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.2-2.2 3.1-3.3 5.5-3.3s4.3 1.1 5.5 3.3"/></svg>Профиль</button>
+            </div>
           </div>
         </div>
       </div>
@@ -541,6 +636,25 @@
 
   <section class="band">
     <div class="wrap">
+      <div class="news-block" data-reveal>
+        <div class="news-copy">
+          <span class="eyebrow">Канал Wolso</span>
+          <h2>Рассказываем всё как есть</h2>
+          <p>Публикуем, что меняем в приложении и зачем, отвечаем на вопросы в комментариях и правда читаем ваши предложения — это рабочий журнал команды, а не пресс-релизы.</p>
+          <ul class="news-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Что нового и что чиним в приложении</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Отвечаем на вопросы прямо в комментариях</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Собираем и правда используем ваши идеи</li>
+          </ul>
+          <a href="https://t.me/wolsoapp" target="_blank" rel="noreferrer" class="btn btn-primary" data-channel>Подписаться на канал</a>
+        </div>
+        <div class="news-art"><img src="channel-promo.png" alt="Обновления и новости Wolso" /></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
       <div class="final-cta" data-reveal>
         <span class="eyebrow">Готовы?</span>
         <h2>Следующая смена уже пролистывается мимо</h2>
@@ -594,20 +708,26 @@
   }
 
   // ---- Interactive swipe demo ----
+  // Photos are Picsum placeholder shots (seeded, so each card is stable) run
+  // through a per-card duotone tint — not actual Wolso venues, since none
+  // exist to pull from yet. Swap `photo` for a real venue photo URL any
+  // time and the tint still applies automatically.
   var DEMOS = [
-    { init: 'П', color1: '#34d17c', color2: '#1f8f56', title: 'Просвет Кофе', sub: 'Бариста · 1.2 км', chips: ['Сегодня 14:00', '6 часов'], price: '2 100 ₽', unit: '350 ₽/ч' },
-    { init: 'М', color1: '#e8b23f', color2: '#b9860f', title: 'Мама Раша', sub: 'Повар · 900 м', chips: ['Завтра 10:00', '8 часов'], price: '3 200 ₽', unit: '400 ₽/ч' },
-    { init: 'Л', color1: '#4d9bef', color2: '#2c6fc2', title: 'Лаунж Бар №9', sub: 'Официант · 2.4 км', chips: ['Сегодня 18:00', '5 часов'], price: '2 750 ₽', unit: '550 ₽/ч' }
+    { init: 'П', color1: '#34d17c', color2: '#0d3a22', photo: 'https://picsum.photos/seed/wolso-cafe-1/480/420', title: 'Просвет Кофе', sub: 'Бариста · 1.2 км', chips: ['Сегодня 14:00', '6 часов'], price: '2 100 ₽', unit: '350 ₽/ч' },
+    { init: 'М', color1: '#e8b23f', color2: '#4a3305', photo: 'https://picsum.photos/seed/wolso-kitchen-2/480/420', title: 'Мама Раша', sub: 'Повар · 900 м', chips: ['Завтра 10:00', '8 часов'], price: '3 200 ₽', unit: '400 ₽/ч' },
+    { init: 'Л', color1: '#4d9bef', color2: '#0e2c4d', photo: 'https://picsum.photos/seed/wolso-bar-3/480/420', title: 'Лаунж Бар №9', sub: 'Официант · 2.4 км', chips: ['Сегодня 18:00', '5 часов'], price: '2 750 ₽', unit: '550 ₽/ч' },
+    { init: 'Р', color1: '#ef7d5e', color2: '#4a1c0d', photo: 'https://picsum.photos/seed/wolso-retail-4/480/420', title: 'Рынок Central', sub: 'Продавец · 600 м', chips: ['Сегодня 11:00', '4 часа'], price: '1 600 ₽', unit: '400 ₽/ч' }
   ];
   var deck = document.getElementById('deck');
-  var order = [0, 1, 2];
+  var order = [0, 1, 2, 3];
 
   function cardHTML(d) {
     return (
       '<div class="demo-photo">' +
-        '<div class="grad-fill" style="background:linear-gradient(150deg,' + d.color1 + ',' + d.color2 + ')"></div>' +
+        '<img class="photo-img" src="' + d.photo + '" alt="" loading="lazy" />' +
+        '<div class="tint" style="background:linear-gradient(150deg,' + d.color1 + ',' + d.color2 + ')"></div>' +
         '<div class="demo-chip-row"><span class="demo-chip">' + d.chips[0] + '</span><span class="demo-chip">' + d.chips[1] + '</span></div>' +
-        '<div class="badge-init" style="background:rgba(255,255,255,0.9)">' + d.init + '</div>' +
+        '<div class="badge-init" style="background:rgba(255,255,255,0.92)">' + d.init + '</div>' +
         '<div class="name-overlay"><p>' + d.title + '</p><p>' + d.sub + '</p></div>' +
       '</div>' +
       '<div class="demo-body">' +
@@ -684,6 +804,39 @@
     front.style.transform = 'translateX(26px) rotate(4deg)';
     setTimeout(function () { front.style.transform = 'translateX(0) rotate(0)'; }, 380);
   }, 1600);
+
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- Floating activity toast — a little proof of life on an otherwise static mock. ----
+  if (!reducedMotion) {
+    var TOASTS = ['🔔 Новый отклик на смену', '💬 Работодатель написал в чат', '✅ Смена подтверждена', '⭐ Новый отзыв — 5.0'];
+    var toast = document.getElementById('toast');
+    var toastText = document.getElementById('toastText');
+    var toastIdx = 0;
+    function showToast() {
+      toastText.textContent = TOASTS[toastIdx % TOASTS.length];
+      toastIdx++;
+      toast.classList.add('show');
+      setTimeout(function () { toast.classList.remove('show'); }, 2600);
+    }
+    setTimeout(function () {
+      showToast();
+      setInterval(showToast, 5200);
+    }, 2200);
+  }
+
+  // ---- Subtle cursor-follow tilt on the phone (desktop only, no touch fuss). ----
+  var stage = document.getElementById('phoneStage');
+  var phone = document.getElementById('phone');
+  if (!reducedMotion && window.matchMedia('(pointer: fine)').matches) {
+    stage.addEventListener('mousemove', function (e) {
+      var r = stage.getBoundingClientRect();
+      var px = (e.clientX - r.left) / r.width - 0.5;
+      var py = (e.clientY - r.top) / r.height - 0.5;
+      phone.style.transform = 'rotate(' + (3 + px * 6) + 'deg) rotateX(' + (py * -8) + 'deg)';
+    });
+    stage.addEventListener('mouseleave', function () { phone.style.transform = 'rotate(3deg)'; });
+  }
 })();
 </script>
 </body>
