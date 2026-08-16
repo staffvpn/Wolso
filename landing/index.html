@@ -142,6 +142,19 @@
   }
   .btn-ghost:hover { border-color: var(--accent-dim); }
   .btn-sm { padding: 11px 18px; font-size: 13.5px; border-radius: 11px; }
+  .cta-short { display: none; }
+  @media (max-width: 400px) {
+    .wrap { padding: 0 16px; }
+    .nav { padding: 14px 16px; gap: 10px; }
+    .wordmark { font-size: 18px; }
+    .btn-sm { padding: 9px 13px; font-size: 12.5px; }
+    .nav .cta-full { display: none; }
+    .nav .cta-short { display: inline; }
+    /* 300px-wide phone mockup vs. ~290px of content width on the
+       narrowest phones — scale it down a touch so it sits fully
+       inside its column instead of bleeding past the edges. */
+    .phone-stage { transform: scale(0.86); margin: -42px 0; }
+  }
 
   /* ---------------- Nav ---------------- */
   header {
@@ -479,7 +492,10 @@
       <a href="#how" class="hide-mobile">Как это работает</a>
       <a href="#audience" class="hide-mobile">Кому подходит</a>
       <a href="#features" class="hide-mobile">Возможности</a>
-      <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary btn-sm" data-cta>Открыть в Telegram</a>
+      <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary btn-sm" data-cta>
+        <span class="cta-full">Открыть в Telegram</span>
+        <span class="cta-short">Открыть</span>
+      </a>
     </nav>
   </div>
 </header>
