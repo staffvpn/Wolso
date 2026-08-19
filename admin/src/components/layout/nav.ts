@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone } from 'lucide-react';
 import type { RoleDef } from '@/types';
 import { FEATURES } from '@/lib/features';
 
@@ -17,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/vacancies', label: 'Вакансии и смены', icon: Briefcase, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/verification', label: 'Проверка работодателей', icon: BadgeCheck, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/support', label: 'Поддержка', icon: LifeBuoy, visible: (r) => yes(r, 'viewSupportChats') },
+  { to: '/broadcast', label: 'Рассылка', icon: Megaphone, visible: (r) => yes(r, 'manageData') },
   { to: '/finance', label: 'Финансы', icon: Wallet, visible: (r) => FEATURES.payments && yes(r, 'refundsPayouts') },
   { to: '/roles', label: 'Роли и права', icon: ShieldCheck, visible: (r) => yes(r, 'manageTeam') },
   { to: '/audit-log', label: 'Аудит-лог', icon: History, visible: (r) => yes(r, 'manageTeam') || yes(r, 'changeCommission') },

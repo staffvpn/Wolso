@@ -22,6 +22,7 @@ import { adminSupportRoutes } from './admin/support';
 import { adminDataRoutes } from './admin/data';
 import { adminVerificationRoutes } from './admin/verification';
 import { adminSchemaHealthRoutes } from './admin/schemaHealth';
+import { adminBroadcastRoutes } from './admin/broadcast';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -56,6 +57,7 @@ app.route('/admin/support', adminSupportRoutes);
 app.route('/admin/data', adminDataRoutes);
 app.route('/admin/verification', adminVerificationRoutes);
 app.route('/admin/health', adminSchemaHealthRoutes);
+app.route('/admin/broadcast', adminBroadcastRoutes);
 
 app.onError((err, c) => {
   console.error(err);

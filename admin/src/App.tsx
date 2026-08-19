@@ -12,6 +12,7 @@ import { Roles } from './screens/Roles';
 import { AuditLog } from './screens/AuditLog';
 import { Settings } from './screens/Settings';
 import { Support } from './screens/Support';
+import { BroadcastScreen } from './screens/Broadcast';
 import { DataManagement } from './screens/DataManagement';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/vacancies" element={<Vacancies />} />
               <Route path="/verification" element={<Verification />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/broadcast" element={<BroadcastScreen />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/audit-log" element={<AuditLog />} />

@@ -26,7 +26,7 @@ export async function getTelegramUsername(env: Env, chatId: number): Promise<str
  *  pings their phone. Best-effort: a blocked bot, deactivated account, or
  *  any other single failure is logged and swallowed rather than thrown,
  *  so one bad chat_id in a batch never takes down the rest. */
-export async function sendTelegramMessage(env: Env, chatId: number, text: string): Promise<void> {
+export async function sendTelegramMessage(env: Env, chatId: number, text: string): Promise<boolean> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -41,8 +41,11 @@ export async function sendTelegramMessage(env: Env, chatId: number, text: string
     });
     if (!res.ok) {
       console.error('telegram sendMessage failed', chatId, res.status, await res.text().catch(() => ''));
+      return false;
     }
+    return true;
   } catch (err) {
     console.error('telegram sendMessage threw', chatId, err);
+    return false;
   }
 }

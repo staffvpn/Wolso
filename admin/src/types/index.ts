@@ -225,3 +225,30 @@ export interface DashboardStats {
   weekly: DashboardDay[];
   topPositions: { label: string; count: number }[];
 }
+
+export type BroadcastAudience = 'all' | 'seekers' | 'employers';
+
+/** A message sent from the bot to a whole audience at once. Sending runs
+ *  in batches, so a row can be partially delivered — `done` is what tells
+ *  a finished broadcast from an interrupted one. */
+export interface Broadcast {
+  id: string;
+  text: string;
+  audience: BroadcastAudience;
+  city?: string;
+  total: number;
+  sent: number;
+  failed: number;
+  done: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface BroadcastProgress {
+  id: number;
+  processed: number;
+  total: number;
+  sent: number;
+  failed: number;
+  done: boolean;
+}
