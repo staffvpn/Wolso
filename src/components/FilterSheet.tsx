@@ -8,6 +8,8 @@ import { SectionLabel } from './ui/Card';
 import { useFiltersStore } from '@/store/useFiltersStore';
 import { POSITIONS, TOP_POSITIONS } from '@/data/positions';
 import { fetchShifts } from '@/services/shiftsApi';
+import { EMPLOYMENT_TYPES as ALL_EMPLOYMENT_TYPES } from '@/data/employmentTypes';
+import type { Filters } from '@/types';
 
 interface FilterSheetProps {
   open: boolean;
@@ -15,10 +17,12 @@ interface FilterSheetProps {
   onApply: () => void;
 }
 
-const EMPLOYMENT_TYPES: { id: 'shift' | 'permanent' | 'internship'; label: string }[] = [
-  { id: 'shift', label: 'Смены' },
-  { id: 'permanent', label: 'Постоянно' },
-  { id: 'internship', label: 'Стажировка' },
+
+/** "Любая" first — the feed defaults to it, so a worker sees permanent
+ *  jobs and one-off shifts together until they deliberately narrow down. */
+const EMPLOYMENT_FILTERS: { id: Filters['employmentType']; label: string }[] = [
+  { id: 'any', label: 'Любая' },
+  ...ALL_EMPLOYMENT_TYPES,
 ];
 
 const TIME_OF_DAY: { id: 'morning' | 'day' | 'evening' | 'night'; label: string }[] = [
@@ -90,7 +94,7 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
         <div>
           <SectionLabel>Тип занятости</SectionLabel>
           <div className="flex flex-wrap gap-2">
-            {EMPLOYMENT_TYPES.map((t) => (
+            {EMPLOYMENT_FILTERS.map((t) => (
               <Chip key={t.id} tone="dark" selected={filters.employmentType === t.id} onClick={() => setEmploymentType(t.id)}>
                 {t.label}
               </Chip>

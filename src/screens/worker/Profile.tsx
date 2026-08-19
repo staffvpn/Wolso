@@ -8,7 +8,7 @@ import { Card, SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
 import { FEATURES } from '@/lib/features';
-import { formatExperience } from '@/lib/format';
+import { formatExperience, formatRating } from '@/lib/format';
 
 export function WorkerProfileScreen() {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export function WorkerProfileScreen() {
           </h1>
           <p className="text-[13px] text-text-muted">{positions[0]?.positionLabel} · {profile.city}</p>
           <div className="flex items-center gap-1 mt-1">
-            <span className="text-accent text-[13px] font-bold">★ {profile.rating.toFixed(1)}</span>
+            <span className="text-accent text-[13px] font-bold">{formatRating(profile.rating)}</span>
             <span className="text-text-faint text-[13px]">· {profile.shiftsCompleted} смен</span>
           </div>
         </div>

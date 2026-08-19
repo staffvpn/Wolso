@@ -8,6 +8,7 @@ import {
   cancelCandidate as cancelCandidateApi,
   closeShift as closeShiftApi,
   createVacancy as createVacancyApi,
+  deleteVacancy as deleteVacancyApi,
 } from '@/services/employerApi';
 import { haptic, hapticNotify } from '@/lib/telegram';
 
@@ -32,9 +33,11 @@ interface EmployerState {
     endMin: number;
     hourlyRate: number;
     requirements: string[];
+    employmentType: Vacancy['employmentType'];
     description?: string;
     urgent: boolean;
   }) => Promise<Vacancy>;
+  deleteVacancy: (vacancyId: string) => Promise<void>;
 }
 
 export const useEmployerStore = create<EmployerState>((set, get) => ({
@@ -103,5 +106,16 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
     const vacancy = await createVacancyApi(input);
     set((s) => ({ vacancies: [vacancy, ...s.vacancies] }));
     return vacancy;
+  },
+
+  // Drops the vacancy and every candidate row that pointed at it — the
+  // server cascade-deletes the applications, so keeping them in the store
+  // would leave orphans referencing a vacancy that no longer exists.
+  deleteVacancy: async (vacancyId) => {
+    await deleteVacancyApi(vacancyId);
+    set((s) => ({
+      vacancies: s.vacancies.filter((v) => v.id !== vacancyId),
+      candidates: s.candidates.filter((c) => c.vacancyId !== vacancyId),
+    }));
   },
 }));

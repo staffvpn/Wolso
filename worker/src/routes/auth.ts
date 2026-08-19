@@ -19,7 +19,10 @@ export async function provisionWorker(env: Env, user: TelegramUser, name: string
 
   const referralCode = `${(user.username ?? user.first_name).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)}${user.id % 100}`;
   const inserted = await env.DB.prepare(
-    'INSERT INTO workers (telegram_id, name, photo_url, referral_code, telegram_username) VALUES (?, ?, ?, ?, ?) RETURNING id',
+    // rating 0, not the table's legacy 5.0 default — a brand-new account
+    // hasn't earned a score yet, and the UI renders 0 as "нет оценок"
+    // rather than a fake perfect five.
+    'INSERT INTO workers (telegram_id, name, photo_url, referral_code, telegram_username, rating) VALUES (?, ?, ?, ?, ?, 0) RETURNING id',
   )
     .bind(user.id, name, user.photo_url ?? null, referralCode, user.username ?? null)
     .first<{ id: number }>();
@@ -40,7 +43,7 @@ export async function provisionCompany(env: Env, user: TelegramUser): Promise<nu
   let company = await env.DB.prepare('SELECT id FROM companies WHERE owner_telegram_id = ?').bind(user.id).first<{ id: number }>();
   if (company) return company.id;
 
-  const inserted = await env.DB.prepare('INSERT INTO companies (owner_telegram_id, name, telegram_username) VALUES (?, ?, ?) RETURNING id')
+  const inserted = await env.DB.prepare('INSERT INTO companies (owner_telegram_id, name, telegram_username, rating) VALUES (?, ?, ?, 0) RETURNING id')
     .bind(user.id, '', user.username ?? null)
     .first<{ id: number }>();
   return inserted!.id;

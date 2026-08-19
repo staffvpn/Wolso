@@ -9,6 +9,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { useCompanyStore } from '@/store/useCompanyStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { FEATURES } from '@/lib/features';
+import { formatRating } from '@/lib/format';
 
 export function EmployerProfileScreen() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export function EmployerProfileScreen() {
             {company.address}
             {company.foundedYear && ` · с ${company.foundedYear}`}
           </p>
-          <p className="text-accent text-[13px] font-bold mt-0.5">★ {company.rating} · {company.reviewsCount} отзывов</p>
+          <p className="text-accent text-[13px] font-bold mt-0.5">{formatRating(company.rating)} · {company.reviewsCount} отзывов</p>
         </div>
         <button
           onClick={() => navigate('/e/profile/edit')}

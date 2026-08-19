@@ -15,7 +15,7 @@ import { CloseShiftSheet } from '@/components/CloseShiftSheet';
 import { CancelSheet } from '@/components/CancelSheet';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
-import { formatDateRange, localDateStr, timeAgoSince } from '@/lib/format';
+import { formatDateRange, formatRating, localDateStr, timeAgoSince } from '@/lib/format';
 import type { Candidate } from '@/types';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -116,16 +116,19 @@ export function VacancyDetail() {
           <div className="space-y-2.5 mb-5">
             {engaged.map((c) => {
               const isClosed = c.workStage === 'employer_closed' || c.workStage === 'reviewed';
-              // Withdrawing only makes sense before the shift's actually
-              // happened — once it has, closing (and reviewing) is the path.
-              const canCancel = !isClosed && !shiftIsPast;
+              // An invitation the worker never confirmed can always be
+              // withdrawn — including after the day has passed, where it
+              // would otherwise be stuck forever (closing needs an
+              // *accepted* candidate, so there was no way out of it).
+              // A confirmed hire can only be cancelled before the shift.
+              const canCancel = !isClosed && (c.status === 'invited' || !shiftIsPast);
               return (
                 <Card key={c.id} className="p-4">
                   <div className="flex items-center gap-3">
                     <Avatar src={c.photos[0]} name={c.name} size={44} />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[14px] truncate">{c.name}</p>
-                      <p className="text-[12px] text-text-muted">★ {c.rating.toFixed(1)} · {c.shiftsCompleted} смен</p>
+                      <p className="text-[12px] text-text-muted">{formatRating(c.rating)} · {c.shiftsCompleted} смен</p>
                     </div>
                     {c.status === 'invited' && <Badge tone="neutral">Ждём подтверждения</Badge>}
                     {isClosed && <Badge tone="accent">Смена закрыта</Badge>}
@@ -180,12 +183,12 @@ export function VacancyDetail() {
                   <Avatar src={top.photos[0]} name={top.name} size={52} />
                   <div className="min-w-0">
                     <p className="font-bold text-[17px]">{top.name}</p>
-                    <p className="text-[13px] text-text-muted">★ {top.rating.toFixed(1)} · {top.shiftsCompleted} смен</p>
+                    <p className="text-[13px] text-text-muted">{formatRating(top.rating)} · {top.shiftsCompleted} смен</p>
                   </div>
                 </button>
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
-                    Пригласить на смену
+                    Пригласить
                   </Button>
                   <Button variant="dark" size="icon" onClick={() => decideCandidate(vacancy.id, top.id, 'declined')} aria-label="Отклонить">
                     <X size={17} />
@@ -207,7 +210,7 @@ export function VacancyDetail() {
                   <Avatar src={c.photos[0]} name={c.name} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[14px] truncate">{c.name}</p>
-                    <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · ★ {c.rating.toFixed(1)}</p>
+                    <p className="text-[12px] text-text-muted truncate">{c.positionLabel} · {formatRating(c.rating)}</p>
                   </div>
                   <button
                     onClick={(e) => {
@@ -230,7 +233,7 @@ export function VacancyDetail() {
           <CandidateDetailOverlay
             candidate={selected}
             onClose={() => setSelected(null)}
-            acceptLabel="Пригласить на смену"
+            acceptLabel="Пригласить"
             onAccept={() => {
               decideCandidate(vacancy.id, selected.id, 'accepted');
               setSelected(null);

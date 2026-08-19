@@ -7,7 +7,7 @@ function buildQuery(filters: Filters): string {
   if (filters.rateFrom) params.set('rateFrom', String(filters.rateFrom));
   if (filters.radiusKm !== 'city') params.set('radiusKm', String(filters.radiusKm));
   if (filters.urgentOnly) params.set('urgentOnly', 'true');
-  if (filters.employmentType) params.set('employmentType', filters.employmentType);
+  if (filters.employmentType !== 'any') params.set('employmentType', filters.employmentType);
   if (filters.when) params.set('when', filters.when);
   if (filters.timeOfDay.length) params.set('timeOfDay', filters.timeOfDay.join(','));
   return params.toString();

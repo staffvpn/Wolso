@@ -25,8 +25,10 @@ export function ShiftCheckout({ gate = false }: { gate?: boolean }) {
     ? applications.find((a) => a.workStage === 'employer_closed')
     : applications.find((a) => a.id === routeApplicationId);
 
-  const [rating, setRating] = useState(5);
-  const [tags, setTags] = useState<string[]>([TAGS[0]]);
+  // Unrated by default — same reasoning as the employer's own review sheet:
+  // a pre-filled 5 is a score nobody actually chose.
+  const [rating, setRating] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,10 @@ export function ShiftCheckout({ gate = false }: { gate?: boolean }) {
 
   async function submit() {
     if (submitting || !application) return;
+    if (rating < 1) {
+      setError('Поставьте оценку — без неё отзыв отправить нельзя');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {

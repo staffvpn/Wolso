@@ -108,6 +108,13 @@ export function timeAgoSince(timestamp: string) {
   return timeAgo(minutesSince(timestamp));
 }
 
+/** A rating of 0 means "no reviews yet", not "rated zero" — everyone
+ *  starts there now instead of at a fake 5.0, so it has to read as an
+ *  absence rather than a bad score everywhere it's shown. */
+export function formatRating(rating: number): string {
+  return rating > 0 ? `★ ${rating.toFixed(1)}` : 'Без оценок';
+}
+
 export function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
   const mod100 = n % 100;

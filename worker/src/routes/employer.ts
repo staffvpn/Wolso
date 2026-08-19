@@ -285,6 +285,43 @@ employerRoutes.post('/vacancies', async (c) => {
   return c.json({ shift: shiftToJson(row!) });
 });
 
+/** An employer removing one of their own postings. Cascades to its
+ *  applications, chats and favorites the same way the admin-side delete
+ *  does (see worker/migrations for the FK graph) — so anyone already
+ *  invited or hired gets told first, since from their side the shift is
+ *  simply about to vanish. */
+employerRoutes.delete('/vacancies/:id', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const id = c.req.param('id');
+
+  const shift = await c.env.DB.prepare('SELECT id, position_label FROM shifts WHERE id = ? AND company_id = ?')
+    .bind(id, session.companyId)
+    .first<{ id: number; position_label: string }>();
+  if (!shift) return c.json({ error: 'not_found' }, 404);
+
+  const { results: engaged } = await c.env.DB.prepare(
+    `SELECT a.worker_id, w.telegram_id FROM applications a JOIN workers w ON w.id = a.worker_id
+     WHERE a.shift_id = ? AND a.status IN ('invited', 'accepted')`,
+  )
+    .bind(id)
+    .all<{ worker_id: number; telegram_id: number }>();
+
+  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
+  const title = `${company?.name ?? 'Работодатель'} снял(а) смену с публикации`;
+  const subtitle = `«${shift.position_label}» — смена больше не актуальна`;
+
+  for (const person of engaged) {
+    await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+      .bind(person.worker_id, 'cancelled_by_employer', title, subtitle)
+      .run();
+    c.executionCtx.waitUntil(sendTelegramMessage(c.env, person.telegram_id, `❌ ${title}\n${subtitle}`));
+  }
+
+  await c.env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
+  return c.json({ ok: true });
+});
+
 /** Pings, via the bot itself (not just the in-app notifications list),
  *  every worker who has this position in their experience — the same
  *  match a worker would get by filtering the feed for it. Deliberately
@@ -585,17 +622,21 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
   const { rating, tags, comment } = await c.req.json<{ rating: number; tags: string[]; comment: string }>();
   if (!rating || rating < 1 || rating > 5) return c.json({ error: 'rating_required' }, 400);
 
-  const shift = await c.env.DB.prepare('SELECT id, date, position_label FROM shifts WHERE id = ? AND company_id = ?')
+  const shift = await c.env.DB.prepare('SELECT id, date, end_date, position_label FROM shifts WHERE id = ? AND company_id = ?')
     .bind(shiftId, session.companyId)
-    .first<{ id: number; date: string; position_label: string }>();
-  if (!shift) return c.json({ error: 'not_found' }, 404);
+    .first<{ id: number; date: string; end_date: string | null; position_label: string }>();
+  if (!shift) return c.json({ error: 'shift_not_found' }, 404);
 
-  if (shift.date >= mskTodayStr()) return c.json({ error: 'too_early' }, 400);
+  // A multi-day posting isn't over until its *last* day has passed —
+  // comparing against the start date would let it be closed (and reviewed)
+  // while the worker still has days left to work.
+  const lastDay = shift.end_date && shift.end_date > shift.date ? shift.end_date : shift.date;
+  if (lastDay >= mskTodayStr()) return c.json({ error: 'too_early' }, 400);
 
   const app = await c.env.DB.prepare('SELECT id, worker_id, status, closed_by_employer_at FROM applications WHERE id = ? AND shift_id = ?')
     .bind(appId, shiftId)
     .first<{ id: number; worker_id: number; status: string; closed_by_employer_at: string | null }>();
-  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (!app) return c.json({ error: 'application_not_found' }, 404);
   if (app.status !== 'accepted') return c.json({ error: 'not_accepted' }, 400);
   if (app.closed_by_employer_at) return c.json({ error: 'already_closed' }, 409);
 
@@ -615,23 +656,32 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
     .bind(app.worker_id, app.worker_id)
     .run();
 
-  const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
-  const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
+  // Everything past this point is after-the-fact bookkeeping — the shift is
+  // already closed and reviewed in the database. If notifying the worker or
+  // tearing down the chat fails, that must not surface to the employer as
+  // "не получилось закрыть смену": they'd retry, hit already_closed, and be
+  // stuck looking at an error for work that actually succeeded.
+  try {
+    const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
+    const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
 
-  const title = `${company?.name ?? 'Работодатель'} закрыл(а) смену`;
-  const subtitle = `«${shift.position_label}» — оставьте отзыв о том, как всё прошло`;
-  await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-    .bind(app.worker_id, 'shift_closed', title, subtitle)
-    .run();
+    const title = `${company?.name ?? 'Работодатель'} закрыл(а) смену`;
+    const subtitle = `«${shift.position_label}» — оставьте отзыв о том, как всё прошло`;
+    await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+      .bind(app.worker_id, 'shift_closed', title, subtitle)
+      .run();
 
-  if (worker) {
-    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `✅ ${title}\n${subtitle}`));
+    if (worker) {
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `✅ ${title}\n${subtitle}`));
+    }
+
+    // The chat was only ever meant to last for the duration of this hire —
+    // once the shift is closed there's nothing left to coordinate about, so
+    // it (and its messages, via ON DELETE CASCADE) goes away with it.
+    await deleteShiftChat(c.env, session.companyId, app.worker_id, shiftId);
+  } catch (err) {
+    console.error('close-shift post-steps failed (shift itself is closed)', shiftId, appId, err);
   }
-
-  // The chat was only ever meant to last for the duration of this hire —
-  // once the shift is closed there's nothing left to coordinate about, so
-  // it (and its messages, via ON DELETE CASCADE) goes away with it.
-  await deleteShiftChat(c.env, session.companyId, app.worker_id, shiftId);
 
   return c.json({ ok: true });
 });

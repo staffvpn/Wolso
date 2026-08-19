@@ -113,7 +113,7 @@ export function FindWorkers() {
         loading={loading}
         renderCard={(worker) => <CandidateCard candidate={worker} />}
         onSwiped={(_worker, direction) => handleSwiped(direction)}
-        rightLabel="Пригласить на смену"
+        rightLabel="Пригласить"
         leftLabel="Пропуск"
         empty={
           <EmptyState
@@ -136,7 +136,7 @@ export function FindWorkers() {
             <X size={22} className="text-text-muted" />
           </IconButton>
           <Button size="lg" className="flex-1 max-w-[220px]" onClick={() => deckRef.current?.swipeRight()}>
-            <UserPlus size={18} /> Пригласить на смену
+            <UserPlus size={18} /> Пригласить
           </Button>
         </div>
       )}

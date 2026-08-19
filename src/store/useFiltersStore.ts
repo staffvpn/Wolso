@@ -6,7 +6,7 @@ const DEFAULT_FILTERS: Filters = {
   rateFrom: 200,
   radiusKm: 'city',
   urgentOnly: false,
-  employmentType: 'shift',
+  employmentType: 'any',
   when: 'upcoming',
   timeOfDay: [],
 };

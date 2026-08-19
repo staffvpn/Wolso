@@ -14,6 +14,7 @@ interface VacancyApiResponse {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  employmentType?: string;
   urgency: string;
   status: string;
   createdAt: string;
@@ -33,6 +34,7 @@ function fromApiVacancy(v: VacancyApiResponse): Vacancy {
     endMin: v.endMin,
     hourlyRate: v.hourlyRate,
     requirements: v.requirements,
+    employmentType: (v.employmentType as Vacancy['employmentType']) ?? 'shift',
     urgent: v.urgency === 'urgent',
     createdAt: v.createdAt,
     status: v.status as Vacancy['status'],
@@ -210,6 +212,7 @@ export async function createVacancy(input: {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  employmentType: Vacancy['employmentType'];
   description?: string;
   urgent: boolean;
 }): Promise<Vacancy> {
@@ -227,9 +230,16 @@ export async function createVacancy(input: {
       endMin: input.endMin,
       hourlyRate: input.hourlyRate,
       requirements: input.requirements,
+      employmentType: input.employmentType,
       description: input.description,
       urgency: input.urgent ? 'urgent' : 'normal',
     },
   });
   return fromApiVacancy({ ...shift, responseCount: shift.responseCount ?? 0 });
+}
+
+/** An employer taking down one of their own postings. Anyone already
+ *  invited or hired is notified server-side before the row goes. */
+export async function deleteVacancy(vacancyId: string): Promise<void> {
+  await apiFetch(`/employer/vacancies/${vacancyId}`, { method: 'DELETE', as: 'company' });
 }

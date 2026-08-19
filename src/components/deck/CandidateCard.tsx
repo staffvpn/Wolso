@@ -3,6 +3,7 @@ import type { CandidateProfile } from '@/types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
+import { formatRating } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
 /** Tinder-style card: tap the left/right edge of the photo to cycle through
@@ -59,7 +60,7 @@ export function CandidateCard({ candidate, tall = false }: { candidate: Candidat
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         <div className="flex flex-wrap gap-2">
-          <Badge tone="accent">★ {candidate.rating.toFixed(1)} · {candidate.shiftsCompleted} смен</Badge>
+          <Badge tone="accent">{formatRating(candidate.rating)} · {candidate.shiftsCompleted} смен</Badge>
         </div>
 
         {candidate.bio && <p className="text-[14px] text-text leading-relaxed">{candidate.bio}</p>}

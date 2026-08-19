@@ -43,6 +43,11 @@ export interface Company {
 
 export type ShiftUrgency = 'normal' | 'urgent';
 
+/** Whether a posting is a one-off (or multi-day) shift or an ongoing job —
+ *  picked by the employer when publishing, shown on every card, and
+ *  filterable from the worker's feed. */
+export type EmploymentType = 'shift' | 'permanent' | 'internship';
+
 export interface Shift {
   id: string;
   companyId: string;
@@ -68,7 +73,7 @@ export interface Shift {
   tags: string[];
   meal: boolean;
   urgency: ShiftUrgency;
-  employmentType: 'shift' | 'permanent' | 'internship';
+  employmentType: EmploymentType;
   timeOfDay: 'morning' | 'day' | 'evening' | 'night';
 }
 
@@ -214,6 +219,7 @@ export interface Vacancy {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  employmentType: EmploymentType;
   urgent: boolean;
   createdAt: string;
   status: 'pending_review' | 'active' | 'rejected';
@@ -244,7 +250,9 @@ export interface Filters {
   rateFrom: number;
   radiusKm: number | 'city';
   urgentOnly: boolean;
-  employmentType: 'shift' | 'permanent' | 'internship';
+  /** 'any' is the default — the feed used to default to 'shift', which
+   *  silently hid every permanent posting until someone opened filters. */
+  employmentType: EmploymentType | 'any';
   /** 'upcoming' (default, no explicit chip selected) shows every shift from
    *  today onward — 'today'/'tomorrow' are deliberate narrowing filters a
    *  worker picks in the sheet, 'custom' means "dates I picked" but isn't

@@ -11,7 +11,8 @@ import { SectionLabel } from '@/components/ui/Card';
 import { POSITIONS, MARKET_AVG_RATE } from '@/data/positions';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { formatDayMonth, pluralizeShifts } from '@/lib/format';
-import type { Position } from '@/types';
+import { EMPLOYMENT_TYPES } from '@/data/employmentTypes';
+import type { EmploymentType, Position } from '@/types';
 
 const KEY_POSITIONS = POSITIONS.slice(0, 8);
 const REQUIREMENT_POOL = ['Опыт от 1 года', 'Медкнижка', 'Без опыта', 'Своя форма'];
@@ -37,6 +38,10 @@ export function NewVacancy() {
   const createVacancy = useEmployerStore((s) => s.createVacancy);
 
   const [position, setPosition] = useState<Position>('barista');
+  // No default: the employer has to say whether this is a one-off shift or
+  // an ongoing job before they can publish — it changes what the posting
+  // means, and guessing 'shift' for them was hiding that choice entirely.
+  const [employmentType, setEmploymentType] = useState<EmploymentType | null>(null);
   const [startDate, setStartDate] = useState(TODAY);
   const [days, setDays] = useState(1);
   const [startHour, setStartHour] = useState(9);
@@ -58,6 +63,7 @@ export function NewVacancy() {
    *  is one posting with a date range, not three separate shifts each
    *  needing their own candidate pool and their own invite. */
   async function publish() {
+    if (!employmentType) return;
     setPublishing(true);
     const vac = await createVacancy({
       position,
@@ -70,6 +76,7 @@ export function NewVacancy() {
       endMin: 0,
       hourlyRate: rate,
       requirements,
+      employmentType,
       description: description.trim(),
       urgent: false, // paid feature — locked for now, see the toggle below
     });
@@ -88,6 +95,19 @@ export function NewVacancy() {
             {KEY_POSITIONS.map((p) => (
               <Chip key={p.id} selected={position === p.id} onClick={() => setPosition(p.id)}>
                 {p.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <SectionLabel>
+            Тип работы <span className="text-danger">*</span>
+          </SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            {EMPLOYMENT_TYPES.map((et) => (
+              <Chip key={et.id} selected={employmentType === et.id} onClick={() => setEmploymentType(et.id)}>
+                {et.label}
               </Chip>
             ))}
           </div>
@@ -217,8 +237,14 @@ export function NewVacancy() {
       </div>
 
       <div className="px-5 pb-5 pt-2 shrink-0">
-        <Button fullWidth disabled={publishing} onClick={publish}>
-          {publishing ? 'Публикуем…' : days > 1 ? `Опубликовать · ${days} ${pluralizeShifts(days)}` : 'Опубликовать'}
+        <Button fullWidth disabled={publishing || !employmentType} onClick={publish}>
+          {publishing
+            ? 'Публикуем…'
+            : !employmentType
+              ? 'Выберите тип работы'
+              : days > 1
+                ? `Опубликовать · ${days} ${pluralizeShifts(days)}`
+                : 'Опубликовать'}
         </Button>
       </div>
     </div>

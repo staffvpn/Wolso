@@ -47,7 +47,7 @@ export function Candidates() {
         loading={loading}
         renderCard={(candidate) => <CandidateCard candidate={candidate} />}
         onSwiped={(candidate, direction) => decideCandidate(candidate.vacancyId, candidate.id, direction === 'right' ? 'accepted' : 'declined')}
-        rightLabel="Пригласить на смену"
+        rightLabel="Пригласить"
         leftLabel="Отклонить"
         empty={
           <EmptyState
@@ -68,7 +68,7 @@ export function Candidates() {
             <X size={22} className="text-text-muted" />
           </IconButton>
           <Button size="lg" className="flex-1 max-w-[220px]" onClick={() => deckRef.current?.swipeRight()}>
-            <Check size={18} /> Пригласить на смену
+            <Check size={18} /> Пригласить
           </Button>
         </div>
       )}

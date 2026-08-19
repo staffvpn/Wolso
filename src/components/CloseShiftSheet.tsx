@@ -7,10 +7,13 @@ import { ApiError } from '@/lib/apiClient';
 const TAGS = ['Пришёл вовремя', 'Хорошо справился', 'Опоздал', 'Ушёл раньше', 'Не справился'];
 
 const ERROR_MESSAGES: Record<string, string> = {
-  too_early: 'Эту смену ещё нельзя закрыть — она пока не наступила или идёт прямо сейчас.',
-  not_accepted: 'Этот кандидат не был принят на смену.',
+  too_early: 'Эту смену ещё нельзя закрыть — последний её день ещё не прошёл.',
+  not_accepted: 'Сотрудник ещё не подтвердил смену — закрыть можно только подтверждённую.',
   already_closed: 'Смена уже закрыта.',
   rating_required: 'Поставьте оценку от 1 до 5.',
+  shift_not_found: 'Смена не найдена — возможно, её удалили.',
+  application_not_found: 'Отклик не найден — возможно, сотрудник отменил участие.',
+  auth_required: 'Сессия истекла — закройте и откройте приложение заново.',
 };
 
 interface CloseShiftSheetProps {
@@ -23,8 +26,11 @@ interface CloseShiftSheetProps {
 /** Closing a shift and reviewing the worker are the same action — there's
  *  no "close without rating them" path, so this is the only way in. */
 export function CloseShiftSheet({ open, onClose, workerName, onSubmit }: CloseShiftSheetProps) {
-  const [rating, setRating] = useState(5);
-  const [tags, setTags] = useState<string[]>([TAGS[0]]);
+  // Starts unrated (0 stars) rather than pre-filled with a 5 nobody chose —
+  // the server rejects anything below 1 anyway, so this makes the employer
+  // actually pick instead of silently submitting a default perfect score.
+  const [rating, setRating] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,17 +41,29 @@ export function CloseShiftSheet({ open, onClose, workerName, onSubmit }: CloseSh
 
   async function submit() {
     if (submitting) return;
+    if (rating < 1) {
+      setError('Поставьте оценку — без неё смену закрыть нельзя');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
       await onSubmit(rating, tags, comment);
-      setRating(5);
-      setTags([TAGS[0]]);
+      setRating(0);
+      setTags([]);
       setComment('');
       onClose();
     } catch (err) {
       const code = err instanceof ApiError ? err.code : undefined;
-      setError((code && ERROR_MESSAGES[code]) ?? 'Не получилось закрыть смену — попробуйте ещё раз');
+      const status = err instanceof ApiError ? err.status : undefined;
+      // Falling back to a bare "попробуйте ещё раз" hid *why* it failed and
+      // made the same error look identical every time — show the server's
+      // own code/status when it isn't one we have wording for, so a real
+      // failure can actually be reported and diagnosed.
+      setError(
+        (code && ERROR_MESSAGES[code]) ??
+          `Не получилось закрыть смену${code || status ? ` (${[code, status && `код ${status}`].filter(Boolean).join(', ')})` : ''} — попробуйте ещё раз`,
+      );
     } finally {
       setSubmitting(false);
     }

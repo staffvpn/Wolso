@@ -20,6 +20,7 @@ import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { resolveCompany } from '@/data/companies';
 import { formatDistance, formatMoney, localDateStr, relativeDayRange, shiftDaysCount, pluralizeShifts, timeRange } from '@/lib/format';
+import { employmentTypeLabel } from '@/data/employmentTypes';
 import { FEATURES } from '@/lib/features';
 import { hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
@@ -257,6 +258,9 @@ function ShiftDetailOverlay({
           <h2 className="text-[26px] font-extrabold mt-5">{shift.positionLabel}</h2>
 
           <div className="flex flex-wrap gap-2 mt-3">
+            <Badge tone={shift.employmentType === 'permanent' ? 'accent' : 'dark'}>
+              {employmentTypeLabel(shift.employmentType)}
+            </Badge>
             <Badge tone={shift.urgency === 'urgent' ? 'warning' : 'dark'}>
               {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
             </Badge>

@@ -9,6 +9,7 @@ import { ChevronRight, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
+import { employmentTypeLabel } from '@/data/employmentTypes';
 
 export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?: () => void }) {
   const company = resolveCompany(shift);
@@ -84,6 +85,9 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
         <h2 className="text-[24px] font-extrabold">{shift.positionLabel}</h2>
 
         <div className="flex flex-wrap gap-2 mt-3">
+          <Badge tone={shift.employmentType === 'permanent' ? 'accent' : 'dark'}>
+            {employmentTypeLabel(shift.employmentType)}
+          </Badge>
           <Badge tone={shift.urgency === 'urgent' ? 'warning' : 'dark'}>
             {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
           </Badge>
