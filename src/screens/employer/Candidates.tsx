@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { CandidateCard } from '@/components/deck/CandidateCard';
+import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay';
 import { useEmployerStore } from '@/store/useEmployerStore';
 
 export function Candidates() {
@@ -24,6 +26,13 @@ export function Candidates() {
 
   const pending = useMemo(() => candidates.filter((c) => c.status === 'pending'), [candidates]);
   const current = pending[0];
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // The deck can empty out from under the detail view (last candidate
+  // decided) — fall back to the swipe view instead of showing it blank.
+  useEffect(() => {
+    if (detailOpen && !current) setDetailOpen(false);
+  }, [detailOpen, current]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -45,7 +54,7 @@ export function Candidates() {
         items={pending}
         keyOf={(c) => c.id}
         loading={loading}
-        renderCard={(candidate) => <CandidateCard candidate={candidate} />}
+        renderCard={(candidate) => <CandidateCard candidate={candidate} onOpenDetail={() => setDetailOpen(true)} />}
         onSwiped={(candidate, direction) => decideCandidate(candidate.vacancyId, candidate.id, direction === 'right' ? 'accepted' : 'declined')}
         rightLabel="Пригласить"
         leftLabel="Отклонить"
@@ -76,6 +85,24 @@ export function Candidates() {
       <p className="text-center text-[11px] text-text-faint pb-2 shrink-0">
         свайп вправо — приглашаем · влево — дальше
       </p>
+
+      <AnimatePresence>
+        {detailOpen && current && (
+          <CandidateDetailOverlay
+            candidate={current}
+            onClose={() => setDetailOpen(false)}
+            acceptLabel="Пригласить"
+            onAccept={() => {
+              setDetailOpen(false);
+              deckRef.current?.swipeRight();
+            }}
+            onDecline={() => {
+              setDetailOpen(false);
+              deckRef.current?.swipeLeft();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

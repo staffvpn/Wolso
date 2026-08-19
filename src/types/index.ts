@@ -201,6 +201,10 @@ export interface CandidateProfile {
   bio?: string;
   skills?: string;
   age?: number;
+  /** What they've done and for how long — the same list they fill in on
+   *  their own profile, so the detail view can show real experience
+   *  instead of just a position label. */
+  experience?: { positionLabel: string; months: number }[];
   /** Avatar first, then any portfolio photos — the card taps through this
    *  whole list left-to-right, Tinder-style. */
   photos: string[];

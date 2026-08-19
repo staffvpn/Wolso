@@ -419,7 +419,9 @@ const CANDIDATE_WORKER_FIELDS = `
   w.name as worker_name, w.rating as worker_rating, w.shifts_completed as worker_shifts_completed, w.city as worker_city,
   w.bio as worker_bio, w.skills as worker_skills, w.birthdate as worker_birthdate,
   (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
-  (SELECT json_group_array(id) FROM worker_photos wp WHERE wp.worker_id = w.id) as worker_photo_ids
+  (SELECT json_group_array(id) FROM worker_photos wp WHERE wp.worker_id = w.id) as worker_photo_ids,
+  (SELECT json_group_array(json_object('positionLabel', position_label, 'months', months))
+     FROM worker_positions wp2 WHERE wp2.worker_id = w.id) as worker_experience
 `;
 
 interface CandidateWorkerRow {

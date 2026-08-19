@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, X, SlidersHorizontal, Search } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
 import { Chip } from '@/components/ui/Chip';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { CandidateCard } from '@/components/deck/CandidateCard';
+import { CandidateDetailOverlay } from '@/components/deck/CandidateDetailOverlay';
 import { VacancyPickSheet } from '@/components/VacancyPickSheet';
 import { useWorkerBrowseStore } from '@/store/useWorkerBrowseStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
@@ -22,6 +24,7 @@ export function FindWorkers() {
   const navigate = useNavigate();
   const deckRef = useRef<SwipeDeckHandle>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const vacancies = useEmployerStore((s) => s.vacancies);
   const loadVacancies = useEmployerStore((s) => s.loadAll);
@@ -49,6 +52,10 @@ export function FindWorkers() {
 
   const remaining = deck.slice(index);
   const current = remaining[0];
+
+  useEffect(() => {
+    if (detailOpen && !current) setDetailOpen(false);
+  }, [detailOpen, current]);
 
   // Single path for both an actual drag-swipe-right and tapping the button
   // below — the button just triggers the same fling animation, so this is
@@ -111,7 +118,7 @@ export function FindWorkers() {
         items={remaining}
         keyOf={(w) => w.id}
         loading={loading}
-        renderCard={(worker) => <CandidateCard candidate={worker} />}
+        renderCard={(worker) => <CandidateCard candidate={worker} onOpenDetail={() => setDetailOpen(true)} />}
         onSwiped={(_worker, direction) => handleSwiped(direction)}
         rightLabel="Пригласить"
         leftLabel="Пропуск"
@@ -144,6 +151,24 @@ export function FindWorkers() {
       <p className="text-center text-[11px] text-text-faint pb-2 shrink-0">
         свайп вправо — пригласить на смену · влево — пропустить
       </p>
+
+      <AnimatePresence>
+        {detailOpen && current && (
+          <CandidateDetailOverlay
+            candidate={current}
+            onClose={() => setDetailOpen(false)}
+            acceptLabel="Пригласить"
+            onAccept={() => {
+              setDetailOpen(false);
+              deckRef.current?.swipeRight();
+            }}
+            onDecline={() => {
+              setDetailOpen(false);
+              deckRef.current?.swipeLeft();
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <VacancyPickSheet
         open={sheetOpen}

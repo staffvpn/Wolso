@@ -4,13 +4,14 @@ import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
 import { formatRating } from '@/lib/format';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 /** Tinder-style card: tap the left/right edge of the photo to cycle through
  *  the avatar + portfolio photos, everything else scrolls for the rest of
  *  the anketa (bio, skills). Shared by the applicant queue (Candidate) and
  *  the "find staff" browse deck (WorkerListing) — both are CandidateProfile. */
-export function CandidateCard({ candidate, tall = false }: { candidate: CandidateProfile; tall?: boolean }) {
+export function CandidateCard({ candidate, tall = false, onOpenDetail }: { candidate: CandidateProfile; tall?: boolean; onOpenDetail?: () => void }) {
   const [index, setIndex] = useState(0);
   const photos = candidate.photos;
   const hasPhotos = photos.length > 0;
@@ -23,7 +24,7 @@ export function CandidateCard({ candidate, tall = false }: { candidate: Candidat
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <div className={cn('relative shrink-0 bg-surface-2 overflow-hidden', tall ? 'h-[58%]' : 'h-[42%]')}>
         {hasPhotos ? (
           <SafeImage key={photos[index]} src={photos[index]} alt={candidate.name} className="h-full w-full object-cover" />
@@ -58,7 +59,7 @@ export function CandidateCard({ candidate, tall = false }: { candidate: Candidat
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 relative">
         <div className="flex flex-wrap gap-2">
           <Badge tone="accent">{formatRating(candidate.rating)} · {candidate.shiftsCompleted} смен</Badge>
         </div>
@@ -71,7 +72,20 @@ export function CandidateCard({ candidate, tall = false }: { candidate: Candidat
             <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{candidate.skills}</p>
           </div>
         )}
+
+        {/* Same as the shift card: a dedicated button rather than a tap on
+         *  the card itself, so a real swipe never gets misread as a tap. */}
+        {onOpenDetail && <div className="h-9" />}
       </div>
+
+      {onOpenDetail && (
+        <button
+          onClick={onOpenDetail}
+          className="absolute bottom-4 right-4 flex items-center gap-0.5 h-8 pl-3 pr-2.5 rounded-full bg-surface-2/95 backdrop-blur border border-border-soft text-[12px] font-semibold text-text shadow-sm"
+        >
+          Подробнее <ChevronRight size={13} className="text-text-faint" />
+        </button>
+      )}
     </div>
   );
 }

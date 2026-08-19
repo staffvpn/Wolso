@@ -66,7 +66,21 @@ interface CandidateApiResponse {
   worker_birthdate: string | null;
   worker_avatar_url: string | null;
   worker_photos: string[];
+  worker_experience?: string | null;
   shift_position_label?: string;
+}
+
+/** D1 hands this back as a JSON string from json_group_array — and as
+ *  '[null]' when the worker has no experience rows at all, which would
+ *  otherwise render as an empty entry. */
+function parseExperience(raw?: string | null): { positionLabel: string; months: number }[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as ({ positionLabel: string; months: number } | null)[];
+    return parsed.filter((e): e is { positionLabel: string; months: number } => !!e && !!e.positionLabel);
+  } catch {
+    return [];
+  }
 }
 
 function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: string): Candidate {
@@ -90,6 +104,7 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     bio: c.worker_bio ?? undefined,
     skills: c.worker_skills ?? undefined,
     age: ageFrom(c.worker_birthdate),
+    experience: parseExperience(c.worker_experience),
     photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }
@@ -136,6 +151,7 @@ interface WorkerListingApiResponse {
   worker_birthdate: string | null;
   worker_avatar_url: string | null;
   worker_photos: string[];
+  worker_experience?: string | null;
   matched_position_label: string | null;
 }
 
@@ -153,6 +169,7 @@ function fromApiWorkerListing(w: WorkerListingApiResponse): WorkerListing {
     bio: w.worker_bio ?? undefined,
     skills: w.worker_skills ?? undefined,
     age: ageFrom(w.worker_birthdate),
+    experience: parseExperience(w.worker_experience),
     photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }
