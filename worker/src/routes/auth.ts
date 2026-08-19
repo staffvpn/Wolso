@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { verifyInitData, verifyLoginWidget, type TelegramUser } from '../lib/telegramAuth';
 import { signSession } from '../lib/session';
+import { notifyAdmin, adminNotifyHandle } from '../lib/adminNotify';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -127,6 +128,15 @@ authRoutes.post('/choose-role', async (c) => {
   await c.env.DB.prepare('INSERT INTO telegram_accounts (telegram_id, active_role) VALUES (?, ?)').bind(user.id, role).run();
 
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+
+  // This is the one moment an account is genuinely new — /telegram above
+  // runs on every launch, so alerting there would fire on every open.
+  c.executionCtx.waitUntil(
+    notifyAdmin(
+      c.env,
+      `👤 Новый пользователь\n${name || 'Без имени'} · ${adminNotifyHandle(user.username, user.id)}\nРоль: ${role === 'worker' ? 'соискатель' : 'работодатель'}`,
+    ),
+  );
   // '' — not `name` — for provisioning: a fresh worker/company profile
   // starts blank (see provisionWorker/provisionCompany above) rather than
   // pre-filling from the Telegram account. `name` still goes out on

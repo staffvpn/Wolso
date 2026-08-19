@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
+import { notifyAdmin } from '../lib/adminNotify';
 
 export const supportRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 supportRoutes.use('*', attachSession);
@@ -46,6 +47,23 @@ supportRoutes.post('/messages', async (c) => {
   const inserted = await c.env.DB.prepare("INSERT INTO support_messages (thread_id, sender, text) VALUES (?, 'user', ?) RETURNING *")
     .bind(threadId, text.trim())
     .first();
+
+  // Only the first unanswered message pings — a person typing three lines
+  // in a row shouldn't be three separate alerts, and once staff have
+  // replied the thread is already being watched.
+  const priorCount = await c.env.DB.prepare('SELECT COUNT(*) as n FROM support_messages WHERE thread_id = ? AND id != ?')
+    .bind(threadId, (inserted as { id: number }).id)
+    .first<{ n: number }>();
+  if ((priorCount?.n ?? 0) === 0) {
+    const who =
+      actor.col === 'worker_id'
+        ? await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(actor.id).first<{ name: string }>()
+        : await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(actor.id).first<{ name: string }>();
+    const role = actor.col === 'worker_id' ? 'соискатель' : 'работодатель';
+    c.executionCtx.waitUntil(
+      notifyAdmin(c.env, `🛟 Новое обращение в поддержку\n${who?.name || 'Без имени'} (${role})\n\n${text.trim().slice(0, 300)}`),
+    );
+  }
 
   return c.json({ message: inserted });
 });

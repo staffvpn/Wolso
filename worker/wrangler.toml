@@ -24,3 +24,7 @@ database_id = "3bd49b64-c1ac-494a-a747-b5a02d421b59"
 #   BOT_TOKEN          — the Telegram bot token from @BotFather
 #   SESSION_SECRET      — any long random string, used to sign session tokens
 #   OWNER_TELEGRAM_ID   — your own numeric Telegram user id, to bootstrap the first Owner
+#   ADMIN_CHAT_ID       — optional: where the bot sends operator alerts (new signups,
+#                         employers awaiting verification, support tickets). Defaults to
+#                         OWNER_TELEGRAM_ID. Must be a numeric id — a bot can't message
+#                         a @username — and you must press Start in the bot once first.

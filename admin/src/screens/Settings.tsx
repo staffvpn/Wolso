@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { apiFetch, ApiError } from '@/lib/apiClient';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { Input, Label } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -10,6 +12,42 @@ import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/cn';
 
 const CITIES = ['Москва', 'Санкт-Петербург', 'Казань', 'Екатеринбург', 'Новосибирск'];
+
+/** Sends a real alert through the real path, because "уведомления не
+ *  приходят" is almost always the bot not being allowed to DM you yet —
+ *  and there's no way to tell without actually trying. */
+function TestAlertButton() {
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+
+  async function test() {
+    setState('sending');
+    setMessage('');
+    try {
+      await apiFetch('/admin/health/test-alert', { method: 'POST' });
+      setState('sent');
+      setMessage('Отправлено — проверьте чат с ботом. Если ничего не пришло, откройте бота и нажмите «Старт».');
+    } catch (err) {
+      setState('error');
+      setMessage(
+        err instanceof ApiError && err.code === 'no_admin_chat_id'
+          ? 'Не задан ADMIN_CHAT_ID (и OWNER_TELEGRAM_ID) — укажите свой числовой Telegram ID секретом воркера.'
+          : 'Не получилось отправить — проверьте, что воркер задеплоен с BOT_TOKEN.',
+      );
+    }
+  }
+
+  return (
+    <div>
+      <Button variant="dark" disabled={state === 'sending'} onClick={test}>
+        {state === 'sending' ? 'Отправляем…' : 'Отправить тестовое уведомление'}
+      </Button>
+      {message && (
+        <p className={cn('text-[12px] mt-2.5 leading-relaxed', state === 'error' ? 'text-danger' : 'text-accent')}>{message}</p>
+      )}
+    </div>
+  );
+}
 
 export function Settings() {
   const s = useSettingsStore();
@@ -72,6 +110,17 @@ export function Settings() {
             </div>
           </Card>
         )}
+
+        <Card className="p-6 sm:col-span-2">
+          <SectionLabel className="mb-4">Оповещения в Telegram</SectionLabel>
+          <p className="text-[13px] text-text-muted leading-relaxed mb-4">
+            Бот пишет вам в личку о новых регистрациях, работодателях, ждущих проверки, и обращениях в поддержку.
+            Адрес задаётся секретом воркера <span className="font-mono text-text">ADMIN_CHAT_ID</span> (по умолчанию —{' '}
+            <span className="font-mono text-text">OWNER_TELEGRAM_ID</span>).
+            Важно: бот не сможет вам написать, пока вы сами хотя бы раз не нажмёте «Старт» в чате с ним.
+          </p>
+          <TestAlertButton />
+        </Card>
 
         <Card className="p-6 sm:col-span-2">
           <SectionLabel className="mb-4">Уведомления администраторам</SectionLabel>

@@ -6,6 +6,7 @@ import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../l
 import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
 import { lookupInn } from '../lib/innLookup';
+import { notifyAdmin } from '../lib/adminNotify';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -148,6 +149,12 @@ employerRoutes.patch('/me', async (c) => {
     )
       .bind(session.companyId)
       .run();
+    c.executionCtx.waitUntil(
+      notifyAdmin(
+        c.env,
+        `🏢 Работодатель на проверку\n${after.name || 'Без названия'}\nИНН: ${after.inn ?? '—'} · ${after.city ?? ''}\nОткройте «Проверка работодателей» в дашборде.`,
+      ),
+    );
     c.executionCtx.waitUntil(
       (async () => {
         const summary = await lookupInn({ id: session.companyId, name: after.name, inn: after.inn });

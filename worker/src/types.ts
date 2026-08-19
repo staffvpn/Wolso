@@ -5,6 +5,9 @@ export interface Env {
   BOT_TOKEN: string;
   SESSION_SECRET: string;
   OWNER_TELEGRAM_ID?: string;
+  /** Numeric Telegram id that operator alerts go to (see lib/adminNotify).
+   *  Falls back to OWNER_TELEGRAM_ID when unset. */
+  ADMIN_CHAT_ID?: string;
 }
 
 export type PermissionKey =

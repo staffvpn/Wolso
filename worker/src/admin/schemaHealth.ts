@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, requireStaffMiddleware } from '../middleware/auth';
+import { notifyAdmin } from '../lib/adminNotify';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -51,4 +52,16 @@ adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
     missingMigrations,
     missingColumns: missing.map((m) => ({ table: m.table, column: m.column, migration: m.migration, breaks: m.breaks })),
   });
+});
+
+/** Sends a test operator alert. Worth having a button for: the usual
+ *  reason alerts never arrive is that nobody pressed Start in the bot's
+ *  chat, and Telegram simply refuses ("chat not found") — which is
+ *  invisible until something tries to send. */
+adminSchemaHealthRoutes.post('/test-alert', requireStaffMiddleware, async (c) => {
+  const configured = !!(c.env.ADMIN_CHAT_ID || c.env.OWNER_TELEGRAM_ID);
+  if (!configured) return c.json({ error: 'no_admin_chat_id' }, 400);
+
+  await notifyAdmin(c.env, '🔔 Проверка уведомлений Wolso\nЕсли вы это видите — оповещения настроены и работают.');
+  return c.json({ ok: true });
 });
