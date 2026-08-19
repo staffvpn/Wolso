@@ -107,7 +107,7 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
          *  a long description just ends at the card edge. A tap used to open
          *  the full-screen detail view here, but that made real swipes get
          *  occasionally misread as taps — a dedicated button is unambiguous. */}
-        <p className="text-[14px] leading-relaxed text-text-muted mt-3 line-clamp-3">{shift.description}</p>
+        <p className="text-[14px] leading-relaxed text-text-muted mt-3 line-clamp-3 whitespace-pre-line">{shift.description}</p>
         <p className="text-[12px] text-text-faint mt-2">
           {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
         </p>

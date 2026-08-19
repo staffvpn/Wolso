@@ -46,12 +46,12 @@ export function WorkerProfileScreen() {
         </button>
       </div>
 
-      {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4">{profile.bio}</p>}
+      {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{profile.bio}</p>}
 
       {profile.skills && (
         <div className="mt-3">
           <SectionLabel>Навыки</SectionLabel>
-          <p className="text-[13px] text-text-muted leading-relaxed">{profile.skills}</p>
+          <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{profile.skills}</p>
         </div>
       )}
 

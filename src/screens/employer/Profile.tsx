@@ -54,7 +54,7 @@ export function EmployerProfileScreen() {
         </button>
       </div>
 
-      {company.description && <p className="text-[14px] text-text leading-relaxed mt-4">{company.description}</p>}
+      {company.description && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{company.description}</p>}
 
       {(company.photos ?? []).length > 0 && (
         <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">

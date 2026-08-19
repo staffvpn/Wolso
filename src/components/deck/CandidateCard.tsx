@@ -63,12 +63,12 @@ export function CandidateCard({ candidate, tall = false }: { candidate: Candidat
           <Badge tone="accent">{formatRating(candidate.rating)} · {candidate.shiftsCompleted} смен</Badge>
         </div>
 
-        {candidate.bio && <p className="text-[14px] text-text leading-relaxed">{candidate.bio}</p>}
+        {candidate.bio && <p className="text-[14px] text-text leading-relaxed whitespace-pre-line">{candidate.bio}</p>}
 
         {candidate.skills && (
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-1">Навыки</p>
-            <p className="text-[13px] text-text-muted leading-relaxed">{candidate.skills}</p>
+            <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{candidate.skills}</p>
           </div>
         )}
       </div>

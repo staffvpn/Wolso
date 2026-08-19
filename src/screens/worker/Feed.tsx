@@ -274,7 +274,7 @@ function ShiftDetailOverlay({
             <span className="text-[14px] text-text-muted ml-2">за смену · {shift.hourlyRate} ₽/ч</span>
           </div>
 
-          <p className="text-[14px] leading-relaxed text-text-muted mt-4">{shift.description}</p>
+          <p className="text-[14px] leading-relaxed text-text-muted mt-4 whitespace-pre-line">{shift.description}</p>
           <p className="text-[12px] text-text-faint mt-2">
             {timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin)}
           </p>

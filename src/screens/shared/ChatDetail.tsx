@@ -154,7 +154,7 @@ export function ChatDetail() {
             >
               <div
                 className={cn(
-                  'max-w-[78%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed',
+                  'max-w-[78%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-line break-words',
                   m.from === 'me' ? 'bg-accent text-accent-fg rounded-br-md' : 'bg-surface-2 text-text rounded-bl-md',
                 )}
               >
