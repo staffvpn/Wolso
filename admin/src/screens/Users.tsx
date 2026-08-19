@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +16,7 @@ import { useUserDetailStore } from '@/store/useUserDetailStore';
 import { useRolesStore } from '@/store/useRolesStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
-import { timeAgo, telegramLink, telegramLabel, formatDayMonth } from '@/lib/format';
+import { timeAgo, telegramLink, telegramLabel, formatDayMonth, formatDateRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { ApiError } from '@/lib/apiClient';
 import type { PlatformUser, TeamMember, UserPhoto } from '@/types';
@@ -153,14 +153,23 @@ export function Users() {
     });
   }, [seekers, employers, team]);
 
+  // createMinAgo is minutes since the account row was created — i.e. since
+  // that Telegram id first registered in the bot. Sorting by it ascending
+  // puts the most recently registered person at the top. The seeker/
+  // employer API calls already come back newest-first, but the merged
+  // "Все" tab used to just concatenate team, then seekers, then employers
+  // — team members always led regardless of when anyone actually joined.
+  // Sorting here, for every tab, is what actually guarantees the order.
   const rows: Row[] = useMemo(() => {
     const teamRows: Row[] = team.map((member) => ({ kind: 'team', member }));
     const seekerRows: Row[] = seekers.map((user) => ({ kind: 'seeker', user }));
     const employerRows: Row[] = employers.map((user) => ({ kind: 'employer', user }));
-    if (tab === 'team') return teamRows;
-    if (tab === 'seekers') return seekerRows;
-    if (tab === 'employers') return employerRows;
-    return [...teamRows, ...seekerRows, ...employerRows];
+    const registeredAgo = (r: Row) => (r.kind === 'team' ? r.member.createdMinAgo : r.user.createdMinAgo);
+    const byRecency = (list: Row[]) => [...list].sort((a, b) => registeredAgo(a) - registeredAgo(b));
+    if (tab === 'team') return byRecency(teamRows);
+    if (tab === 'seekers') return byRecency(seekerRows);
+    if (tab === 'employers') return byRecency(employerRows);
+    return byRecency([...teamRows, ...seekerRows, ...employerRows]);
   }, [tab, team, seekers, employers]);
 
   const filtered = useMemo(() => {
@@ -571,6 +580,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
   const detail = useUserDetailStore((s) => s.employer);
   const loadEmployer = useUserDetailStore((s) => s.loadEmployer);
   const updateEmployer = useUserDetailStore((s) => s.updateEmployer);
+  const deleteEmployerVacancy = useUserDetailStore((s) => s.deleteEmployerVacancy);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
   const canManageData = useCan('manageData');
@@ -580,6 +590,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', address: '', city: '', description: '', foundedYear: '' });
+  const [deletingVacancy, setDeletingVacancy] = useState<{ id: string; positionLabel: string } | null>(null);
 
   useEffect(() => {
     setEditing(false);
@@ -666,9 +677,20 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
                   <div key={v.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-text">{v.positionLabel}</span>
-                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                        <button
+                          onClick={() => setDeletingVacancy(v)}
+                          disabled={!canManageData}
+                          aria-label="Удалить вакансию"
+                          title="Удалить вакансию"
+                          className="h-6 w-6 rounded-md flex items-center justify-center text-text-faint hover:text-danger hover:bg-danger-soft transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-faint"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </span>
                     </div>
-                    <p className="text-text-faint mt-0.5">{formatDayMonth(new Date(v.date))} · откликов: {v.responseCount}</p>
+                    <p className="text-text-faint mt-0.5">{formatDateRange(v.date, v.endDate)} · откликов: {v.responseCount}</p>
                   </div>
                 );
               })}
@@ -684,9 +706,20 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
                   <div key={v.id} className="rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-text">{v.positionLabel}</span>
-                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                        <button
+                          onClick={() => setDeletingVacancy(v)}
+                          disabled={!canManageData}
+                          aria-label="Удалить вакансию"
+                          title="Удалить вакансию"
+                          className="h-6 w-6 rounded-md flex items-center justify-center text-text-faint hover:text-danger hover:bg-danger-soft transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-faint"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </span>
                     </div>
-                    <p className="text-text-faint mt-0.5">{formatDayMonth(new Date(v.date))} · откликов: {v.responseCount}</p>
+                    <p className="text-text-faint mt-0.5">{formatDateRange(v.date, v.endDate)} · откликов: {v.responseCount}</p>
                   </div>
                 );
               })}
@@ -753,6 +786,14 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
         description={`${user.name} и вся его история (вакансии, отклики, чаты, уведомления) удаляются без возможности восстановить.`}
         confirmLabel="Удалить"
         onConfirm={() => deleteUser(user.id, 'employer')}
+      />
+      <ConfirmModal
+        open={!!deletingVacancy}
+        onClose={() => setDeletingVacancy(null)}
+        title="Удалить вакансию?"
+        description={`«${deletingVacancy?.positionLabel}» и все отклики на неё удаляются без возможности восстановить.`}
+        confirmLabel="Удалить"
+        onConfirm={() => deleteEmployerVacancy(deletingVacancy!.id)}
       />
     </div>
   );

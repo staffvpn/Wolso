@@ -9,10 +9,22 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatMoney, isSameDay, weekdayShort } from '@/lib/format';
+import { formatDateRange, formatMoney, isSameDay, weekdayShort } from '@/lib/format';
 import { hapticNotify } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
 import type { Application, Shift } from '@/types';
+
+/** True if `day` falls anywhere within the shift's date (or date range,
+ *  for a multi-day posting) — a shift spanning several days should show
+ *  as "today" on every one of those days, and mark all of them on the
+ *  week strip, not just its first day. */
+function shiftCoversDay(shift: Shift, day: Date) {
+  const strip = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const d = strip(day);
+  const start = strip(new Date(shift.date));
+  const end = shift.endDate ? strip(new Date(shift.endDate)) : start;
+  return d >= start && d <= end;
+}
 
 function timeUntil(shift: Shift): string | null {
   const start = new Date(shift.date);
@@ -56,8 +68,8 @@ export function Shifts() {
     .filter((x): x is { app: (typeof confirmed)[number]; shift: Shift } => !!x.shift)
     .sort((a, b) => a.shift.date.localeCompare(b.shift.date));
 
-  const todays = withDates.filter((x) => isSameDay(new Date(x.shift.date), today));
-  const upcoming = withDates.filter((x) => !isSameDay(new Date(x.shift.date), today));
+  const todays = withDates.filter((x) => shiftCoversDay(x.shift, today));
+  const upcoming = withDates.filter((x) => !shiftCoversDay(x.shift, today));
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -77,7 +89,7 @@ export function Shifts() {
       <div className="flex gap-2 px-5 py-4 shrink-0">
         {weekDays.map((d) => {
           const active = isSameDay(d, today);
-          const hasShift = withDates.some((x) => isSameDay(new Date(x.shift.date), d));
+          const hasShift = withDates.some((x) => shiftCoversDay(x.shift, d));
           return (
             <div
               key={d.toISOString()}
@@ -161,6 +173,7 @@ export function Shifts() {
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
                       <p className="text-[12px] text-text-muted truncate">
+                        {shift.endDate ? `${formatDateRange(shift.date, shift.endDate)} · ` : ''}
                         {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}–{String(shift.endHour).padStart(2, '0')}:{String(shift.endMin).padStart(2, '0')} · {formatMoney(shift.totalPay)}
                       </p>
                     </div>

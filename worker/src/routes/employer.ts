@@ -234,6 +234,7 @@ employerRoutes.post('/vacancies', async (c) => {
     position: string;
     positionLabel: string;
     date: string;
+    endDate?: string;
     startHour: number;
     startMin: number;
     endHour: number;
@@ -251,15 +252,16 @@ employerRoutes.post('/vacancies', async (c) => {
   const totalPay = Math.max(0, Math.round(durationHours * body.hourlyRate));
 
   const inserted = await c.env.DB.prepare(
-    `INSERT INTO shifts (company_id, position, position_label, date, start_hour, start_min, end_hour, end_min,
+    `INSERT INTO shifts (company_id, position, position_label, date, end_date, start_hour, start_min, end_hour, end_min,
        hourly_rate, total_pay, description, meal, urgency, employment_type, time_of_day, requirements, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') RETURNING id`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') RETURNING id`,
   )
     .bind(
       session.companyId,
       body.position,
       body.positionLabel,
       body.date,
+      body.endDate && body.endDate > body.date ? body.endDate : null,
       body.startHour,
       body.startMin ?? 0,
       body.endHour,

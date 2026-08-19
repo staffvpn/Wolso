@@ -7,6 +7,7 @@ interface VacancyApiResponse {
   position: string;
   positionLabel: string;
   date: string;
+  endDate?: string;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -25,6 +26,7 @@ function fromApiVacancy(v: VacancyApiResponse): Vacancy {
     position: v.position as Position,
     positionLabel: v.positionLabel,
     date: v.date,
+    endDate: v.endDate,
     startHour: v.startHour,
     startMin: v.startMin,
     endHour: v.endHour,
@@ -201,6 +203,7 @@ export async function createVacancy(input: {
   position: Position;
   positionLabel: string;
   date: string;
+  endDate?: string;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -217,6 +220,7 @@ export async function createVacancy(input: {
       position: input.position,
       positionLabel: input.positionLabel,
       date: input.date,
+      endDate: input.endDate,
       startHour: input.startHour,
       startMin: input.startMin,
       endHour: input.endHour,

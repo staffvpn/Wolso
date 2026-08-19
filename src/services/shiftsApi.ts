@@ -19,6 +19,7 @@ export interface ShiftApiResponse {
   position: string;
   positionLabel: string;
   date: string;
+  endDate?: string;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -60,6 +61,7 @@ export function fromApi(s: ShiftApiResponse): Shift {
     position: s.position as Shift['position'],
     positionLabel: s.positionLabel,
     date: s.date,
+    endDate: s.endDate,
     startHour: s.startHour,
     startMin: s.startMin,
     endHour: s.endHour,

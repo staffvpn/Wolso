@@ -1,6 +1,6 @@
 import { BottomSheet } from './ui/BottomSheet';
 import { SectionLabel } from './ui/Card';
-import { formatMoney, relativeDay } from '@/lib/format';
+import { formatMoney, relativeDayRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { Vacancy } from '@/types';
 
@@ -39,7 +39,7 @@ export function VacancyPickSheet({ open, onClose, vacancies, selectedId, onSelec
           >
             <p className="font-semibold text-[14px]">{v.positionLabel}</p>
             <p className="text-[13px] text-text-muted mt-0.5">
-              {relativeDay(new Date(v.date))} {String(v.startHour).padStart(2, '0')}:{String(v.startMin).padStart(2, '0')} · {formatMoney(v.hourlyRate)}/ч
+              {relativeDayRange(v.date, v.endDate)} {String(v.startHour).padStart(2, '0')}:{String(v.startMin).padStart(2, '0')} · {formatMoney(v.hourlyRate)}/ч
             </p>
           </button>
         ))}

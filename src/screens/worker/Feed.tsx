@@ -19,7 +19,7 @@ import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatDistance, formatMoney, localDateStr, relativeDay, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, localDateStr, relativeDayRange, shiftDaysCount, pluralizeShifts, timeRange } from '@/lib/format';
 import { FEATURES } from '@/lib/features';
 import { hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
@@ -173,7 +173,8 @@ function ShiftDetailOverlay({
   onApply: () => void;
 }) {
   const company = resolveCompany(shift);
-  const day = relativeDay(new Date(shift.date));
+  const day = relativeDayRange(shift.date, shift.endDate);
+  const days = shiftDaysCount(shift.date, shift.endDate);
   const durationH = shift.endHour - shift.startHour;
   const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
@@ -260,6 +261,7 @@ function ShiftDetailOverlay({
               {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
             </Badge>
             <Badge tone="dark">{durationH} часов</Badge>
+            {days > 1 && <Badge tone="dark">{days} {pluralizeShifts(days)}</Badge>}
             {shift.meal && <Badge tone="dark">Питание</Badge>}
           </div>
 

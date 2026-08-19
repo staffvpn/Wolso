@@ -51,7 +51,10 @@ export interface Shift {
   company?: Company;
   position: Position;
   positionLabel: string;
-  date: string; // ISO date, day only
+  date: string; // ISO date, day only — first (or only) day
+  /** Last day of a multi-day posting — one shift, several consecutive
+   *  days, not several separate shifts. Absent means single-day. */
+  endDate?: string;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -204,6 +207,7 @@ export interface Vacancy {
   position: Position;
   positionLabel: string;
   date: string;
+  endDate?: string;
   startHour: number;
   startMin: number;
   endHour: number;

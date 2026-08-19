@@ -25,6 +25,7 @@ interface EmployerState {
     position: Position;
     positionLabel: string;
     date: string;
+    endDate?: string;
     startHour: number;
     startMin: number;
     endHour: number;

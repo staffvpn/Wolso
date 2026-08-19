@@ -159,7 +159,7 @@ adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
     .bind(id)
     .all<{ id: number }>();
   const { results: vacancies } = await c.env.DB.prepare(
-    `SELECT s.id, s.position_label, s.date, s.status,
+    `SELECT s.id, s.position_label, s.date, s.end_date, s.status,
             (SELECT COUNT(*) FROM applications a WHERE a.shift_id = s.id) as response_count
      FROM shifts s WHERE s.company_id = ? ORDER BY s.created_at DESC LIMIT 50`,
   )

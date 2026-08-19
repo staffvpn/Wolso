@@ -203,6 +203,7 @@ interface EmployerVacancyApiRow {
   id: number;
   position_label: string;
   date: string;
+  end_date: string | null;
   status: string;
   response_count: number;
 }
@@ -234,6 +235,7 @@ export async function fetchEmployerDetail(id: string): Promise<EmployerDetail> {
         id: String(v.id),
         positionLabel: v.position_label,
         date: v.date,
+        endDate: v.end_date ?? undefined,
         status: v.status,
         responseCount: v.response_count,
       }),

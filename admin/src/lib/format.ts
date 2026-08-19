@@ -27,6 +27,14 @@ export function formatDayMonth(date: Date) {
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
+/** A multi-day vacancy ("нужен человек на 3 дня") is one posting with a
+ *  start and end date, not several separate ones — shows as a range when
+ *  it spans more than a day, same single date as before otherwise. */
+export function formatDateRange(date: string, endDate?: string): string {
+  if (!endDate || endDate === date) return formatDayMonth(new Date(date));
+  return `${formatDayMonth(new Date(date))} – ${formatDayMonth(new Date(endDate))}`;
+}
+
 export function formatMonthYear(date: Date) {
   return `${MONTHS_NOM[date.getMonth()]} ${date.getFullYear()}`;
 }

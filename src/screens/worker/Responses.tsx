@@ -12,7 +12,7 @@ import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
 import { resolveCompany } from '@/data/companies';
-import { formatMoney, relativeDay } from '@/lib/format';
+import { formatMoney, relativeDayRange } from '@/lib/format';
 import { hapticNotify } from '@/lib/telegram';
 import type { Application, ApplicationStatus } from '@/types';
 
@@ -110,7 +110,7 @@ export function Responses() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[15px] truncate">{shift.positionLabel} · {company.name}</p>
                       <p className="text-[13px] text-text-muted truncate">
-                        {relativeDay(new Date(shift.date))} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · {formatMoney(shift.totalPay)}
+                        {relativeDayRange(shift.date, shift.endDate)} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · {formatMoney(shift.totalPay)}
                       </p>
                     </div>
                     <Badge tone={status.tone}>{status.label}</Badge>

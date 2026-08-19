@@ -4,7 +4,7 @@ import { resolveCompany } from '@/data/companies';
 import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
-import { formatDistance, formatMoney, relativeDay, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, relativeDayRange, shiftDaysCount, pluralizeShifts, timeRange } from '@/lib/format';
 import { ChevronRight, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
@@ -12,7 +12,8 @@ import { hapticSelect } from '@/lib/telegram';
 
 export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?: () => void }) {
   const company = resolveCompany(shift);
-  const day = relativeDay(new Date(shift.date));
+  const day = relativeDayRange(shift.date, shift.endDate);
+  const days = shiftDaysCount(shift.date, shift.endDate);
   const durationH = shift.endHour - shift.startHour;
   const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
@@ -87,6 +88,7 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
             {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
           </Badge>
           <Badge tone="dark">{durationH} часов</Badge>
+          {days > 1 && <Badge tone="dark">{days} {pluralizeShifts(days)}</Badge>}
           {shift.meal && <Badge tone="dark">Питание</Badge>}
         </div>
 

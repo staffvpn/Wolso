@@ -15,7 +15,7 @@ import { CloseShiftSheet } from '@/components/CloseShiftSheet';
 import { CancelSheet } from '@/components/CancelSheet';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { useChatStore } from '@/store/useChatStore';
-import { localDateStr, timeAgoSince } from '@/lib/format';
+import { formatDateRange, localDateStr, timeAgoSince } from '@/lib/format';
 import type { Candidate } from '@/types';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -79,8 +79,9 @@ export function VacancyDetail() {
   }
 
   // "Этот день прошёл" — closing (and the mandatory review that comes with
-  // it) only makes sense once the shift has actually happened.
-  const shiftIsPast = vacancy.date < localDateStr();
+  // it) only makes sense once the shift has actually happened. For a
+  // multi-day vacancy that's once the *last* day has passed, not the first.
+  const shiftIsPast = (vacancy.endDate ?? vacancy.date) < localDateStr();
 
   const [top, ...rest] = filtered;
 
@@ -100,7 +101,7 @@ export function VacancyDetail() {
     <div className="flex flex-col h-full min-h-0">
       <TopBar
         onBack={() => navigate(-1)}
-        title={`${vacancy.positionLabel} · сегодня`}
+        title={`${vacancy.positionLabel} · ${formatDateRange(vacancy.date, vacancy.endDate)}`}
         subtitle={`${String(vacancy.startHour).padStart(2, '0')}:${String(vacancy.startMin).padStart(2, '0')}–${String(vacancy.endHour).padStart(2, '0')}:${String(vacancy.endMin).padStart(2, '0')} · опубликовано ${timeAgoSince(vacancy.createdAt)} назад`}
         right={<Badge tone={STATUS_TONE[vacancy.status] ?? 'neutral'}>{STATUS_LABEL[vacancy.status] ?? vacancy.status}</Badge>}
       />

@@ -8,6 +8,9 @@ export interface ShiftRow {
   position: string;
   position_label: string;
   date: string;
+  /** Last day of a multi-day posting — NULL (or equal to `date`) means a
+   *  single-day shift, unchanged from before this column existed. */
+  end_date: string | null;
   start_hour: number;
   start_min: number;
   end_hour: number;
@@ -47,6 +50,7 @@ export function shiftToJson(r: ShiftRow) {
     position: r.position,
     positionLabel: r.position_label,
     date: r.date,
+    endDate: r.end_date && r.end_date !== r.date ? r.end_date : undefined,
     startHour: r.start_hour,
     startMin: r.start_min,
     endHour: r.end_hour,

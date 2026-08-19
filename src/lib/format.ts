@@ -58,6 +58,30 @@ export function relativeDay(date: Date, now = new Date()) {
   return `${formatDayMonth(date)}`;
 }
 
+/** How many calendar days a shift spans, inclusive — 1 for a single-day
+ *  shift (the common case: no endDate, or endDate === date). */
+export function shiftDaysCount(date: string, endDate?: string): number {
+  if (!endDate || endDate === date) return 1;
+  const ms = new Date(endDate).getTime() - new Date(date).getTime();
+  return Math.max(1, Math.round(ms / 86400000) + 1);
+}
+
+/** A multi-day vacancy shows as a range ("10–12 авг"); a single-day one is
+ *  just the one date, same as `formatDayMonth` always did. */
+export function formatDateRange(date: string, endDate?: string): string {
+  if (!endDate || endDate === date) return formatDayMonth(new Date(date));
+  return `${formatDayMonth(new Date(date))} – ${formatDayMonth(new Date(endDate))}`;
+}
+
+/** Same as `relativeDay`, but a multi-day shift keeps "Сегодня"/"Завтра"
+ *  for its first day and appends where it ends — "Сегодня – 12 авг"
+ *  instead of losing that context to a bare date range. */
+export function relativeDayRange(date: string, endDate: string | undefined, now = new Date()) {
+  const startLabel = relativeDay(new Date(date), now);
+  if (!endDate || endDate === date) return startLabel;
+  return `${startLabel} – ${formatDayMonth(new Date(endDate))}`;
+}
+
 export function timeRange(startHour: number, startMin: number, endHour: number, endMin: number) {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(startHour)}:${pad(startMin)}–${pad(endHour)}:${pad(endMin)}`;
@@ -84,12 +108,18 @@ export function timeAgoSince(timestamp: string) {
   return timeAgo(minutesSince(timestamp));
 }
 
-function pluralize(n: number, one: string, few: string, many: string): string {
+export function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return one;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
   return many;
+}
+
+/** Genitive plural for "N смена/смены/смен" — shared by anywhere a
+ *  multi-day vacancy needs to say how many days it covers. */
+export function pluralizeShifts(n: number): string {
+  return pluralize(n, 'смена', 'смены', 'смен');
 }
 
 /** Work experience is stored as a single total-months count so people can

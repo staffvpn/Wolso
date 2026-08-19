@@ -6,7 +6,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatMoney, localDateStr, timeAgoSince } from '@/lib/format';
+import { formatDateRange, formatMoney, localDateStr, timeAgoSince } from '@/lib/format';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Активна',
@@ -61,7 +61,7 @@ export function Vacancies() {
             const pending = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'pending').length;
             const invited = candidates.filter((c) => c.vacancyId === vac.id && c.status === 'invited').length;
             const needsClosing =
-              vac.date < localDateStr() &&
+              (vac.endDate ?? vac.date) < localDateStr() &&
               candidates.some(
                 (c) => c.vacancyId === vac.id && c.status === 'accepted' && c.workStage !== 'employer_closed' && c.workStage !== 'reviewed',
               );
@@ -78,7 +78,7 @@ export function Vacancies() {
                   <Badge tone={STATUS_TONE[vac.status] ?? 'neutral'}>{STATUS_LABEL[vac.status] ?? vac.status}</Badge>
                   <span className="text-[12px] text-text-faint">опубликовано {timeAgoSince(vac.createdAt)} назад</span>
                 </div>
-                <p className="font-bold text-[17px]">{vac.positionLabel} · сегодня</p>
+                <p className="font-bold text-[17px]">{vac.positionLabel} · {formatDateRange(vac.date, vac.endDate)}</p>
                 <p className="text-[13px] text-text-muted mt-0.5">
                   {String(vac.startHour).padStart(2, '0')}:{String(vac.startMin).padStart(2, '0')}–{String(vac.endHour).padStart(2, '0')}:{String(vac.endMin).padStart(2, '0')} · {formatMoney(vac.hourlyRate)}/ч
                 </p>

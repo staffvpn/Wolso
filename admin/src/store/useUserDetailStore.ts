@@ -6,6 +6,7 @@ import {
   updateSeeker as updateSeekerApi,
   updateEmployer as updateEmployerApi,
 } from '@/services/usersApi';
+import { deleteVacancy as deleteVacancyApi } from '@/services/vacanciesApi';
 
 /** The expanded card's full profile + edit state — kept separate from
  *  useUsersStore (which only ever needs the thin list shape) since this
@@ -21,6 +22,7 @@ interface UserDetailState {
     id: string,
     update: { name?: string; address?: string; city?: string; description?: string; foundedYear?: number },
   ) => Promise<void>;
+  deleteEmployerVacancy: (vacancyId: string) => Promise<void>;
   clear: () => void;
 }
 
@@ -51,6 +53,16 @@ export const useUserDetailStore = create<UserDetailState>((set, get) => ({
     await updateEmployerApi(id, update);
     const current = get().employer;
     if (current && current.id === id) set({ employer: { ...current, ...update } });
+  },
+
+  // Reuses the same hard-delete the standalone "Вакансии" screen has
+  // always used (DELETE /admin/vacancies/:id, manageData-gated) — just
+  // triggered from the employer's own card instead of the global list,
+  // and drops the row locally on success instead of a full refetch.
+  deleteEmployerVacancy: async (vacancyId) => {
+    await deleteVacancyApi(vacancyId);
+    const current = get().employer;
+    if (current) set({ employer: { ...current, vacancies: current.vacancies.filter((v) => v.id !== vacancyId) } });
   },
 
   clear: () => set({ seeker: null, employer: null }),

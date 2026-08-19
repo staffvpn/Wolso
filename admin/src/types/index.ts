@@ -112,6 +112,7 @@ export interface EmployerVacancy {
   id: string;
   positionLabel: string;
   date: string;
+  endDate?: string;
   status: string;
   responseCount: number;
 }
