@@ -106,6 +106,22 @@ export interface SeekerDetail {
   positions: UserPosition[];
   photos: UserPhoto[];
   applications: SeekerApplication[];
+  reviewsReceived: AdminReview[];
+  reviewsGiven: AdminReview[];
+}
+
+/** One review, as shown in the dashboard. `counterpartyName` is whoever
+ *  is on the other side of it — the company for a review a worker
+ *  received, the worker for a review a company received. */
+export interface AdminReview {
+  id: string;
+  rating: number;
+  tags: string[];
+  comment: string;
+  createdAt?: string;
+  positionLabel: string;
+  shiftDate: string;
+  counterpartyName: string;
 }
 
 export interface EmployerVacancy {
@@ -133,6 +149,8 @@ export interface EmployerDetail {
   createdAt: string;
   photos: UserPhoto[];
   vacancies: EmployerVacancy[];
+  reviewsReceived: AdminReview[];
+  reviewsGiven: AdminReview[];
 }
 
 /** An employer's profile awaiting (or already given) an admin decision on

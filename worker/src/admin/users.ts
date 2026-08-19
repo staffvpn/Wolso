@@ -102,6 +102,37 @@ adminUserRoutes.post('/sync-telegram-usernames', requireStaffMiddleware, async (
   return c.json({ checked: workers.length + companies.length, updated });
 });
 
+/** Every review lives on the application it came out of — the employer's
+ *  review of the worker in employer_rating/employer_review_*, the worker's
+ *  review of the employer in rating/review_*. Both sides are shown in the
+ *  dashboard: "получил" is what others wrote about this account (the
+ *  reputation staff are usually checking), "оставил" is what they wrote
+ *  about everyone else — which is what you need when someone's disputing a
+ *  review or serially one-starring people. */
+interface AdminReviewRow {
+  id: number;
+  rating: number;
+  tags: string | null;
+  comment: string | null;
+  created_at: string | null;
+  position_label: string;
+  date: string;
+  counterparty_name: string;
+}
+
+function reviewToJson(r: AdminReviewRow) {
+  return {
+    id: r.id,
+    rating: r.rating,
+    tags: r.tags ? (JSON.parse(r.tags) as string[]) : [],
+    comment: r.comment || '',
+    createdAt: r.created_at,
+    positionLabel: r.position_label,
+    shiftDate: r.date,
+    counterpartyName: r.counterparty_name,
+  };
+}
+
 /** Full profile — everything the person themselves filled in, plus their
  *  application history, for the expanded card in the dashboard. The list
  *  endpoints above stay thin (just enough for the table row); this is
@@ -135,6 +166,30 @@ adminUserRoutes.get('/seekers/:id', requireStaffMiddleware, async (c) => {
     .bind(id)
     .all();
 
+  const { results: reviewsReceived } = await c.env.DB.prepare(
+    `SELECT a.id, a.employer_rating as rating, a.employer_review_tags as tags, a.employer_review_comment as comment,
+            a.closed_by_employer_at as created_at, s.position_label, s.date, co.name as counterparty_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     WHERE a.worker_id = ? AND a.employer_rating IS NOT NULL
+     ORDER BY a.closed_by_employer_at DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all<AdminReviewRow>();
+
+  const { results: reviewsGiven } = await c.env.DB.prepare(
+    `SELECT a.id, a.rating as rating, a.review_tags as tags, a.review_comment as comment,
+            a.created_at as created_at, s.position_label, s.date, co.name as counterparty_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     WHERE a.worker_id = ? AND a.rating IS NOT NULL
+     ORDER BY a.id DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all<AdminReviewRow>();
+
   return c.json({
     worker: {
       ...worker,
@@ -144,6 +199,8 @@ adminUserRoutes.get('/seekers/:id', requireStaffMiddleware, async (c) => {
     positions,
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${id}/photos/${p.id}` })),
     applications,
+    reviewsReceived: reviewsReceived.map(reviewToJson),
+    reviewsGiven: reviewsGiven.map(reviewToJson),
   });
 });
 
@@ -166,6 +223,30 @@ adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
     .bind(id)
     .all();
 
+  const { results: reviewsReceived } = await c.env.DB.prepare(
+    `SELECT a.id, a.rating as rating, a.review_tags as tags, a.review_comment as comment,
+            a.created_at as created_at, s.position_label, s.date, w.name as counterparty_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE s.company_id = ? AND a.rating IS NOT NULL
+     ORDER BY a.id DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all<AdminReviewRow>();
+
+  const { results: reviewsGiven } = await c.env.DB.prepare(
+    `SELECT a.id, a.employer_rating as rating, a.employer_review_tags as tags, a.employer_review_comment as comment,
+            a.closed_by_employer_at as created_at, s.position_label, s.date, w.name as counterparty_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE s.company_id = ? AND a.employer_rating IS NOT NULL
+     ORDER BY a.closed_by_employer_at DESC LIMIT 50`,
+  )
+    .bind(id)
+    .all<AdminReviewRow>();
+
   return c.json({
     company: {
       ...company,
@@ -174,6 +255,8 @@ adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
     },
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${id}/photos/${p.id}` })),
     vacancies,
+    reviewsReceived: reviewsReceived.map(reviewToJson),
+    reviewsGiven: reviewsGiven.map(reviewToJson),
   });
 });
 

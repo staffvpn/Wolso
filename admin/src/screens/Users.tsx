@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2 } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +19,7 @@ import { roleById } from '@/data/permissions';
 import { timeAgo, telegramLink, telegramLabel, formatDayMonth, formatDateRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { ApiError } from '@/lib/apiClient';
-import type { PlatformUser, TeamMember, UserPhoto } from '@/types';
+import type { AdminReview, PlatformUser, TeamMember, UserPhoto } from '@/types';
 
 const ERROR_MESSAGES: Record<string, string> = {
   owner_transfer_requires_permission: 'Передать или снять роль владельца может только сам владелец.',
@@ -380,6 +380,91 @@ function SectionLabel({ children }: { children: ReactNode }) {
   return <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-1.5">{children}</p>;
 }
 
+/** Stars as a compact inline row — the dashboard shows a lot of reviews
+ *  at once, so a filled/empty five-star strip reads faster than a number. */
+function Stars({ value }: { value: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`Оценка ${value} из 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} size={12} className={n <= value ? 'fill-warning text-warning' : 'text-border'} />
+      ))}
+    </span>
+  );
+}
+
+/** Both directions of the review relationship, shown as two tabs on the
+ *  same block: what people wrote about this account, and what this account
+ *  wrote about everyone else. The second one is what you actually need when
+ *  someone disputes a rating or is serially one-starring people. */
+function ReviewsBlock({ received, given, receivedLabel, givenLabel }: {
+  received: AdminReview[];
+  given: AdminReview[];
+  receivedLabel: string;
+  givenLabel: string;
+}) {
+  const [tab, setTab] = useState<'received' | 'given'>('received');
+  const list = tab === 'received' ? received : given;
+  const avg = received.length > 0 ? received.reduce((sum, r) => sum + r.rating, 0) / received.length : 0;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <SectionLabel>Отзывы</SectionLabel>
+        {received.length > 0 && (
+          <span className="text-[12px] text-text-faint flex items-center gap-1.5 mb-1.5">
+            <Stars value={Math.round(avg)} /> {avg.toFixed(1)} из {received.length}
+          </span>
+        )}
+      </div>
+
+      <div className="flex gap-1.5 mb-3">
+        <button
+          onClick={() => setTab('received')}
+          className={cn(
+            'text-[12px] font-semibold px-2.5 py-1 rounded-lg transition-colors',
+            tab === 'received' ? 'bg-accent-soft text-accent' : 'text-text-faint hover:text-text',
+          )}
+        >
+          {receivedLabel} · {received.length}
+        </button>
+        <button
+          onClick={() => setTab('given')}
+          className={cn(
+            'text-[12px] font-semibold px-2.5 py-1 rounded-lg transition-colors',
+            tab === 'given' ? 'bg-accent-soft text-accent' : 'text-text-faint hover:text-text',
+          )}
+        >
+          {givenLabel} · {given.length}
+        </button>
+      </div>
+
+      {list.length === 0 && <p className="text-[13px] text-text-faint">Пока нет отзывов</p>}
+
+      <div className="flex flex-col gap-2">
+        {list.map((r) => (
+          <div key={`${tab}-${r.id}`} className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text truncate">{r.counterpartyName}</span>
+              <Stars value={r.rating} />
+            </div>
+            <p className="text-text-faint text-[12px] mt-0.5">
+              {r.positionLabel} · {formatDayMonth(new Date(r.shiftDate))}
+            </p>
+            {r.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {r.tags.map((tag) => (
+                  <span key={tag} className="text-[11px] text-text-muted bg-surface rounded px-1.5 py-0.5">{tag}</span>
+                ))}
+              </div>
+            )}
+            {r.comment && <p className="text-text mt-1.5 leading-relaxed whitespace-pre-line">{r.comment}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
   const switchRole = useUsersStore((s) => s.switchRole);
@@ -496,6 +581,12 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
               ))}
             </div>
           </div>
+          <ReviewsBlock
+            received={ready.reviewsReceived}
+            given={ready.reviewsGiven}
+            receivedLabel="О нём"
+            givenLabel="Он оставил"
+          />
           <div>
             <SectionLabel>Завершённые смены{completedApplications.length > 0 ? ` (${completedApplications.length})` : ''}</SectionLabel>
             {completedApplications.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}
@@ -696,6 +787,12 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
               })}
             </div>
           </div>
+          <ReviewsBlock
+            received={ready.reviewsReceived}
+            given={ready.reviewsGiven}
+            receivedLabel="О компании"
+            givenLabel="Компания оставила"
+          />
           <div>
             <SectionLabel>Завершённые вакансии{closedVacancies.length > 0 ? ` (${closedVacancies.length})` : ''}</SectionLabel>
             {closedVacancies.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}

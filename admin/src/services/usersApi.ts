@@ -1,6 +1,6 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { minutesSince, telegramLabel } from '@/lib/format';
-import type { EmployerDetail, EmployerVacancy, PlatformUser, SeekerApplication, SeekerDetail, TeamMember, UserPhoto, UserPosition, UserStatus } from '@/types';
+import type { AdminReview, EmployerDetail, EmployerVacancy, PlatformUser, SeekerApplication, SeekerDetail, TeamMember, UserPhoto, UserPosition, UserStatus } from '@/types';
 
 interface TeamApiRow {
   id: number;
@@ -140,12 +140,38 @@ interface SeekerApplicationApiRow {
   company_name: string;
 }
 
+interface ReviewApiRow {
+  id: number;
+  rating: number;
+  tags: string[];
+  comment: string;
+  createdAt: string | null;
+  positionLabel: string;
+  shiftDate: string;
+  counterpartyName: string;
+}
+
+function fromApiReview(r: ReviewApiRow): AdminReview {
+  return {
+    id: String(r.id),
+    rating: r.rating,
+    tags: r.tags ?? [],
+    comment: r.comment ?? '',
+    createdAt: r.createdAt ?? undefined,
+    positionLabel: r.positionLabel,
+    shiftDate: r.shiftDate,
+    counterpartyName: r.counterpartyName,
+  };
+}
+
 export async function fetchSeekerDetail(id: string): Promise<SeekerDetail> {
-  const { worker, positions, photos, applications } = await apiFetch<{
+  const { worker, positions, photos, applications, reviewsReceived, reviewsGiven } = await apiFetch<{
     worker: SeekerDetailApiRow;
     positions: { id: number; position: string; position_label: string; months: number }[];
     photos: { id: number; url: string }[];
     applications: SeekerApplicationApiRow[];
+    reviewsReceived: ReviewApiRow[];
+    reviewsGiven: ReviewApiRow[];
   }>(`/admin/users/seekers/${id}`);
 
   return {
@@ -180,6 +206,10 @@ export async function fetchSeekerDetail(id: string): Promise<SeekerDetail> {
         companyName: a.company_name,
       }),
     ),
+    // Older deploys of the worker don't return these yet — default rather
+    // than crash the whole card on a stale API.
+    reviewsReceived: (reviewsReceived ?? []).map(fromApiReview),
+    reviewsGiven: (reviewsGiven ?? []).map(fromApiReview),
   };
 }
 
@@ -209,10 +239,12 @@ interface EmployerVacancyApiRow {
 }
 
 export async function fetchEmployerDetail(id: string): Promise<EmployerDetail> {
-  const { company, photos, vacancies } = await apiFetch<{
+  const { company, photos, vacancies, reviewsReceived, reviewsGiven } = await apiFetch<{
     company: EmployerDetailApiRow;
     photos: { id: number; url: string }[];
     vacancies: EmployerVacancyApiRow[];
+    reviewsReceived: ReviewApiRow[];
+    reviewsGiven: ReviewApiRow[];
   }>(`/admin/users/employers/${id}`);
 
   return {
@@ -240,6 +272,8 @@ export async function fetchEmployerDetail(id: string): Promise<EmployerDetail> {
         responseCount: v.response_count,
       }),
     ),
+    reviewsReceived: (reviewsReceived ?? []).map(fromApiReview),
+    reviewsGiven: (reviewsGiven ?? []).map(fromApiReview),
   };
 }
 
