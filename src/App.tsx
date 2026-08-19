@@ -27,6 +27,7 @@ import { ChatList } from './screens/shared/ChatList';
 import { ChatDetail } from './screens/shared/ChatDetail';
 import { Notifications } from './screens/shared/Notifications';
 import { Support } from './screens/shared/Support';
+import { Reviews } from './screens/shared/Reviews';
 import { CompleteWorkerProfile } from './screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from './screens/onboarding/CompleteEmployerProfile';
 
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="/w/notifications" element={<Notifications />} />
               <Route path="/w/support" element={<Support />} />
               <Route path="/w/profile/edit" element={<CompleteWorkerProfile />} />
+              <Route path="/w/reviews" element={<Reviews role="worker" />} />
 
               {/* Employer tabs */}
               <Route path="/e" element={<TabShell />}>
@@ -80,6 +82,7 @@ export default function App() {
               <Route path="/e/notifications" element={<Notifications />} />
               <Route path="/e/support" element={<Support />} />
               <Route path="/e/profile/edit" element={<CompleteEmployerProfile />} />
+              <Route path="/e/reviews" element={<Reviews role="employer" />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

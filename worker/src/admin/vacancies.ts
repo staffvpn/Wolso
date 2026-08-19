@@ -29,6 +29,10 @@ adminVacancyRoutes.delete('/:id', requirePermission('manageData'), async (c) => 
   const shift = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
+  // Same reason as the employer-side delete: chats.shift_id is
+  // ON DELETE SET NULL, so without this the worker keeps an orphaned chat
+  // for a vacancy that's gone.
+  await c.env.DB.prepare('DELETE FROM chats WHERE shift_id = ?').bind(id).run();
   await c.env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
 
   const actor = await actorLabel(c.env, session);

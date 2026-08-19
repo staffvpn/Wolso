@@ -138,6 +138,21 @@ export interface WorkerExperience {
   months: number;
 }
 
+/** One review someone left about you, on either side — the employer's
+ *  review of a worker after closing a shift, or the worker's review of
+ *  the employer afterwards. `authorName` is whoever wrote it. */
+export interface Review {
+  id: string;
+  rating: number;
+  tags: string[];
+  comment: string;
+  createdAt?: string;
+  positionLabel: string;
+  shiftDate: string;
+  authorName: string;
+  authorAvatarUrl?: string;
+}
+
 export interface WorkerReview {
   companyName: string;
   rating: number;

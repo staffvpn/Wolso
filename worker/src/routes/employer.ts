@@ -285,6 +285,52 @@ employerRoutes.post('/vacancies', async (c) => {
   return c.json({ shift: shiftToJson(row!) });
 });
 
+/** Reviews workers left about this company, newest first — the list
+ *  behind the rating on the employer's own profile. Mirrors
+ *  GET /me/reviews on the worker side. */
+employerRoutes.get('/reviews', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT a.id, a.rating as rating, a.review_tags as tags, a.review_comment as comment,
+            a.created_at, s.position_label, s.date,
+            w.id as worker_id, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE s.company_id = ? AND a.rating IS NOT NULL
+     ORDER BY a.id DESC LIMIT 100`,
+  )
+    .bind(session.companyId)
+    .all<{
+      id: number;
+      rating: number;
+      tags: string | null;
+      comment: string | null;
+      created_at: string;
+      position_label: string;
+      date: string;
+      worker_id: number;
+      worker_name: string;
+      worker_has_avatar: number;
+    }>();
+
+  return c.json({
+    reviews: results.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      tags: r.tags ? (JSON.parse(r.tags) as string[]) : [],
+      comment: r.comment || '',
+      createdAt: r.created_at,
+      positionLabel: r.position_label,
+      shiftDate: r.date,
+      authorName: r.worker_name,
+      authorAvatarUrl: r.worker_has_avatar ? `/media/workers/${r.worker_id}/avatar` : null,
+    })),
+  });
+});
+
 /** An employer removing one of their own postings. Cascades to its
  *  applications, chats and favorites the same way the admin-side delete
  *  does (see worker/migrations for the FK graph) — so anyone already
@@ -318,6 +364,11 @@ employerRoutes.delete('/vacancies/:id', async (c) => {
     c.executionCtx.waitUntil(sendTelegramMessage(c.env, person.telegram_id, `❌ ${title}\n${subtitle}`));
   }
 
+  // chats.shift_id is ON DELETE SET NULL, not CASCADE — deleting the shift
+  // on its own leaves the chat alive with a null shift, still sitting in
+  // both sides' chat list pointing at a vacancy that no longer exists.
+  // Messages cascade off the chat row itself.
+  await c.env.DB.prepare('DELETE FROM chats WHERE shift_id = ?').bind(id).run();
   await c.env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
   return c.json({ ok: true });
 });

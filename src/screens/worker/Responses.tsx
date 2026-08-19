@@ -43,14 +43,22 @@ export function Responses() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const invitedCount = useMemo(() => applications.filter((a) => a.status === 'invited').length, [applications]);
+  // Once the employer has closed the shift it isn't an open response any
+  // more — it's work history, and it moves to "Мои смены". Leaving it here
+  // is what made a finished shift keep saying "Вы подтвердили".
+  const open = useMemo(
+    () => applications.filter((a) => a.workStage !== 'employer_closed' && a.workStage !== 'reviewed'),
+    [applications],
+  );
+
+  const invitedCount = useMemo(() => open.filter((a) => a.status === 'invited').length, [open]);
 
   const filtered = useMemo(() => {
-    if (tab === 'invited') return applications.filter((a) => a.status === 'invited');
-    if (tab === 'pending') return applications.filter((a) => a.status === 'pending');
-    if (tab === 'accepted') return applications.filter((a) => a.status === 'accepted');
-    return applications;
-  }, [applications, tab]);
+    if (tab === 'invited') return open.filter((a) => a.status === 'invited');
+    if (tab === 'pending') return open.filter((a) => a.status === 'pending');
+    if (tab === 'accepted') return open.filter((a) => a.status === 'accepted');
+    return open;
+  }, [open, tab]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -58,7 +66,7 @@ export function Responses() {
 
       <div className="flex gap-2 px-5 pb-3 shrink-0 overflow-x-auto">
         <Chip tone="dark" selected={tab === 'all'} onClick={() => setTab('all')}>
-          Все · {applications.length}
+          Все · {open.length}
         </Chip>
         {invitedCount > 0 && (
           <Chip tone="dark" selected={tab === 'invited'} onClick={() => setTab('invited')}>

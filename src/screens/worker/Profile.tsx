@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Plus } from 'lucide-react';
+import { ChevronRight, Pencil, Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
@@ -32,10 +32,11 @@ export function WorkerProfileScreen() {
             {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
           </h1>
           <p className="text-[13px] text-text-muted">{positions[0]?.positionLabel} · {profile.city}</p>
-          <div className="flex items-center gap-1 mt-1">
+          <button onClick={() => navigate('/w/reviews')} className="flex items-center gap-1 mt-1 text-left">
             <span className="text-accent text-[13px] font-bold">{formatRating(profile.rating)}</span>
             <span className="text-text-faint text-[13px]">· {profile.shiftsCompleted} смен</span>
-          </div>
+            <ChevronRight size={13} className="text-text-faint" />
+          </button>
         </div>
         <button
           onClick={() => navigate('/w/profile/edit')}
@@ -64,7 +65,7 @@ export function WorkerProfileScreen() {
       )}
 
       <div className="mt-6">
-        <SectionLabel>Должности</SectionLabel>
+        <SectionLabel>Опыт работы</SectionLabel>
         <div className="flex flex-wrap gap-2">
           {positions.map((p) => (
             <Chip key={p.id} tone="dark" selected>

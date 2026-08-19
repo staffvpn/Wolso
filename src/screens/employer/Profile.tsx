@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil } from 'lucide-react';
+import { ChevronRight, Pencil } from 'lucide-react';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Card, SectionLabel } from '@/components/ui/Card';
@@ -43,7 +43,10 @@ export function EmployerProfileScreen() {
             {company.address}
             {company.foundedYear && ` · с ${company.foundedYear}`}
           </p>
-          <p className="text-accent text-[13px] font-bold mt-0.5">{formatRating(company.rating)} · {company.reviewsCount} отзывов</p>
+          <button onClick={() => navigate('/e/reviews')} className="flex items-center gap-1 mt-0.5 text-left">
+            <span className="text-accent text-[13px] font-bold">{formatRating(company.rating)} · {company.reviewsCount} отзывов</span>
+            <ChevronRight size={13} className="text-text-faint" />
+          </button>
         </div>
         <button
           onClick={() => navigate('/e/profile/edit')}

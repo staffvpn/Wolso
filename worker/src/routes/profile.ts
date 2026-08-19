@@ -80,6 +80,52 @@ profileRoutes.get('/', async (c) => {
   return c.json(profile);
 });
 
+/** Reviews employers left about this worker, newest first — the list
+ *  behind the rating on their own profile. Only closed-and-reviewed
+ *  shifts have one, so this is exactly what the rating averages over. */
+profileRoutes.get('/reviews', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT a.id, a.employer_rating as rating, a.employer_review_tags as tags, a.employer_review_comment as comment,
+            a.closed_by_employer_at as created_at, s.position_label, s.date,
+            co.id as company_id, co.name as company_name, (co.avatar_data IS NOT NULL) as company_has_avatar
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     WHERE a.worker_id = ? AND a.employer_rating IS NOT NULL
+     ORDER BY a.closed_by_employer_at DESC LIMIT 100`,
+  )
+    .bind(session.workerId)
+    .all<{
+      id: number;
+      rating: number;
+      tags: string | null;
+      comment: string | null;
+      created_at: string | null;
+      position_label: string;
+      date: string;
+      company_id: number;
+      company_name: string;
+      company_has_avatar: number;
+    }>();
+
+  return c.json({
+    reviews: results.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      tags: r.tags ? (JSON.parse(r.tags) as string[]) : [],
+      comment: r.comment || '',
+      createdAt: r.created_at,
+      positionLabel: r.position_label,
+      shiftDate: r.date,
+      authorName: r.company_name,
+      authorAvatarUrl: r.company_has_avatar ? `/media/companies/${r.company_id}/avatar` : null,
+    })),
+  });
+});
+
 profileRoutes.patch('/', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
