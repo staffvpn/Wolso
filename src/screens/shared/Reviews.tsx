@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Loader } from '@/components/ui/Loader';
 import { fetchMyWorkerReviews, fetchMyCompanyReviews } from '@/services/reviewsApi';
 import { formatDayMonth } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -60,7 +61,11 @@ export function Reviews({ role }: { role: 'worker' | 'employer' }) {
           <EmptyState title="Не удалось загрузить" description="Проверьте связь и попробуйте открыть экран заново." />
         )}
 
-        {!error && reviews === null && <p className="text-[13px] text-text-faint text-center py-8">Загружаем…</p>}
+        {!error && reviews === null && (
+          <div className="flex justify-center py-10">
+            <Loader size={64} />
+          </div>
+        )}
 
         {!error && reviews !== null && reviews.length === 0 && (
           <EmptyState

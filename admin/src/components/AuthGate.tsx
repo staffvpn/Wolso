@@ -1,8 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
 import { useSessionStore } from '@/store/useSessionStore';
 import { Login } from '@/screens/Login';
-import { Logo } from './ui/Logo';
+import { LoadingScreen } from './ui/Loader';
 
 /** Blocks the admin app behind a real Telegram-login session. Nothing else
  *  can talk to the API before this resolves, so it sits above the router. */
@@ -19,15 +18,5 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === 'idle' || status === 'error') return <Login />;
 
-  return (
-    <div className="flex h-screen w-screen items-center justify-center bg-bg">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-        className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center"
-      >
-        <Logo size={22} className="text-accent" />
-      </motion.div>
-    </div>
-  );
+  return <LoadingScreen label="Входим…" />;
 }

@@ -1,32 +1,17 @@
 import { useEffect, type ReactNode } from 'react';
 import { RotateCw } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useCompanyStore } from '@/store/useCompanyStore';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { Button } from './ui/Button';
+import { LoadingScreen } from './ui/Loader';
 import { Logo } from './ui/Logo';
 import { Welcome } from '@/screens/onboarding/Welcome';
 import { CompleteWorkerProfile } from '@/screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from '@/screens/onboarding/CompleteEmployerProfile';
 import { EmployerVerificationPending } from '@/screens/onboarding/EmployerVerificationPending';
 import { ShiftCheckout } from '@/screens/worker/ShiftCheckout';
-
-function Spinner({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-8 gap-5 text-center safe-top safe-bottom">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-        className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center"
-      >
-        <Logo size={22} className="text-accent" />
-      </motion.div>
-      <p className="text-text-muted text-[14px]">{label}</p>
-    </div>
-  );
-}
 
 /** Every gate below blocks the entire app on one API call — if that call
  *  fails (and nothing here retries it automatically), showing the spinner
@@ -65,7 +50,7 @@ function WorkerProfileGate({ children }: { children: ReactNode }) {
     if (!loaded) load();
   }, [loaded, load]);
 
-  if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (!loaded) return <LoadingScreen label="Загружаем профиль…" />;
   if (error) return <LoadError onRetry={load} />;
   if (!complete) return <CompleteWorkerProfile gate />;
   return <PendingReviewGate>{children}</PendingReviewGate>;
@@ -84,7 +69,7 @@ function PendingReviewGate({ children }: { children: ReactNode }) {
     if (!loaded) load();
   }, [loaded, load]);
 
-  if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (!loaded) return <LoadingScreen label="Загружаем профиль…" />;
   if (error) return <LoadError onRetry={load} />;
   if (owesReview) return <ShiftCheckout gate />;
   return <>{children}</>;
@@ -100,7 +85,7 @@ function EmployerProfileGate({ children }: { children: ReactNode }) {
     if (!loaded) load();
   }, [loaded, load]);
 
-  if (!loaded) return <Spinner label="Загружаем профиль…" />;
+  if (!loaded) return <LoadingScreen label="Загружаем профиль…" />;
   if (error) return <LoadError onRetry={load} />;
   if (!complete) return <CompleteEmployerProfile gate />;
   return <EmployerVerificationGate>{children}</EmployerVerificationGate>;
@@ -148,29 +133,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (status === 'ready') return <ProfileGate>{children}</ProfileGate>;
   if (status === 'needs_role') return <Welcome />;
 
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-8 gap-5 text-center safe-top safe-bottom">
-      <motion.div
-        animate={status === 'loading' || status === 'idle' ? { rotate: 360 } : {}}
-        transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-        className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center"
-      >
-        <Logo size={22} className="text-accent" />
-      </motion.div>
+  if (status === 'error') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-8 gap-5 text-center safe-top safe-bottom">
+        {/* Deliberately the still mark, not the Loader — an animation that
+            keeps playing under an error message reads as "still trying". */}
+        <div className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center">
+          <Logo size={22} className="text-accent" />
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-bold text-[16px]">Не удалось войти</p>
+          <p className="text-[14px] text-text-muted max-w-[280px]">{error}</p>
+        </div>
+        <Button onClick={bootstrap}>
+          <RotateCw size={16} /> Попробовать снова
+        </Button>
+      </div>
+    );
+  }
 
-      {status === 'error' ? (
-        <>
-          <div className="space-y-1.5">
-            <p className="font-bold text-[16px]">Не удалось войти</p>
-            <p className="text-[14px] text-text-muted max-w-[280px]">{error}</p>
-          </div>
-          <Button onClick={bootstrap}>
-            <RotateCw size={16} /> Попробовать снова
-          </Button>
-        </>
-      ) : (
-        <p className="text-text-muted text-[14px]">Заходим…</p>
-      )}
-    </div>
-  );
+  return <LoadingScreen label="Заходим…" />;
 }
