@@ -2,6 +2,14 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, requireStaffMiddleware } from '../middleware/auth';
 import { notifyAdmin } from '../lib/adminNotify';
+import sql0014 from '../../migrations/0014_shift_close_reviews.sql';
+import sql0015 from '../../migrations/0015_chat_notify_cooldown.sql';
+import sql0016 from '../../migrations/0016_invite_and_cancel_flow.sql';
+import sql0018 from '../../migrations/0018_telegram_username.sql';
+import sql0019 from '../../migrations/0019_message_visibility.sql';
+import sql0020 from '../../migrations/0020_company_verification.sql';
+import sql0021 from '../../migrations/0021_shift_end_date.sql';
+import sql0024 from '../../migrations/0024_broadcasts.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -31,8 +39,48 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'shifts', column: 'end_date', migration: '0021_shift_end_date', breaks: 'многодневные вакансии и закрытие смены' },
 ];
 
+/** Same idea for whole tables a migration creates — a missing table fails
+ *  the same silent way a missing column does. */
+const REQUIRED_TABLES: { table: string; migration: string; breaks: string }[] = [
+  { table: 'broadcasts', migration: '0024_broadcasts', breaks: 'рассылки из дашборда' },
+];
+
+/** The real migration files, bundled in as text (see the Text rule in
+ *  wrangler.toml). Imported rather than retyped: a hand-copied list of
+ *  statements would eventually drift from the files, and handing someone
+ *  SQL that doesn't match the migration is a worse failure than the
+ *  missing migration itself. Only the ones detectable above are here —
+ *  a data-only migration leaves nothing to probe for. */
+const MIGRATION_FILES: Record<string, string> = {
+  '0014_shift_close_reviews': sql0014,
+  '0015_chat_notify_cooldown': sql0015,
+  '0016_invite_and_cancel_flow': sql0016,
+  '0018_telegram_username': sql0018,
+  '0019_message_visibility': sql0019,
+  '0020_company_verification': sql0020,
+  '0021_shift_end_date': sql0021,
+  '0024_broadcasts': sql0024,
+};
+
+/** Strips the explanatory comments and splits into individual statements,
+ *  because the D1 console runs one at a time. Safe to split on `;` here:
+ *  no statement in these files carries a semicolon inside a string
+ *  literal, and comment lines are dropped before the split. */
+function statementsOf(migration: string): string[] {
+  const file = MIGRATION_FILES[migration];
+  if (!file) return [];
+  return file
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => `${s};`);
+}
+
 adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
-  const tables = [...new Set(REQUIRED_COLUMNS.map((r) => r.table))];
+  const tables = [...new Set([...REQUIRED_COLUMNS.map((r) => r.table), ...REQUIRED_TABLES.map((t) => t.table)])];
   const present = new Map<string, Set<string>>();
 
   for (const table of tables) {
@@ -44,13 +92,22 @@ adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
     }
   }
 
-  const missing = REQUIRED_COLUMNS.filter((r) => !present.get(r.table)?.has(r.column));
-  const missingMigrations = [...new Set(missing.map((m) => m.migration))].sort();
+  // A table that doesn't exist at all reports zero columns above, which
+  // would otherwise show up as "every column missing" rather than as the
+  // one missing table it actually is.
+  const missingTables = REQUIRED_TABLES.filter((t) => !present.get(t.table)?.size);
+  const missingColumns = REQUIRED_COLUMNS.filter((r) => !present.get(r.table)?.has(r.column));
+
+  const missingMigrations = [...new Set([...missingColumns, ...missingTables].map((m) => m.migration))].sort();
 
   return c.json({
-    ok: missing.length === 0,
+    ok: missingMigrations.length === 0,
     missingMigrations,
-    missingColumns: missing.map((m) => ({ table: m.table, column: m.column, migration: m.migration, breaks: m.breaks })),
+    missingColumns: missingColumns.map((m) => ({ table: m.table, column: m.column, migration: m.migration, breaks: m.breaks })),
+    missingTables: missingTables.map((t) => ({ table: t.table, migration: t.migration, breaks: t.breaks })),
+    // Copy-paste-ready, in migration order, so fixing this never means
+    // going and finding the files in the repo.
+    sql: missingMigrations.map((migration) => ({ migration, statements: statementsOf(migration) })),
   });
 });
 

@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local worker state: .dev.vars holds the same secrets that go in
+# `wrangler secret put`, and .wrangler/ is miniflare's local D1 copy.
+.dev.vars
+.wrangler/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

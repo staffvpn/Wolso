@@ -49,6 +49,91 @@ function TestAlertButton() {
   );
 }
 
+interface SchemaHealth {
+  ok: boolean;
+  missingMigrations: string[];
+  missingColumns: { table: string; column: string; migration: string; breaks: string }[];
+  missingTables: { table: string; migration: string; breaks: string }[];
+  sql: { migration: string; statements: string[] }[];
+}
+
+/** Migrations are applied by hand in the D1 console, so the database can
+ *  sit a migration behind the deployed code — and when it does, the
+ *  failure is a bare 500 with no hint of the cause. This names the missing
+ *  migration and hands over the exact statements to paste, straight from
+ *  the real .sql files. */
+function SchemaHealthCard() {
+  const [health, setHealth] = useState<SchemaHealth | null>(null);
+  const [state, setState] = useState<'idle' | 'checking' | 'error'>('idle');
+  const [copied, setCopied] = useState<string | null>(null);
+
+  async function check() {
+    setState('checking');
+    try {
+      setHealth(await apiFetch<SchemaHealth>('/admin/health/schema'));
+      setState('idle');
+    } catch {
+      setState('error');
+    }
+  }
+
+  async function copy(migration: string, statements: string[]) {
+    await navigator.clipboard.writeText(statements.join('\n\n'));
+    setCopied(migration);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <Card className="p-6 sm:col-span-2">
+      <SectionLabel className="mb-4">Состояние базы данных</SectionLabel>
+      <p className="text-[13px] text-text-muted leading-relaxed mb-4">
+        Проверяет, все ли миграции применены к базе. Если какой-то не хватает, код обращается к колонке, которой нет, — и
+        всё, что её использует, отвечает ошибкой 500 без объяснений.
+      </p>
+
+      <Button variant="dark" disabled={state === 'checking'} onClick={check}>
+        {state === 'checking' ? 'Проверяем…' : 'Проверить миграции'}
+      </Button>
+
+      {state === 'error' && <p className="text-[12px] mt-2.5 text-danger">Не удалось проверить — воркер недоступен.</p>}
+
+      {health?.ok && <p className="text-[13px] mt-3 text-accent">Все миграции применены — база в порядке.</p>}
+
+      {health && !health.ok && (
+        <div className="mt-4 space-y-4">
+          <p className="text-[13px] text-danger leading-relaxed">
+            Не применено: {health.missingMigrations.join(', ')}. Из-за этого не работает:{' '}
+            {[...new Set([...health.missingColumns, ...health.missingTables].map((m) => m.breaks))].join(', ')}.
+          </p>
+          <p className="text-[12px] text-text-muted leading-relaxed">
+            Откройте базу <span className="font-mono text-text">wolso</span> в панели Cloudflare → D1 → Console и выполните
+            запросы по порядку. Консоль выполняет по одному запросу за раз. Ошибка вида{' '}
+            <span className="font-mono text-text">duplicate column name</span> означает, что этот запрос уже применён — его
+            можно пропустить.
+          </p>
+
+          {health.sql.map(({ migration, statements }) => (
+            <div key={migration} className="rounded-xl border border-border-soft overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-surface-2">
+                <span className="font-mono text-[12px] text-text">{migration}</span>
+                <button
+                  onClick={() => copy(migration, statements)}
+                  className="text-[12px] font-medium text-accent hover:opacity-70 transition-opacity shrink-0"
+                >
+                  {copied === migration ? 'Скопировано' : 'Копировать'}
+                </button>
+              </div>
+              <pre className="px-3.5 py-3 text-[12px] font-mono text-text-muted overflow-x-auto whitespace-pre">
+                {statements.join('\n\n')}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function Settings() {
   const s = useSettingsStore();
   const canEdit = useCan('changeCommission');
@@ -121,6 +206,8 @@ export function Settings() {
           </p>
           <TestAlertButton />
         </Card>
+
+        <SchemaHealthCard />
 
         <Card className="p-6 sm:col-span-2">
           <SectionLabel className="mb-4">Уведомления администраторам</SectionLabel>
