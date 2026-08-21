@@ -55,6 +55,22 @@ export function NewVacancy() {
   const positionLabel = POSITIONS.find((p) => p.id === position)!.label;
   const endDate = days > 1 ? addDays(startDate, days - 1) : startDate;
 
+  /** An ongoing job isn't tied to a day the way a shift is — asking "когда"
+   *  only makes sense for a one-off, so the dates appear only once «Смена»
+   *  is picked (the type starts unchosen, and a date section for a posting
+   *  whose kind isn't decided yet is just noise). Switching to «Постоянная
+   *  работа» also resets whatever dates were already chosen, so a stale
+   *  range can't be published from a section that's no longer visible. */
+  const showDates = employmentType === 'shift';
+
+  function chooseEmploymentType(id: EmploymentType) {
+    setEmploymentType(id);
+    if (id === 'permanent') {
+      setStartDate(TODAY);
+      setDays(1);
+    }
+  }
+
   function toggleRequirement(r: string) {
     setRequirements((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
   }
@@ -106,13 +122,14 @@ export function NewVacancy() {
           </SectionLabel>
           <div className="flex flex-wrap gap-2">
             {EMPLOYMENT_TYPES.map((et) => (
-              <Chip key={et.id} selected={employmentType === et.id} onClick={() => setEmploymentType(et.id)}>
+              <Chip key={et.id} selected={employmentType === et.id} onClick={() => chooseEmploymentType(et.id)}>
                 {et.label}
               </Chip>
             ))}
           </div>
         </div>
 
+        {showDates && (
         <div>
           <SectionLabel>Когда</SectionLabel>
           <p className="text-[13px] text-text-muted mb-3 leading-relaxed">
@@ -187,12 +204,17 @@ export function NewVacancy() {
             </div>
           </div>
         </div>
+        )}
 
         <div>
           <SectionLabel>Оплата</SectionLabel>
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-[28px] font-extrabold">{rate} ₽</span>
-            <span className="text-[13px] text-text-muted">в час · {rate * (endHour - startHour)} ₽ за смену</span>
+            {/* No per-shift total unless the hours it's derived from are on
+                screen — they live in the «Когда» section. */}
+            <span className="text-[13px] text-text-muted">
+              в час{showDates && ` · ${rate * (endHour - startHour)} ₽ за смену`}
+            </span>
           </div>
           <Slider min={200} max={1000} step={10} value={rate} onChange={setRate} className="mt-3" />
           <p className="text-accent text-[13px] font-medium mt-2">

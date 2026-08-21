@@ -79,7 +79,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   if (!skills.trim()) missing.push('навыки');
   if (!birthdate) missing.push('дата рождения');
   const underage = !!birthdate && !isAtLeast18(birthdate);
-  if (!profile.avatarUrl) missing.push('фото');
+  // "фото" alone was ambiguous next to the «Дополнительные фото» block —
+  // name the field the screen actually labels.
+  if (!profile.avatarUrl) missing.push('главное фото');
   if (profile.positions.length === 0) missing.push('опыт работы');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {

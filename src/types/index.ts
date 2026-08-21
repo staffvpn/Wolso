@@ -46,7 +46,7 @@ export type ShiftUrgency = 'normal' | 'urgent';
 /** Whether a posting is a one-off (or multi-day) shift or an ongoing job —
  *  picked by the employer when publishing, shown on every card, and
  *  filterable from the worker's feed. */
-export type EmploymentType = 'shift' | 'permanent' | 'internship';
+export type EmploymentType = 'shift' | 'permanent';
 
 export interface Shift {
   id: string;

@@ -88,8 +88,12 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
           <Badge tone={shift.employmentType === 'permanent' ? 'accent' : 'dark'}>
             {employmentTypeLabel(shift.employmentType)}
           </Badge>
+          {/* An ongoing job carries no meaningful date — the employer never
+              picks one — so showing "Сегодня" here would read as a specific
+              shift that doesn't exist. Just the start time. */}
           <Badge tone={shift.urgency === 'urgent' ? 'warning' : 'dark'}>
-            {day} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
+            {shift.employmentType === 'permanent' ? 'с' : day}{' '}
+            {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')}
           </Badge>
           <Badge tone="dark">{durationH} часов</Badge>
           {days > 1 && <Badge tone="dark">{days} {pluralizeShifts(days)}</Badge>}

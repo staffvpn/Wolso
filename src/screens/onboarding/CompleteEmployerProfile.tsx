@@ -66,7 +66,8 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
   if (!name.trim()) missing.push('название');
   if (!description.trim()) missing.push('описание');
   if (!foundedYear) missing.push('год основания');
-  if (!company.avatarUrl) missing.push('фото');
+  // Same as the worker screen: «фото» didn't say which one.
+  if (!company.avatarUrl) missing.push('главное фото');
   if (!innDigits) missing.push('ИНН');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {

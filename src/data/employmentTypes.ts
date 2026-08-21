@@ -6,15 +6,14 @@ import type { EmploymentType } from '@/types';
 export const EMPLOYMENT_TYPES: { id: EmploymentType; label: string }[] = [
   { id: 'shift', label: 'Смена' },
   { id: 'permanent', label: 'Постоянная работа' },
-  { id: 'internship', label: 'Стажировка' },
 ];
 
 /** Short form for the badge on a card, where "Постоянная работа" would
- *  crowd out the rest of the row. */
+ *  crowd out the rest of the row. The fallback in employmentTypeLabel
+ *  covers postings created back when "Стажировка" was still an option. */
 export const EMPLOYMENT_TYPE_SHORT: Record<EmploymentType, string> = {
   shift: 'Смена',
   permanent: 'Постоянно',
-  internship: 'Стажировка',
 };
 
 export function employmentTypeLabel(type: EmploymentType | undefined): string {
