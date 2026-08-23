@@ -41,18 +41,26 @@ feedRoutes.get('/', async (c) => {
     clauses.push(`s.time_of_day IN (${timeOfDay.map(() => '?').join(',')})`);
     binds.push(...timeOfDay);
   }
+  // Every date rule below is about *shifts*. A permanent posting is an
+  // ongoing job, not a day of work: it carries a date only because the
+  // column is NOT NULL, and that date is just when it was published. Left
+  // to the date filter it fell out of the feed the day after it was
+  // posted — which is exactly how "не вижу никаких вакансий" happened. A
+  // permanent job is open today, tomorrow and next week alike, so it
+  // passes whatever the date filter is set to.
+  const ongoing = "s.employment_type = 'permanent'";
   if (when === 'today' || when === 'tomorrow') {
     const target = new Date();
     if (when === 'tomorrow') target.setDate(target.getDate() + 1);
-    clauses.push('s.date = ?');
+    clauses.push(`(${ongoing} OR s.date = ?)`);
     binds.push(target.toISOString().slice(0, 10));
   } else {
     // 'upcoming' (default — no date chip explicitly picked) and 'custom'
     // (not actually wired to specific dates yet) both show every shift
     // from today on, so a shift posted for tomorrow or later doesn't
     // silently disappear from the feed just because nobody narrowed the
-    // date filter. Still excludes anything dated in the past.
-    clauses.push('s.date >= ?');
+    // date filter. Still excludes shifts dated in the past.
+    clauses.push(`(${ongoing} OR s.date >= ?)`);
     binds.push(new Date().toISOString().slice(0, 10));
   }
 
