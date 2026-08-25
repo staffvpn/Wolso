@@ -126,3 +126,55 @@ adminSchemaHealthRoutes.post('/test-alert', requireStaffMiddleware, async (c) =>
   await notifyAdmin(c.env, '🔔 Проверка уведомлений Wolso\nЕсли вы это видите — оповещения настроены и работают.');
   return c.json({ ok: true });
 });
+
+/** The my_chat_member webhook (see routes/bot.ts) has to be registered
+ *  with Telegram once. Doing that by hand means finding the bot token and
+ *  the Worker's own URL and pasting a long api.telegram.org link together
+ *  — but the Worker already has both, so it can just do it. Keeps the
+ *  token out of the operator's clipboard and browser history too. */
+function webhookUrl(c: { req: { url: string }; env: Env }): string {
+  return `${new URL(c.req.url).origin}/bot/webhook/${c.env.BOT_TOKEN}`;
+}
+
+/** Never returns the URL as Telegram reports it — it contains the bot
+ *  token. Only whether it points at this Worker. */
+adminSchemaHealthRoutes.get('/webhook', requireStaffMiddleware, async (c) => {
+  if (!c.env.BOT_TOKEN) return c.json({ error: 'no_bot_token' }, 400);
+
+  const res = await fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/getWebhookInfo`);
+  const data = await res
+    .json<{ ok: boolean; result?: { url?: string; last_error_message?: string; last_error_date?: number } }>()
+    .catch(() => null);
+
+  if (!data?.ok) return c.json({ error: 'telegram_unreachable' }, 502);
+
+  const current = data.result?.url ?? '';
+  return c.json({
+    connected: current === webhookUrl(c),
+    // Some other URL registered means another deployment (or an older
+    // one) owns this bot's updates — worth saying out loud rather than
+    // just showing "не подключён" and inviting a fight over it.
+    otherUrl: current !== '' && current !== webhookUrl(c),
+    lastError: data.result?.last_error_message ?? null,
+  });
+});
+
+adminSchemaHealthRoutes.post('/webhook', requireStaffMiddleware, async (c) => {
+  if (!c.env.BOT_TOKEN) return c.json({ error: 'no_bot_token' }, 400);
+
+  const res = await fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: webhookUrl(c),
+      // Only membership changes. Without this Telegram would also post
+      // every message sent to the bot, which nothing here handles.
+      allowed_updates: ['my_chat_member'],
+    }),
+  });
+
+  const data = await res.json<{ ok: boolean; description?: string }>().catch(() => null);
+  if (!data?.ok) return c.json({ error: 'setwebhook_failed', description: data?.description ?? '' }, 502);
+
+  return c.json({ ok: true });
+});

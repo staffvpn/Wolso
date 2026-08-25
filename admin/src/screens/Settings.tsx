@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { apiFetch, ApiError } from '@/lib/apiClient';
 import { Card, SectionLabel } from '@/components/ui/Card';
@@ -46,6 +46,82 @@ function TestAlertButton() {
         <p className={cn('text-[12px] mt-2.5 leading-relaxed', state === 'error' ? 'text-danger' : 'text-accent')}>{message}</p>
       )}
     </div>
+  );
+}
+
+interface WebhookState {
+  connected: boolean;
+  otherUrl: boolean;
+  lastError: string | null;
+}
+
+/** Registering the my_chat_member webhook by hand means digging up the bot
+ *  token and the Worker's URL and assembling an api.telegram.org link. The
+ *  Worker has both already, so this is a button. */
+function WebhookCard() {
+  const [state, setState] = useState<WebhookState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(async () => {
+    setError('');
+    try {
+      setState(await apiFetch<WebhookState>('/admin/health/webhook'));
+    } catch (err) {
+      setState(null);
+      setError(
+        err instanceof ApiError && err.code === 'no_bot_token'
+          ? 'BOT_TOKEN не задан в секретах воркера.'
+          : 'Не получилось спросить у Telegram — проверьте, что воркер задеплоен.',
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  async function connect() {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch('/admin/health/webhook', { method: 'POST' });
+      await refresh();
+    } catch {
+      setError('Telegram отказался принять адрес. Убедитесь, что воркер доступен по https.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-6 sm:col-span-2">
+      <SectionLabel className="mb-4">Мгновенный статус бота</SectionLabel>
+      <p className="text-[13px] text-text-muted leading-relaxed mb-4">
+        Пока это не подключено, «Заблокировал бота» в разделе «Пользователи» появляется с задержкой — только когда боту
+        не удастся отправить очередное уведомление. С подключением Telegram сообщает о блокировке (и о разблокировке)
+        сразу.
+      </p>
+
+      {state?.connected && <p className="text-[13px] text-accent mb-3">Подключено — статусы обновляются мгновенно.</p>}
+      {state && !state.connected && !state.otherUrl && (
+        <p className="text-[13px] text-text-muted mb-3">Не подключено.</p>
+      )}
+      {state?.otherUrl && (
+        <p className="text-[13px] text-warning mb-3 leading-relaxed">
+          У бота уже прописан другой адрес — похоже, на него смотрит другая копия Wolso. Кнопка ниже переключит бота на
+          этот воркер.
+        </p>
+      )}
+      {state?.lastError && (
+        <p className="text-[13px] text-danger mb-3 leading-relaxed">Последняя ошибка от Telegram: {state.lastError}</p>
+      )}
+
+      <Button variant="dark" disabled={busy} onClick={connect}>
+        {busy ? 'Подключаем…' : state?.connected ? 'Подключить заново' : 'Подключить'}
+      </Button>
+      {error && <p className="text-[12px] mt-2.5 text-danger leading-relaxed">{error}</p>}
+    </Card>
   );
 }
 
@@ -206,6 +282,8 @@ export function Settings() {
           </p>
           <TestAlertButton />
         </Card>
+
+        <WebhookCard />
 
         <SchemaHealthCard />
 
