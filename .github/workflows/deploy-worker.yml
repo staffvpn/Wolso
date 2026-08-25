@@ -1,0 +1,60 @@
+# Выкладывает воркер (папка worker/) в Cloudflare.
+#
+# Зачем: миграции применяются руками в консоли D1, а код воркера до сих пор
+# выкладывался командой `npx wrangler deploy` с чьего-то компьютера. Из-за
+# этого база и задеплоенный код разъезжались, и всё выглядело как «фича
+# сломалась без причины». Здесь деплой происходит сам.
+#
+# Разовая настройка — секрет CLOUDFLARE_API_TOKEN в настройках репозитория
+# (Settings → Secrets and variables → Actions). Без него запуск упадёт на
+# шаге деплоя с понятной ошибкой, ничего не сломав.
+name: Deploy worker
+
+on:
+  push:
+    # Основная ветка репозитория. Фильтр по путям — чтобы правки только в
+    # мобильном приложении или лендинге не гоняли деплой воркера впустую.
+    branches: [claude/telegram-mini-app-cards-io4qu8]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  # Кнопка «Run workflow» на вкладке Actions — запустить руками в любой момент.
+  workflow_dispatch:
+
+# Если пуши идут один за другим, доводим до конца только последний:
+# два одновременных деплоя одного воркера — это гонка за то, чей код останется.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: worker
+
+      # Ловит ошибки типов до выкладки, чтобы заведомо сломанный код не
+      # уехал в продакшн автоматически.
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: worker
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: worker
+        env:
+          # Нужен, только если у токена доступ к нескольким аккаунтам
+          # Cloudflare. Пустой — нормально, wrangler разберётся сам.
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
