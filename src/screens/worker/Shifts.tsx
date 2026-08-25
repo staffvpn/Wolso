@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { DetailRow } from '@/components/ui/DetailRow';
 import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { resolveCompany } from '@/data/companies';
@@ -276,13 +277,13 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
       {open && (
         <div className="px-3.5 pb-3.5 -mt-1 space-y-2.5">
           <div className="rounded-xl bg-surface-2 px-3 py-2.5 space-y-1">
-            <Row label="Заведение" value={company.name} />
-            {company.address && <Row label="Адрес" value={company.address} />}
-            <Row label="Должность" value={shift.positionLabel} />
-            <Row label="Дата" value={formatDateRange(shift.date, shift.endDate)} />
-            <Row label="Время" value={`${timeRangeOf(shift)} · ${hours} ч`} />
-            <Row label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />
-            <Row label="Итого" value={formatMoney(shift.totalPay)} />
+            <DetailRow label="Заведение" value={company.name} />
+            {company.address && <DetailRow label="Адрес" value={company.address} />}
+            <DetailRow label="Должность" value={shift.positionLabel} />
+            <DetailRow label="Дата" value={formatDateRange(shift.date, shift.endDate)} />
+            <DetailRow label="Время" value={`${timeRangeOf(shift)} · ${hours} ч`} />
+            <DetailRow label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />
+            <DetailRow label="Итого" value={formatMoney(shift.totalPay)} />
           </div>
 
           {app.workStage === 'employer_closed' && (
@@ -297,15 +298,6 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 text-[13px]">
-      <span className="text-text-faint shrink-0">{label}</span>
-      <span className="text-text text-right min-w-0 truncate">{value}</span>
     </div>
   );
 }

@@ -31,6 +31,9 @@ interface ApiApplication {
     hourlyRate: number;
     totalPay: number;
     description: string;
+    /** What the employer ticked when publishing ("Медкнижка", …). The API
+     *  has always sent these; this type just never declared them. */
+    requirements?: string[];
     meal: boolean;
     urgency: string;
     employmentType: string;
@@ -69,7 +72,10 @@ function fromApi(a: ApiApplication): Application {
           hourlyRate: a.shift.hourlyRate,
           totalPay: a.shift.totalPay,
           description: a.shift.description,
-          tags: [],
+          // Same drop as in shiftsApi: the employer's requirements were
+          // being thrown away here, so the expanded response card had
+          // nothing to show for them.
+          tags: a.shift.requirements ?? [],
           meal: a.shift.meal,
           urgency: (a.shift.urgency as Shift['urgency']) ?? 'normal',
           employmentType: a.shift.employmentType as Shift['employmentType'],

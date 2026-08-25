@@ -73,7 +73,10 @@ export function fromApi(s: ShiftApiResponse): Shift {
     // don't claim a number. UI hides the distance chip when it's absent.
     distanceKm: undefined,
     description: s.description,
-    tags: [],
+    // The employer's requirements ("Опыт от 1 года", "Медкнижка") were
+    // being dropped here, so nothing they ticked when publishing ever
+    // reached the worker. The API has sent them all along.
+    tags: s.requirements ?? [],
     meal: s.meal,
     urgency: (s.urgency as Shift['urgency']) ?? 'normal',
     employmentType: s.employmentType as Shift['employmentType'],
