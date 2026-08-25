@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star, BellOff } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +19,7 @@ import { roleById } from '@/data/permissions';
 import { timeAgo, telegramLink, telegramLabel, formatDayMonth, formatDateRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { ApiError } from '@/lib/apiClient';
-import type { AdminReview, PlatformUser, TeamMember, UserPhoto } from '@/types';
+import { BOT_STATUS_LABEL, BOT_STATUS_SHORT, BOT_STATUS_TONE, type AdminReview, type PlatformUser, type TeamMember, type UserPhoto } from '@/types';
 
 const ERROR_MESSAGES: Record<string, string> = {
   owner_transfer_requires_permission: 'Передать или снять роль владельца может только сам владелец.',
@@ -112,10 +112,26 @@ function TelegramLinkRow({ telegramId, telegramUsername }: { telegramId: number;
   );
 }
 
+/** Full label plus when it was established, since "Заблокировал бота"
+ *  from six weeks ago and from this morning mean rather different things.
+ *  Deliberately not shown for team members: staff sign in through the
+ *  Login Widget, they have no bot subscription to lose. */
+function BotStatusBadge({ user }: { user: PlatformUser }) {
+  const checked = user.botStatusAt ? new Date(user.botStatusAt) : null;
+  return (
+    <span title={checked ? `Проверено ${formatDayMonth(checked)}` : 'Ещё не проверялось'}>
+      <Badge tone={BOT_STATUS_TONE[user.botStatus]}>{BOT_STATUS_LABEL[user.botStatus]}</Badge>
+    </span>
+  );
+}
+
 export function Users() {
   const { seekers, employers, team, load } = useUsersStore();
   const syncingUsernames = useUsersStore((s) => s.syncingUsernames);
   const syncUsernames = useUsersStore((s) => s.syncUsernames);
+  const checkingBot = useUsersStore((s) => s.checkingBot);
+  const checkBots = useUsersStore((s) => s.checkBots);
+  const botCheckResult = useUsersStore((s) => s.botCheckResult);
   const roles = useRolesStore((s) => s.roles);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
@@ -208,18 +224,24 @@ export function Users() {
           <Button variant="outline" disabled={syncingUsernames} onClick={syncUsernames} title="Подтянуть @username из Telegram для тех, у кого его ещё нет в базе">
             <RefreshCw size={15} className={cn(syncingUsernames && 'animate-spin')} /> {syncingUsernames ? 'Обновляем…' : 'Обновить username'}
           </Button>
+          <Button variant="outline" disabled={checkingBot} onClick={checkBots} title="Спросить у Telegram, кому бот ещё может писать. Ничего не отправляет пользователям.">
+            <BellOff size={15} className={cn(checkingBot && 'animate-pulse')} /> {checkingBot ? 'Проверяем…' : 'Проверить бота'}
+          </Button>
           <Button variant="primary" disabled={!canManageTeam} onClick={() => setInviteOpen(true)}>
             <UserPlus size={15} /> Пригласить в команду
           </Button>
         </div>
       </div>
 
+      {botCheckResult && <p className="px-4 sm:px-8 pb-3 text-[12px] text-text-muted shrink-0">{botCheckResult}</p>}
+
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
         <Card className="lg:overflow-hidden flex flex-col">
-          <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_1fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+          <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_0.9fr_1fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Пользователь</span>
             <span className="hidden sm:block">Роль</span>
             <span>Статус</span>
+            <span className="hidden sm:block">Бот</span>
             <span className="hidden sm:block">Активность</span>
           </div>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
@@ -235,19 +257,26 @@ export function Users() {
                 <button
                   key={rowKey(r)}
                   onClick={() => setSelected(r)}
-                  className={cn('w-full grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_1fr_1fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors', selectedKey === rowKey(r) && 'bg-surface-2')}
+                  className={cn('w-full grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_0.9fr_1fr_0.9fr] items-center px-5 py-3 text-left hover:bg-surface-2 transition-colors', selectedKey === rowKey(r) && 'bg-surface-2')}
                 >
-                  <span className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex items-center gap-2.5 min-w-0 overflow-hidden pr-3">
                     <Avatar name={name} size={32} square={r.kind === 'employer'} />
                     <span className="min-w-0">
                       <span className="block text-[14px] font-semibold text-text truncate">{name}</span>
                       <span className="block text-[12px] text-text-faint truncate">{contact}</span>
                     </span>
                   </span>
-                  <span className="hidden sm:block">
+                  <span className="hidden sm:block min-w-0 pr-3">
                     <Badge tone={r.kind === 'team' ? 'dark' : 'neutral'}>{roleLabel}</Badge>
                   </span>
                   <span className={cn('text-[13px] font-medium', STATUS_COLOR[statusKey])}>{statusLabel}</span>
+                  <span className="hidden sm:block">
+                    {r.kind === 'team' ? (
+                      <span className="text-[13px] text-text-faint">—</span>
+                    ) : (
+                      <Badge tone={BOT_STATUS_TONE[r.user.botStatus]}>{BOT_STATUS_SHORT[r.user.botStatus]}</Badge>
+                    )}
+                  </span>
                   <span className="hidden sm:block text-[13px] text-text-faint">{timeAgo(lastActive)}</span>
                 </button>
               );
@@ -535,6 +564,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
 
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
+        <BotStatusBadge user={user} />
         {user.rating !== undefined && <Badge tone="neutral">★ {user.rating} · {user.shiftsCompleted} смен</Badge>}
       </div>
 
@@ -739,6 +769,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
 
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
+        <BotStatusBadge user={user} />
         {ready && ready.rating > 0 && <Badge tone="neutral">★ {ready.rating} · {ready.reviewsCount} отзывов</Badge>}
       </div>
 

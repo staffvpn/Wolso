@@ -57,7 +57,41 @@ export interface PlatformUser {
   shiftsCompleted?: number;
   telegramId: number;
   telegramUsername?: string;
+  /** Whether the bot can still reach them — see BotStatus. */
+  botStatus: BotStatus;
+  /** When that was last established, ISO. */
+  botStatusAt?: string;
 }
+
+/** Mirrors the worker's BotStatus. 'unknown' means nothing has told us
+ *  either way yet, which is every account until a notification is sent to
+ *  it or the check is run. */
+export type BotStatus = 'active' | 'blocked' | 'deleted' | 'unreachable' | 'unknown';
+
+export const BOT_STATUS_LABEL: Record<BotStatus, string> = {
+  active: 'Бот активен',
+  blocked: 'Заблокировал бота',
+  deleted: 'Аккаунт удалён',
+  unreachable: 'Не запускал бота',
+  unknown: 'Не проверялся',
+};
+
+/** Short form for the table column, where the full label crowds the row. */
+export const BOT_STATUS_SHORT: Record<BotStatus, string> = {
+  active: 'Активен',
+  blocked: 'Заблокировал',
+  deleted: 'Удалён',
+  unreachable: 'Нет чата',
+  unknown: '—',
+};
+
+export const BOT_STATUS_TONE: Record<BotStatus, 'accent' | 'danger' | 'warning' | 'neutral'> = {
+  active: 'accent',
+  blocked: 'danger',
+  deleted: 'danger',
+  unreachable: 'warning',
+  unknown: 'neutral',
+};
 
 export interface UserPosition {
   id: string;

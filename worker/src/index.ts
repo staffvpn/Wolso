@@ -12,6 +12,7 @@ import { profileRoutes } from './routes/profile';
 import { employerRoutes } from './routes/employer';
 import { supportRoutes } from './routes/support';
 import { mediaRoutes } from './routes/media';
+import { botRoutes } from './routes/bot';
 
 import { adminUserRoutes } from './admin/users';
 import { adminRoleRoutes } from './admin/roles';
@@ -47,6 +48,7 @@ app.route('/me', profileRoutes);
 app.route('/employer', employerRoutes);
 app.route('/support', supportRoutes);
 app.route('/media', mediaRoutes);
+app.route('/bot', botRoutes);
 
 app.route('/admin/users', adminUserRoutes);
 app.route('/admin/roles', adminRoleRoutes);

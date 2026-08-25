@@ -3,6 +3,7 @@ import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware, staffHasPermission } from '../middleware/auth';
 import { provisionWorker, provisionCompany } from '../routes/auth';
 import { getTelegramUsername } from '../lib/telegramBot';
+import { probeBotStatus } from '../lib/botStatus';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -100,6 +101,81 @@ adminUserRoutes.post('/sync-telegram-usernames', requireStaffMiddleware, async (
   ]);
 
   return c.json({ checked: workers.length + companies.length, updated });
+});
+
+/** Checks who the bot can still reach. Everything else that writes
+ *  bot_status is passive — a notification has to fail, or the person has
+ *  to block the bot while the webhook is live — so accounts that went
+ *  quiet before either of those existed would sit on 'unknown' forever.
+ *  This asks Telegram directly.
+ *
+ *  Batched: the client calls this in a loop until `remaining` hits 0,
+ *  because one Worker request can't sit through thousands of Bot API
+ *  calls. The queue is "never checked" — bot_status_at IS NULL — and
+ *  every row touched gets stamped whatever the answer, which is what
+ *  guarantees the loop terminates. Selecting on bot_status = 'unknown'
+ *  instead would re-pick rows the probe couldn't classify, forever. */
+adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
+  const BATCH = 25;
+  const [{ results: workers }, { results: companies }] = await Promise.all([
+    c.env.DB.prepare('SELECT id, telegram_id FROM workers WHERE bot_status_at IS NULL ORDER BY id LIMIT ?')
+      .bind(BATCH)
+      .all<{ id: number; telegram_id: number }>(),
+    c.env.DB.prepare('SELECT id, owner_telegram_id FROM companies WHERE bot_status_at IS NULL ORDER BY id LIMIT ?')
+      .bind(BATCH)
+      .all<{ id: number; owner_telegram_id: number }>(),
+  ]);
+
+  const now = new Date().toISOString();
+  let active = 0;
+  let unreachable = 0;
+  let inconclusive = 0;
+
+  /** A probe that came back 'unknown' means Telegram never gave us a
+   *  usable answer — a network blip, a rate limit. Stamp the row so the
+   *  batch moves on, but leave bot_status alone rather than overwriting
+   *  something we do know with something we don't. */
+  const apply = async (table: 'workers' | 'companies', id: number, status: string) => {
+    if (status === 'unknown') {
+      inconclusive++;
+      await c.env.DB.prepare(`UPDATE ${table} SET bot_status_at = ? WHERE id = ?`).bind(now, id).run();
+      return;
+    }
+    if (status === 'active') active++;
+    else unreachable++;
+    await c.env.DB.prepare(`UPDATE ${table} SET bot_status = ?, bot_status_at = ? WHERE id = ?`).bind(status, now, id).run();
+  };
+
+  await Promise.all([
+    ...workers.map(async (w) => apply('workers', w.id, await probeBotStatus(c.env, w.telegram_id))),
+    ...companies.map(async (co) => apply('companies', co.id, await probeBotStatus(c.env, co.owner_telegram_id))),
+  ]);
+
+  const left = await c.env.DB.prepare(
+    `SELECT (SELECT COUNT(*) FROM workers WHERE bot_status_at IS NULL)
+          + (SELECT COUNT(*) FROM companies WHERE bot_status_at IS NULL) as n`,
+  ).first<{ n: number }>();
+
+  return c.json({
+    checked: workers.length + companies.length,
+    active,
+    unreachable,
+    inconclusive,
+    remaining: left?.n ?? 0,
+  });
+});
+
+/** Counts for the "кто отписался" summary above the users table. */
+adminUserRoutes.get('/bot-status-summary', requireStaffMiddleware, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT bot_status, COUNT(*) as n FROM (
+       SELECT bot_status FROM workers UNION ALL SELECT bot_status FROM companies
+     ) GROUP BY bot_status`,
+  ).all<{ bot_status: string; n: number }>();
+
+  const counts: Record<string, number> = {};
+  for (const r of results) counts[r.bot_status] = r.n;
+  return c.json({ counts });
 });
 
 /** Every review lives on the application it came out of — the employer's

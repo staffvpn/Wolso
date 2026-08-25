@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { classifyTelegramFailure, recordBotStatus } from './botStatus';
 
 /** Looks up a person's current @username via the Bot API's getChat — works
  *  for any chat_id the bot has ever exchanged messages with (which, in
@@ -40,9 +41,23 @@ export async function sendTelegramMessage(env: Env, chatId: number, text: string
       }),
     });
     if (!res.ok) {
-      console.error('telegram sendMessage failed', chatId, res.status, await res.text().catch(() => ''));
+      const raw = await res.text().catch(() => '');
+      console.error('telegram sendMessage failed', chatId, res.status, raw);
+      // Every notification doubles as a liveness check: this is the moment
+      // we find out someone blocked the bot, so it's the moment to write it
+      // down. classifyTelegramFailure returns null for rate limits and
+      // outages, which say nothing about the user.
+      let description = '';
+      try {
+        description = (JSON.parse(raw) as { description?: string }).description ?? '';
+      } catch {
+        description = raw;
+      }
+      const status = classifyTelegramFailure(res.status, description);
+      if (status) await recordBotStatus(env, chatId, status);
       return false;
     }
+    await recordBotStatus(env, chatId, 'active');
     return true;
   } catch (err) {
     console.error('telegram sendMessage threw', chatId, err);

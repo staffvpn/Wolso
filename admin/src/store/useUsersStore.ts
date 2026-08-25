@@ -14,6 +14,7 @@ import {
   deleteSeeker,
   deleteEmployer,
   syncTelegramUsernames,
+  checkBotStatus,
 } from '@/services/usersApi';
 
 interface UsersState {
@@ -23,6 +24,9 @@ interface UsersState {
   loading: boolean;
   loaded: boolean;
   syncingUsernames: boolean;
+  checkingBot: boolean;
+  /** Progress line while the bot check loops through the accounts. */
+  botCheckResult: string | null;
   load: () => Promise<void>;
   toggleBlock: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
@@ -31,6 +35,7 @@ interface UsersState {
   switchRole: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   deleteUser: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   syncUsernames: () => Promise<void>;
+  checkBots: () => Promise<void>;
 }
 
 export const useUsersStore = create<UsersState>((set, get) => ({
@@ -40,6 +45,8 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   loading: false,
   loaded: false,
   syncingUsernames: false,
+  checkingBot: false,
+  botCheckResult: null,
 
   load: async () => {
     set({ loading: true });
@@ -93,11 +100,41 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     }
   },
 
-  // Keeps calling the batch endpoint (it caps itself per call) so one click
-  // covers the whole backlog. Stops once a round updates nothing — accounts
-  // the bot has no username for (or has never talked to) stay NULL and
-  // would otherwise keep coming back up as the same "still missing" batch
-  // forever.
+  /** Walks every not-yet-established account in batches. Capped at 40
+   *  rounds (1000 accounts) so a large base doesn't leave the button
+   *  spinning indefinitely — press it again to continue where it left
+   *  off, since checked rows are stamped and not re-picked. */
+  checkBots: async () => {
+    set({ checkingBot: true, botCheckResult: null });
+    let active = 0;
+    let unreachable = 0;
+    let inconclusive = 0;
+    try {
+      for (let i = 0; i < 40; i++) {
+        const res = await checkBotStatus();
+        active += res.active;
+        unreachable += res.unreachable;
+        inconclusive += res.inconclusive;
+        if (res.checked === 0 || res.remaining === 0) break;
+      }
+      const [seekers, employers] = await Promise.all([fetchSeekers(), fetchEmployers()]);
+      set({
+        seekers,
+        employers,
+        botCheckResult:
+          active + unreachable + inconclusive === 0
+            ? 'Все аккаунты уже проверены.'
+            : `Проверено ${active + unreachable + inconclusive}: активны — ${active}, недоступны — ${unreachable}` +
+              (inconclusive > 0 ? `, без ответа — ${inconclusive}` : '') +
+              '.',
+      });
+    } catch {
+      set({ botCheckResult: 'Не получилось проверить — попробуйте ещё раз.' });
+    } finally {
+      set({ checkingBot: false });
+    }
+  },
+
   syncUsernames: async () => {
     set({ syncingUsernames: true });
     try {

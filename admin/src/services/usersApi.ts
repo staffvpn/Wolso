@@ -1,6 +1,14 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { minutesSince, telegramLabel } from '@/lib/format';
-import type { AdminReview, EmployerDetail, EmployerVacancy, PlatformUser, SeekerApplication, SeekerDetail, TeamMember, UserPhoto, UserPosition, UserStatus } from '@/types';
+import type { AdminReview, BotStatus, EmployerDetail, EmployerVacancy, PlatformUser, SeekerApplication, SeekerDetail, TeamMember, UserPhoto, UserPosition, UserStatus } from '@/types';
+
+/** The column is TEXT with a default, so anything could in principle come
+ *  back; anything unrecognised is treated as "we don't know" rather than
+ *  rendered raw. */
+const BOT_STATUSES: BotStatus[] = ['active', 'blocked', 'deleted', 'unreachable', 'unknown'];
+function asBotStatus(v: string | undefined): BotStatus {
+  return BOT_STATUSES.includes(v as BotStatus) ? (v as BotStatus) : 'unknown';
+}
 
 interface TeamApiRow {
   id: number;
@@ -40,6 +48,8 @@ interface SeekerApiRow {
   shifts_completed: number;
   status: string;
   created_at: string;
+  bot_status?: string;
+  bot_status_at?: string | null;
 }
 
 function fromApiSeeker(w: SeekerApiRow): PlatformUser {
@@ -60,6 +70,8 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
     shiftsCompleted: w.shifts_completed,
     telegramId: w.telegram_id,
     telegramUsername: w.telegram_username ?? undefined,
+    botStatus: asBotStatus(w.bot_status),
+    botStatusAt: w.bot_status_at ?? undefined,
   };
 }
 
@@ -77,6 +89,8 @@ interface EmployerApiRow {
   city: string;
   status: string;
   created_at: string;
+  bot_status?: string;
+  bot_status_at?: string | null;
 }
 
 function fromApiEmployer(c: EmployerApiRow): PlatformUser {
@@ -92,6 +106,8 @@ function fromApiEmployer(c: EmployerApiRow): PlatformUser {
     city: c.city,
     telegramId: c.owner_telegram_id,
     telegramUsername: c.telegram_username ?? undefined,
+    botStatus: asBotStatus(c.bot_status),
+    botStatusAt: c.bot_status_at ?? undefined,
   };
 }
 
@@ -107,6 +123,24 @@ export async function fetchEmployers(query?: string): Promise<PlatformUser[]> {
  *  `checked` comes back equal to the batch size to keep going. */
 export async function syncTelegramUsernames(): Promise<{ checked: number; updated: number }> {
   return apiFetch('/admin/users/sync-telegram-usernames', { method: 'POST' });
+}
+
+export interface BotStatusCheckResult {
+  checked: number;
+  active: number;
+  unreachable: number;
+  /** Telegram gave no usable answer for these — a blip or a rate limit,
+   *  not a verdict about the person. */
+  inconclusive: number;
+  /** Accounts still waiting to be checked — loop while this is above 0. */
+  remaining: number;
+}
+
+/** Asks Telegram who can still receive messages, one batch per call. Only
+ *  touches accounts that have never been established either way; a status
+ *  learned from a real send or from the webhook is already current. */
+export async function checkBotStatus(): Promise<BotStatusCheckResult> {
+  return apiFetch('/admin/users/check-bot-status', { method: 'POST' });
 }
 
 interface SeekerDetailApiRow {
