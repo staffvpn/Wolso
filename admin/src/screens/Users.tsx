@@ -132,6 +132,7 @@ export function Users() {
   const checkingBot = useUsersStore((s) => s.checkingBot);
   const checkBots = useUsersStore((s) => s.checkBots);
   const botCheckResult = useUsersStore((s) => s.botCheckResult);
+  const botCheckFailed = useUsersStore((s) => s.botCheckFailed);
   const roles = useRolesStore((s) => s.roles);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
@@ -233,7 +234,19 @@ export function Users() {
         </div>
       </div>
 
-      {botCheckResult && <p className="px-4 sm:px-8 pb-3 text-[12px] text-text-muted shrink-0">{botCheckResult}</p>}
+      {/* Right under the buttons, not above the table: the previous
+          placement put the only feedback the check gives far enough away
+          that pressing the button read as "ничего не происходит". */}
+      {botCheckResult && (
+        <p
+          className={cn(
+            'px-4 sm:px-8 pb-3 text-[13px] leading-relaxed shrink-0 max-w-3xl',
+            botCheckFailed ? 'text-danger' : 'text-text-muted',
+          )}
+        >
+          {botCheckResult}
+        </p>
+      )}
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
         <Card className="lg:overflow-hidden flex flex-col">

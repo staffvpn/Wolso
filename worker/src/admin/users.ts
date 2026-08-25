@@ -3,7 +3,7 @@ import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware, staffHasPermission } from '../middleware/auth';
 import { provisionWorker, provisionCompany } from '../routes/auth';
 import { getTelegramUsername } from '../lib/telegramBot';
-import { probeBotStatus } from '../lib/botStatus';
+import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -116,6 +116,12 @@ adminUserRoutes.post('/sync-telegram-usernames', requireStaffMiddleware, async (
  *  guarantees the loop terminates. Selecting on bot_status = 'unknown'
  *  instead would re-pick rows the probe couldn't classify, forever. */
 adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
+  // Named, not thrown: without this the missing migration surfaces as a
+  // bare 500 and the button just appears to do nothing.
+  if (!(await botStatusColumnsExist(c.env))) {
+    return c.json({ error: 'migration_required', migration: '0025_bot_status' }, 400);
+  }
+
   const BATCH = 25;
   const [{ results: workers }, { results: companies }] = await Promise.all([
     c.env.DB.prepare('SELECT id, telegram_id FROM workers WHERE bot_status_at IS NULL ORDER BY id LIMIT ?')
@@ -167,6 +173,10 @@ adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
 
 /** Counts for the "кто отписался" summary above the users table. */
 adminUserRoutes.get('/bot-status-summary', requireStaffMiddleware, async (c) => {
+  if (!(await botStatusColumnsExist(c.env))) {
+    return c.json({ error: 'migration_required', migration: '0025_bot_status' }, 400);
+  }
+
   const { results } = await c.env.DB.prepare(
     `SELECT bot_status, COUNT(*) as n FROM (
        SELECT bot_status FROM workers UNION ALL SELECT bot_status FROM companies

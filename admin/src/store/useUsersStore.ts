@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { PlatformUser, TeamMember } from '@/types';
+import { ApiError } from '@/lib/apiClient';
 import {
   fetchTeam,
   fetchSeekers,
@@ -27,6 +28,8 @@ interface UsersState {
   checkingBot: boolean;
   /** Progress line while the bot check loops through the accounts. */
   botCheckResult: string | null;
+  /** Whether that line is a failure, so the UI can colour it. */
+  botCheckFailed: boolean;
   load: () => Promise<void>;
   toggleBlock: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
@@ -47,6 +50,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   syncingUsernames: false,
   checkingBot: false,
   botCheckResult: null,
+  botCheckFailed: false,
 
   load: async () => {
     set({ loading: true });
@@ -105,7 +109,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
    *  spinning indefinitely — press it again to continue where it left
    *  off, since checked rows are stamped and not re-picked. */
   checkBots: async () => {
-    set({ checkingBot: true, botCheckResult: null });
+    set({ checkingBot: true, botCheckResult: null, botCheckFailed: false });
     let active = 0;
     let unreachable = 0;
     let inconclusive = 0;
@@ -128,8 +132,17 @@ export const useUsersStore = create<UsersState>((set, get) => ({
               (inconclusive > 0 ? `, без ответа — ${inconclusive}` : '') +
               '.',
       });
-    } catch {
-      set({ botCheckResult: 'Не получилось проверить — попробуйте ещё раз.' });
+    } catch (err) {
+      // A generic "попробуйте ещё раз" here is what made an unapplied
+      // migration look like a dead button. Say which one is missing and
+      // where to fix it.
+      set({
+        botCheckResult:
+          err instanceof ApiError && err.code === 'migration_required'
+            ? 'Не применена миграция 0025_bot_status. Откройте Настройки → Состояние базы данных → «Проверить миграции», там будет готовый SQL.'
+            : 'Не получилось проверить. Проверьте, что воркер задеплоен с последними изменениями.',
+        botCheckFailed: true,
+      });
     } finally {
       set({ checkingBot: false });
     }

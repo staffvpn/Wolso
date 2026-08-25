@@ -28,6 +28,21 @@ export function classifyTelegramFailure(httpStatus: number, description: string)
   return null;
 }
 
+/** Whether migration 0025 has actually been applied. Migrations here are
+ *  run by hand, so the deployed code can be a migration ahead of the
+ *  database — and then every query touching bot_status throws, Hono turns
+ *  it into a bare internal_error 500, and the dashboard button looks like
+ *  it simply does nothing. Checking first lets the caller say which
+ *  migration is missing instead. */
+export async function botStatusColumnsExist(env: Env): Promise<boolean> {
+  try {
+    const { results } = await env.DB.prepare("PRAGMA table_info(workers)").all<{ name: string }>();
+    return results.some((r) => r.name === 'bot_status_at');
+  } catch {
+    return false;
+  }
+}
+
 /** Records what we just learned about a chat. A person is a worker or a
  *  company owner, never both, so both statements run and one is a no-op.
  *  The `bot_status != ?` guard keeps this from writing on every single
