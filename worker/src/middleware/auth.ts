@@ -13,6 +13,49 @@ export async function attachSession(c: Context<{ Bindings: Env; Variables: Vars 
   await next();
 }
 
+/** Details of a suspension, for the 403 body. */
+export interface SuspensionInfo {
+  reason: string | null;
+  at: string | null;
+}
+
+/** Looks up whether the signed-in worker/company is suspended.
+ *
+ *  Blocking used to write status='suspended' and stop there: nothing on the
+ *  app side ever read it, so a blocked person carried on using Wolso
+ *  normally. Enforcing it inside each route would mean every current and
+ *  future route remembering to — this runs once, ahead of all of them. */
+async function suspensionOf(c: Context<{ Bindings: Env; Variables: Vars }>): Promise<SuspensionInfo | null> {
+  const session = c.get('session');
+  if (!session) return null;
+
+  const row =
+    session.kind === 'worker'
+      ? await c.env.DB.prepare('SELECT status, suspended_reason, suspended_at FROM workers WHERE id = ?')
+          .bind(session.workerId)
+          .first<{ status: string; suspended_reason: string | null; suspended_at: string | null }>()
+      : session.kind === 'company'
+        ? await c.env.DB.prepare('SELECT status, suspended_reason, suspended_at FROM companies WHERE id = ?')
+            .bind(session.companyId)
+            .first<{ status: string; suspended_reason: string | null; suspended_at: string | null }>()
+        : null;
+
+  if (!row || row.status !== 'suspended') return null;
+  return { reason: row.suspended_reason, at: row.suspended_at };
+}
+
+/** Refuses everything for a suspended account, naming the reason so the
+ *  app can show it rather than failing in some unexplained way. Mounted on
+ *  the app-facing routes; the admin API is deliberately not behind it,
+ *  since staff suspension is a separate thing checked at login. */
+export async function rejectSuspended(c: Context<{ Bindings: Env; Variables: Vars }>, next: Next) {
+  const suspended = await suspensionOf(c);
+  if (suspended) {
+    return c.json({ error: 'account_suspended', reason: suspended.reason, suspendedAt: suspended.at }, 403);
+  }
+  await next();
+}
+
 export function requireWorker(c: Context<{ Bindings: Env; Variables: Vars }>) {
   const session = c.get('session');
   if (!session || session.kind !== 'worker') return null;

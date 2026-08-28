@@ -11,6 +11,7 @@ import sql0020 from '../../migrations/0020_company_verification.sql';
 import sql0021 from '../../migrations/0021_shift_end_date.sql';
 import sql0024 from '../../migrations/0024_broadcasts.sql';
 import sql0025 from '../../migrations/0025_bot_status.sql';
+import sql0026 from '../../migrations/0026_suspension_reason.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -40,6 +41,8 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'shifts', column: 'end_date', migration: '0021_shift_end_date', breaks: 'многодневные вакансии и закрытие смены' },
   { table: 'workers', column: 'bot_status', migration: '0025_bot_status', breaks: 'статус бота в дашборде' },
   { table: 'companies', column: 'bot_status', migration: '0025_bot_status', breaks: 'статус бота в дашборде' },
+  { table: 'workers', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
+  { table: 'companies', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -64,6 +67,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0021_shift_end_date': sql0021,
   '0024_broadcasts': sql0024,
   '0025_bot_status': sql0025,
+  '0026_suspension_reason': sql0026,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

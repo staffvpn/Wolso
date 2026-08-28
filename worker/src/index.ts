@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './types';
+import { attachSession, rejectSuspended } from './middleware/auth';
 
 import { authRoutes } from './routes/auth';
 import { feedRoutes } from './routes/feed';
@@ -37,6 +38,19 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
+
+// A suspended account is refused everything the app can ask for. Applied
+// here, in front of the app-facing routes, rather than inside each one:
+// blocking that depends on every route remembering to check is blocking
+// that stops working the moment a route is added. Both the bare path and
+// the subtree are registered — Hono's '/me/*' does not match a plain
+// '/me'. /auth is excluded on purpose: sign-in has to be able to answer
+// with the reason, and /media serves avatars that other people's screens
+// still legitimately show.
+for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support']) {
+  app.use(base, attachSession, rejectSuspended);
+  app.use(`${base}/*`, attachSession, rejectSuspended);
+}
 
 app.route('/auth', authRoutes);
 app.route('/shifts', feedRoutes);

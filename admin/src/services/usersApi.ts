@@ -50,6 +50,7 @@ interface SeekerApiRow {
   created_at: string;
   bot_status?: string;
   bot_status_at?: string | null;
+  suspended_reason?: string | null;
 }
 
 function fromApiSeeker(w: SeekerApiRow): PlatformUser {
@@ -72,6 +73,7 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
     telegramUsername: w.telegram_username ?? undefined,
     botStatus: asBotStatus(w.bot_status),
     botStatusAt: w.bot_status_at ?? undefined,
+    suspendedReason: w.suspended_reason ?? undefined,
   };
 }
 
@@ -91,6 +93,7 @@ interface EmployerApiRow {
   created_at: string;
   bot_status?: string;
   bot_status_at?: string | null;
+  suspended_reason?: string | null;
 }
 
 function fromApiEmployer(c: EmployerApiRow): PlatformUser {
@@ -108,6 +111,7 @@ function fromApiEmployer(c: EmployerApiRow): PlatformUser {
     telegramUsername: c.telegram_username ?? undefined,
     botStatus: asBotStatus(c.bot_status),
     botStatusAt: c.bot_status_at ?? undefined,
+    suspendedReason: c.suspended_reason ?? undefined,
   };
 }
 
@@ -325,14 +329,14 @@ export async function updateEmployer(
   await apiFetch(`/admin/users/employers/${id}`, { method: 'PATCH', body: update });
 }
 
-export async function toggleBlockSeeker(id: string): Promise<UserStatus> {
-  const { status } = await apiFetch<{ status: UserStatus }>(`/admin/users/seekers/${id}/block`, { method: 'POST' });
-  return status;
+/** `reason` is required when blocking and ignored when lifting a block —
+ *  the server enforces the same rule. */
+export async function toggleBlockSeeker(id: string, reason?: string): Promise<{ status: UserStatus; reason: string | null }> {
+  return apiFetch(`/admin/users/seekers/${id}/block`, { method: 'POST', body: { reason } });
 }
 
-export async function toggleBlockEmployer(id: string): Promise<UserStatus> {
-  const { status } = await apiFetch<{ status: UserStatus }>(`/admin/users/employers/${id}/block`, { method: 'POST' });
-  return status;
+export async function toggleBlockEmployer(id: string, reason?: string): Promise<{ status: UserStatus; reason: string | null }> {
+  return apiFetch(`/admin/users/employers/${id}/block`, { method: 'POST', body: { reason } });
 }
 
 export async function deleteSeeker(id: string): Promise<void> {

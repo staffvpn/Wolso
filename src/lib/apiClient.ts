@@ -60,8 +60,14 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
   const res = await fetch(`${API_URL}${path}`, { method: opts.method ?? 'GET', headers, body });
 
   if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, (payload as { error?: string }).error);
+    const payload = (await res.json().catch(() => ({}))) as { error?: string; reason?: string | null; suspendedAt?: string | null };
+    // A block can land while the app is already open. Flipping the whole
+    // app into the suspended state here means every screen stops at once,
+    // instead of each call failing on its own and looking like a bug.
+    if (payload.error === 'account_suspended') {
+      useAuthStore.getState().markSuspended({ reason: payload.reason ?? null, at: payload.suspendedAt ?? null });
+    }
+    throw new ApiError(res.status, payload.error);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

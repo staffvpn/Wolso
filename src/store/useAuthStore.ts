@@ -11,7 +11,7 @@ interface TelegramAuthUser {
   photoUrl?: string;
 }
 
-type Status = 'idle' | 'loading' | 'needs_role' | 'ready' | 'error';
+type Status = 'idle' | 'loading' | 'needs_role' | 'ready' | 'error' | 'suspended';
 
 interface AuthState {
   workerToken: string | null;
@@ -21,6 +21,11 @@ interface AuthState {
    *  id is locked to, resolved by the server. Only staff can change it. */
   role: Role | null;
   status: Status;
+  /** Set when the account is blocked — carries the reason to show. */
+  suspension: Suspension | null;
+  /** Called from apiClient when any request comes back account_suspended,
+   *  so a session that was open when the block landed stops too. */
+  markSuspended: (suspension: Suspension) => void;
   error: string | null;
   bootstrap: () => Promise<void>;
   chooseRole: (role: Role) => Promise<void>;
@@ -33,6 +38,23 @@ interface AuthState {
   signOut: () => void;
 }
 
+/** A blocked account, as the server describes it. */
+export interface Suspension {
+  reason: string | null;
+  at: string | null;
+}
+
+/** Thrown when the server refuses because the account is blocked — carries
+ *  the reason so the app can explain it rather than showing a generic
+ *  failure. */
+export class SuspendedError extends Error {
+  suspension: Suspension;
+  constructor(suspension: Suspension) {
+    super('account_suspended');
+    this.suspension = suspension;
+  }
+}
+
 async function callAuth<T>(path: string, body: unknown): Promise<T> {
   if (!API_URL) throw new Error('VITE_API_URL is not set — see .env.example. The app has nothing to talk to without it.');
   const res = await fetch(`${API_URL}${path}`, {
@@ -41,9 +63,11 @@ async function callAuth<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    const code = (payload as { error?: string }).error;
-    throw new Error(`Сервер ответил ошибкой ${res.status}${code ? ` (${code})` : ''}.`);
+    const payload = (await res.json().catch(() => ({}))) as { error?: string; reason?: string | null; suspendedAt?: string | null };
+    if (payload.error === 'account_suspended') {
+      throw new SuspendedError({ reason: payload.reason ?? null, at: payload.suspendedAt ?? null });
+    }
+    throw new Error(`Сервер ответил ошибкой ${res.status}${payload.error ? ` (${payload.error})` : ''}.`);
   }
   return res.json() as Promise<T>;
 }
@@ -57,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       status: 'idle',
       error: null,
+      suspension: null,
 
       bootstrap: async () => {
         set({ status: 'loading', error: null });
@@ -89,6 +114,10 @@ export const useAuthStore = create<AuthState>()(
             status: 'ready',
           });
         } catch (err) {
+          if (err instanceof SuspendedError) {
+            set({ status: 'suspended', suspension: err.suspension });
+            return;
+          }
           const detail = err instanceof Error ? err.message : String(err);
           set({ status: 'error', error: `Не получилось связаться с сервером: ${detail}` });
         }
@@ -121,6 +150,8 @@ export const useAuthStore = create<AuthState>()(
           set({ status: 'error', error: `Не получилось сохранить выбор: ${detail}` });
         }
       },
+
+      markSuspended: (suspension) => set({ status: 'suspended', suspension }),
 
       signOut: () => set({ workerToken: null, companyToken: null, telegramUser: null, role: null, status: 'idle' }),
     }),

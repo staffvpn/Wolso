@@ -8,6 +8,25 @@ export const authRoutes = new Hono<{ Bindings: Env }>();
 
 const DEFAULT_POSITIONS = [{ position: 'barista', position_label: 'Бариста', months: 0 }];
 
+/** The suspension on this Telegram id's active role, if any. */
+async function suspensionFor(
+  env: Env,
+  telegramId: number,
+  role: 'worker' | 'employer',
+): Promise<{ reason: string | null; at: string | null } | null> {
+  const row =
+    role === 'worker'
+      ? await env.DB.prepare('SELECT status, suspended_reason, suspended_at FROM workers WHERE telegram_id = ?')
+          .bind(telegramId)
+          .first<{ status: string; suspended_reason: string | null; suspended_at: string | null }>()
+      : await env.DB.prepare('SELECT status, suspended_reason, suspended_at FROM companies WHERE owner_telegram_id = ?')
+          .bind(telegramId)
+          .first<{ status: string; suspended_reason: string | null; suspended_at: string | null }>();
+
+  if (!row || row.status !== 'suspended') return null;
+  return { reason: row.suspended_reason, at: row.suspended_at };
+}
+
 /** Exported so admin/users.ts's role-switch action can provision the
  *  target role's row the same way onboarding does — that path deliberately
  *  still passes a name (carried over from the person's other role), but
@@ -100,6 +119,15 @@ authRoutes.post('/telegram', async (c) => {
       c.env.DB.prepare('UPDATE companies SET telegram_username = ? WHERE owner_telegram_id = ?').bind(user.username ?? null, user.id).run(),
     ]),
   );
+
+  // Refused before any token is issued, and with the reason attached, so
+  // the app can explain the block instead of just failing. The middleware
+  // in index.ts covers sessions that were already open when the block
+  // happened; this covers the next launch.
+  const suspension = await suspensionFor(c.env, user.id, account.active_role);
+  if (suspension) {
+    return c.json({ error: 'account_suspended', reason: suspension.reason, suspendedAt: suspension.at }, 403);
+  }
 
   // This only ever actually provisions a row for pre-existing accounts
   // being backfilled into telegram_accounts for the first time (a brand

@@ -31,7 +31,7 @@ interface UsersState {
   /** Whether that line is a failure, so the UI can colour it. */
   botCheckFailed: boolean;
   load: () => Promise<void>;
-  toggleBlock: (id: string, kind: 'seeker' | 'employer') => Promise<void>;
+  toggleBlock: (id: string, kind: 'seeker' | 'employer', reason?: string) => Promise<void>;
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
   inviteMember: (name: string, telegramId: number, roleId: string) => Promise<void>;
   revokeAccess: (memberId: string) => Promise<void>;
@@ -58,10 +58,12 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     set({ team, seekers, employers, loading: false, loaded: true });
   },
 
-  toggleBlock: async (id, kind) => {
-    const status = kind === 'seeker' ? await toggleBlockSeeker(id) : await toggleBlockEmployer(id);
+  toggleBlock: async (id, kind, reason) => {
+    const { status, reason: saved } =
+      kind === 'seeker' ? await toggleBlockSeeker(id, reason) : await toggleBlockEmployer(id, reason);
     const statusLabel = status === 'suspended' ? 'Заблокирован' : 'Активен';
-    const apply = (u: PlatformUser) => (u.id === id ? { ...u, status, statusLabel } : u);
+    const apply = (u: PlatformUser) =>
+      u.id === id ? { ...u, status, statusLabel, suspendedReason: saved ?? undefined } : u;
     if (kind === 'seeker') set({ seekers: get().seekers.map(apply) });
     else set({ employers: get().employers.map(apply) });
   },

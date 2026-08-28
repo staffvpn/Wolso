@@ -126,6 +126,61 @@ function BotStatusBadge({ user }: { user: PlatformUser }) {
   );
 }
 
+/** Blocking asks for a reason, because the person is now shown it — and
+ *  "вас заблокировали", full stop, just becomes a support ticket. Unblocking
+ *  needs no explanation, so it doesn't open this. */
+function BlockReasonModal({
+  open,
+  name,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  name: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const trimmed = reason.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm(trimmed);
+      setReason('');
+      onClose();
+    } catch {
+      setError('Не получилось заблокировать — попробуйте ещё раз.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Заблокировать ${name}?`} description="Причину увидит сам пользователь, когда откроет приложение. Пишите так, чтобы ему было понятно, что произошло.">
+      <Textarea
+        rows={3}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Например: не вышли на подтверждённую смену дважды без предупреждения."
+      />
+      {error && <p className="text-[12px] text-danger mt-2">{error}</p>}
+      <div className="flex gap-2 mt-4">
+        <Button variant="outline" className="flex-1" onClick={onClose} disabled={busy}>
+          Отмена
+        </Button>
+        <Button variant="danger" className="flex-1" onClick={submit} disabled={busy || !reason.trim()}>
+          {busy ? 'Блокируем…' : 'Заблокировать'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export function Users() {
   const { seekers, employers, team, load } = useUsersStore();
   const syncingUsernames = useUsersStore((s) => s.syncingUsernames);
@@ -556,6 +611,7 @@ function ReviewsBlock({ received, given, receivedLabel, givenLabel }: {
 
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
+  const [blocking, setBlocking] = useState(false);
   const switchRole = useUsersStore((s) => s.switchRole);
   const deleteUser = useUsersStore((s) => s.deleteUser);
   const detail = useUserDetailStore((s) => s.seeker);
@@ -627,6 +683,15 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         <BotStatusBadge user={user} />
         {user.rating !== undefined && <Badge tone="neutral">★ {user.rating} · {user.shiftsCompleted} смен</Badge>}
       </div>
+
+      {blocked && (
+        <div className="rounded-xl bg-danger-soft px-3.5 py-2.5 mt-3">
+          <p className="text-[12px] font-semibold text-danger mb-0.5">Причина блокировки</p>
+          <p className="text-[13px] text-text leading-relaxed">
+            {user.suspendedReason || 'Не указана — аккаунт заблокирован до того, как причины стали обязательными.'}
+          </p>
+        </div>
+      )}
 
       {!ready && <DetailSkeleton />}
 
@@ -732,7 +797,12 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
       )}
 
       <div className="flex flex-col gap-2">
-        <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'seeker')}>
+        <Button
+          variant={blocked ? 'primary' : 'danger'}
+          className="w-full"
+          disabled={!canBlock}
+          onClick={() => (blocked ? toggleBlock(user.id, 'seeker') : setBlocking(true))}
+        >
           {blocked ? 'Разблокировать' : 'Заблокировать'}
         </Button>
         <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'seeker')}>
@@ -750,12 +820,20 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         confirmLabel="Удалить"
         onConfirm={() => deleteUser(user.id, 'seeker')}
       />
+
+      <BlockReasonModal
+        open={blocking}
+        name={user.name}
+        onClose={() => setBlocking(false)}
+        onConfirm={(reason) => toggleBlock(user.id, 'seeker', reason)}
+      />
     </div>
   );
 }
 
 function EmployerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
+  const [blocking, setBlocking] = useState(false);
   const switchRole = useUsersStore((s) => s.switchRole);
   const deleteUser = useUsersStore((s) => s.deleteUser);
   const detail = useUserDetailStore((s) => s.employer);
@@ -832,6 +910,15 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
         <BotStatusBadge user={user} />
         {ready && ready.rating > 0 && <Badge tone="neutral">★ {ready.rating} · {ready.reviewsCount} отзывов</Badge>}
       </div>
+
+      {blocked && (
+        <div className="rounded-xl bg-danger-soft px-3.5 py-2.5 mt-3">
+          <p className="text-[12px] font-semibold text-danger mb-0.5">Причина блокировки</p>
+          <p className="text-[13px] text-text leading-relaxed">
+            {user.suspendedReason || 'Не указана — аккаунт заблокирован до того, как причины стали обязательными.'}
+          </p>
+        </div>
+      )}
 
       {!ready && <DetailSkeleton />}
 
@@ -957,7 +1044,12 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
       )}
 
       <div className="flex flex-col gap-2">
-        <Button variant={blocked ? 'primary' : 'danger'} className="w-full" disabled={!canBlock} onClick={() => toggleBlock(user.id, 'employer')}>
+        <Button
+          variant={blocked ? 'primary' : 'danger'}
+          className="w-full"
+          disabled={!canBlock}
+          onClick={() => (blocked ? toggleBlock(user.id, 'employer') : setBlocking(true))}
+        >
           {blocked ? 'Разблокировать' : 'Заблокировать'}
         </Button>
         <Button variant="outline" className="w-full" disabled={!canSwitchRole} onClick={() => switchRole(user.id, 'employer')}>
@@ -974,6 +1066,13 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
         description={`${user.name} и вся его история (вакансии, отклики, чаты, уведомления) удаляются без возможности восстановить.`}
         confirmLabel="Удалить"
         onConfirm={() => deleteUser(user.id, 'employer')}
+      />
+
+      <BlockReasonModal
+        open={blocking}
+        name={user.name}
+        onClose={() => setBlocking(false)}
+        onConfirm={(reason) => toggleBlock(user.id, 'employer', reason)}
       />
       <ConfirmModal
         open={!!deletingVacancy}

@@ -445,6 +445,14 @@ adminUserRoutes.delete('/employers/:id', requirePermission('manageData'), async 
   return c.json({ ok: true });
 });
 
+/** Blocking now takes a reason, because the person is shown it: "вас
+ *  заблокировали" with no explanation just turns into a support ticket.
+ *  Required when blocking, ignored when lifting one. */
+async function readBlockReason(c: { req: { json: () => Promise<unknown> } }): Promise<string> {
+  const body = (await c.req.json().catch(() => ({}))) as { reason?: unknown };
+  return typeof body.reason === 'string' ? body.reason.trim() : '';
+}
+
 adminUserRoutes.post('/seekers/:id/block', requirePermission('blockUsers'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
@@ -452,11 +460,21 @@ adminUserRoutes.post('/seekers/:id/block', requirePermission('blockUsers'), asyn
   if (!worker) return c.json({ error: 'not_found' }, 404);
 
   const next = worker.status === 'suspended' ? 'active' : 'suspended';
-  await c.env.DB.prepare('UPDATE workers SET status = ? WHERE id = ?').bind(next, id).run();
+  const reason = await readBlockReason(c);
+  if (next === 'suspended' && !reason) return c.json({ error: 'reason_required' }, 400);
+
+  await c.env.DB.prepare('UPDATE workers SET status = ?, suspended_reason = ?, suspended_at = ? WHERE id = ?')
+    .bind(next, next === 'suspended' ? reason : null, next === 'suspended' ? new Date().toISOString() : null, id)
+    .run();
 
   const actor = await actorLabel(c.env, session);
-  await logAction(c.env, actor, `${next === 'suspended' ? 'заблокировала' : 'разблокировала'} ${worker.name}`, next === 'suspended' ? 'danger' : 'neutral');
-  return c.json({ ok: true, status: next });
+  await logAction(
+    c.env,
+    actor,
+    next === 'suspended' ? `заблокировала ${worker.name} — «${reason}»` : `разблокировала ${worker.name}`,
+    next === 'suspended' ? 'danger' : 'neutral',
+  );
+  return c.json({ ok: true, status: next, reason: next === 'suspended' ? reason : null });
 });
 
 adminUserRoutes.post('/employers/:id/block', requirePermission('blockUsers'), async (c) => {
@@ -466,11 +484,21 @@ adminUserRoutes.post('/employers/:id/block', requirePermission('blockUsers'), as
   if (!company) return c.json({ error: 'not_found' }, 404);
 
   const next = company.status === 'suspended' ? 'active' : 'suspended';
-  await c.env.DB.prepare('UPDATE companies SET status = ? WHERE id = ?').bind(next, id).run();
+  const reason = await readBlockReason(c);
+  if (next === 'suspended' && !reason) return c.json({ error: 'reason_required' }, 400);
+
+  await c.env.DB.prepare('UPDATE companies SET status = ?, suspended_reason = ?, suspended_at = ? WHERE id = ?')
+    .bind(next, next === 'suspended' ? reason : null, next === 'suspended' ? new Date().toISOString() : null, id)
+    .run();
 
   const actor = await actorLabel(c.env, session);
-  await logAction(c.env, actor, `${next === 'suspended' ? 'заблокировала' : 'разблокировала'} ${company.name}`, next === 'suspended' ? 'danger' : 'neutral');
-  return c.json({ ok: true, status: next });
+  await logAction(
+    c.env,
+    actor,
+    next === 'suspended' ? `заблокировала ${company.name} — «${reason}»` : `разблокировала ${company.name}`,
+    next === 'suspended' ? 'danger' : 'neutral',
+  );
+  return c.json({ ok: true, status: next, reason: next === 'suspended' ? reason : null });
 });
 
 /** Wolso is one-account-one-role: a Telegram id is permanently locked to

@@ -8,6 +8,7 @@ import { Button } from './ui/Button';
 import { LoadingScreen } from './ui/Loader';
 import { Logo } from './ui/Logo';
 import { Welcome } from '@/screens/onboarding/Welcome';
+import { AccountSuspended } from '@/screens/onboarding/AccountSuspended';
 import { CompleteWorkerProfile } from '@/screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from '@/screens/onboarding/CompleteEmployerProfile';
 import { EmployerVerificationPending } from '@/screens/onboarding/EmployerVerificationPending';
@@ -130,6 +131,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (status === 'idle') bootstrap();
   }, [status, bootstrap]);
 
+  // Checked before 'ready': a block that lands mid-session flips the status
+  // from under an app that's already running, and this has to win over
+  // whatever screen was showing.
+  if (status === 'suspended') return <AccountSuspended />;
   if (status === 'ready') return <ProfileGate>{children}</ProfileGate>;
   if (status === 'needs_role') return <Welcome />;
 

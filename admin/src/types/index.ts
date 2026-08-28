@@ -57,6 +57,8 @@ export interface PlatformUser {
   shiftsCompleted?: number;
   telegramId: number;
   telegramUsername?: string;
+  /** Why staff blocked them, shown both here and to the person themselves. */
+  suspendedReason?: string;
   /** Whether the bot can still reach them — see BotStatus. */
   botStatus: BotStatus;
   /** When that was last established, ISO. */
