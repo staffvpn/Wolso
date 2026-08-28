@@ -260,7 +260,17 @@ export interface DashboardStats {
   topPositions: { label: string; count: number }[];
 }
 
-export type BroadcastAudience = 'all' | 'seekers' | 'employers';
+export type BroadcastAudience = 'all' | 'seekers' | 'employers' | 'custom';
+
+/** Someone the bot is allowed to message, for the manual picker. Suspended
+ *  accounts never appear here even though they show in Пользователи. */
+export interface BroadcastRecipient {
+  telegramId: number;
+  name: string;
+  telegramUsername?: string;
+  city?: string;
+  role: 'seeker' | 'employer';
+}
 
 /** A message sent from the bot to a whole audience at once. Sending runs
  *  in batches, so a row can be partially delivered — `done` is what tells

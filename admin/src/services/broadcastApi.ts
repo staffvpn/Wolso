@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/apiClient';
-import type { Broadcast, BroadcastAudience, BroadcastProgress } from '@/types';
+import type { Broadcast, BroadcastAudience, BroadcastProgress, BroadcastRecipient } from '@/types';
 
 interface BroadcastApiRow {
   id: number;
@@ -36,6 +36,20 @@ export async function fetchAudienceCount(audience: BroadcastAudience, city?: str
   return count;
 }
 
+/** Everyone the bot may message, for the manual picker. */
+export async function fetchBroadcastRecipients(): Promise<BroadcastRecipient[]> {
+  const { recipients } = await apiFetch<{
+    recipients: { telegram_id: number; name: string; telegram_username: string | null; city: string | null; role: 'seeker' | 'employer' }[];
+  }>('/admin/broadcast/recipients');
+  return recipients.map((r) => ({
+    telegramId: r.telegram_id,
+    name: r.name || (r.role === 'employer' ? 'Без названия' : 'Без имени'),
+    telegramUsername: r.telegram_username ?? undefined,
+    city: r.city ?? undefined,
+    role: r.role,
+  }));
+}
+
 export async function fetchBroadcastCities(): Promise<{ city: string; n: number }[]> {
   const { cities } = await apiFetch<{ cities: { city: string; n: number }[] }>('/admin/broadcast/cities');
   return cities;
@@ -48,10 +62,15 @@ export async function fetchBroadcasts(): Promise<Broadcast[]> {
 
 /** Creates the broadcast and freezes its recipient list — nothing is sent
  *  until sendBatch runs. */
-export async function createBroadcast(text: string, audience: BroadcastAudience, city?: string): Promise<{ id: string; total: number }> {
+export async function createBroadcast(
+  text: string,
+  audience: BroadcastAudience,
+  city?: string,
+  telegramIds?: number[],
+): Promise<{ id: string; total: number }> {
   const res = await apiFetch<{ id: number; total: number }>('/admin/broadcast', {
     method: 'POST',
-    body: { text, audience, city },
+    body: { text, audience, city, telegramIds },
   });
   return { id: String(res.id), total: res.total };
 }

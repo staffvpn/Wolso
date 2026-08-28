@@ -6,7 +6,7 @@ import { sendTelegramMessage } from '../lib/telegramBot';
 export const adminBroadcastRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminBroadcastRoutes.use('*', attachSession);
 
-export type Audience = 'all' | 'seekers' | 'employers';
+export type Audience = 'all' | 'seekers' | 'employers' | 'custom';
 
 /** Telegram caps bots at roughly 30 messages/second before it starts
  *  returning 429s. A batch of 25 per request, sent with a small gap,
@@ -29,8 +29,27 @@ function sameCity(a: string | null, b: string): boolean {
   return (a ?? '').trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-async function resolveRecipients(env: Env, audience: Audience, city: string | null): Promise<number[]> {
+async function resolveRecipients(
+  env: Env,
+  audience: Audience,
+  city: string | null,
+  chosen?: number[],
+): Promise<number[]> {
   const ids = new Set<number>();
+
+  // Hand-picked recipients still get checked against the same eligibility
+  // rules, rather than being taken on the client's word: the browser could
+  // name a suspended account, or an id belonging to nobody. Intersecting
+  // with the real pickable set means the worst a tampered request can do
+  // is send to fewer people than asked, never to someone off-limits.
+  if (audience === 'custom') {
+    if (!chosen?.length) return [];
+    const wanted = new Set(chosen);
+    for (const r of await pickableRecipients(env)) {
+      if (wanted.has(r.telegram_id)) ids.add(r.telegram_id);
+    }
+    return [...ids];
+  }
 
   if (audience === 'all' || audience === 'seekers') {
     const { results } = await env.DB.prepare(
@@ -57,14 +76,57 @@ async function resolveRecipients(env: Env, audience: Audience, city: string | nu
 }
 
 function parseAudience(raw: unknown): Audience {
-  return raw === 'seekers' || raw === 'employers' ? raw : 'all';
+  return raw === 'seekers' || raw === 'employers' || raw === 'custom' ? raw : 'all';
 }
+
+/** One pickable recipient for the manual list. Same eligibility rules as
+ *  resolveRecipients — anyone shown here can actually be sent to. */
+interface PickableRow {
+  telegram_id: number;
+  name: string;
+  telegram_username: string | null;
+  city: string | null;
+  bot_status?: string;
+}
+
+async function pickableRecipients(env: Env): Promise<(PickableRow & { role: 'seeker' | 'employer' })[]> {
+  const [{ results: workers }, { results: companies }] = await Promise.all([
+    env.DB.prepare(
+      `SELECT w.telegram_id, w.name, w.telegram_username, w.city FROM workers w
+       LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+       WHERE w.status != 'suspended' AND (t.active_role = 'worker' OR t.active_role IS NULL)
+       ORDER BY w.created_at DESC`,
+    ).all<PickableRow>(),
+    env.DB.prepare(
+      `SELECT co.owner_telegram_id as telegram_id, co.name, co.telegram_username, co.city FROM companies co
+       LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
+       WHERE co.status != 'suspended' AND (t.active_role = 'employer' OR t.active_role IS NULL)
+       ORDER BY co.created_at DESC`,
+    ).all<PickableRow>(),
+  ]);
+
+  return [
+    ...workers.map((w) => ({ ...w, role: 'seeker' as const })),
+    ...companies.map((co) => ({ ...co, role: 'employer' as const })),
+  ];
+}
+
+/** The list behind the "выбрать вручную" checkboxes. Deliberately the same
+ *  query as the audience resolver rather than the Пользователи list: a
+ *  suspended account shows up there but must never be pickable here. */
+adminBroadcastRoutes.get('/recipients', requirePermission('manageData'), async (c) => {
+  return c.json({ recipients: await pickableRecipients(c.env) });
+});
 
 /** How many people a given audience currently covers — shown next to the
  *  compose box so it's never a surprise how wide a message is going. */
 adminBroadcastRoutes.get('/audience', requirePermission('manageData'), async (c) => {
   const audience = parseAudience(c.req.query('audience'));
   const city = c.req.query('city')?.trim() || null;
+  // 'custom' is counted client-side from the checkboxes — it has no query
+  // to run, and round-tripping the whole id list through a GET would be
+  // silly. Report 0 so a stray call can't imply a wider reach than chosen.
+  if (audience === 'custom') return c.json({ count: 0 });
   const recipients = await resolveRecipients(c.env, audience, city);
   return c.json({ count: recipients.length });
 });
@@ -102,13 +164,16 @@ adminBroadcastRoutes.get('/cities', requirePermission('manageData'), async (c) =
  *  of restarted from the top. */
 adminBroadcastRoutes.post('/', requirePermission('manageData'), async (c) => {
   const session = requireStaff(c as never)!;
-  const body = await c.req.json<{ text: string; audience?: string; city?: string }>();
+  const body = await c.req.json<{ text: string; audience?: string; city?: string; telegramIds?: number[] }>();
   const text = body.text?.trim();
   if (!text) return c.json({ error: 'text_required' }, 400);
 
   const audience = parseAudience(body.audience);
-  const city = body.city?.trim() || null;
-  const recipients = await resolveRecipients(c.env, audience, city);
+  // A hand-picked list is about specific people, so the city filter has no
+  // say in it — resolveRecipients ignores city for 'custom'.
+  const city = audience === 'custom' ? null : body.city?.trim() || null;
+  const chosen = Array.isArray(body.telegramIds) ? body.telegramIds.filter((n) => Number.isFinite(n)) : undefined;
+  const recipients = await resolveRecipients(c.env, audience, city, chosen);
   if (recipients.length === 0) return c.json({ error: 'no_recipients' }, 400);
 
   const actor = await actorLabel(c.env, session);

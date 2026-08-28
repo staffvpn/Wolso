@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Send, Users, Briefcase, Globe, AlertTriangle, Check } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Send, Users, Briefcase, Globe, AlertTriangle, Check, ListChecks } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Avatar } from '@/components/ui/Avatar';
 import { Select } from '@/components/ui/Select';
-import { Label, Textarea } from '@/components/ui/Input';
+import { Input, Label, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useCan } from '@/store/useSessionStore';
@@ -13,23 +14,26 @@ import {
   createBroadcast,
   fetchAudienceCount,
   fetchBroadcastCities,
+  fetchBroadcastRecipients,
   fetchBroadcasts,
   sendBroadcastBatch,
 } from '@/services/broadcastApi';
 import { timeAgo, minutesSince } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { Broadcast, BroadcastAudience } from '@/types';
+import type { Broadcast, BroadcastAudience, BroadcastRecipient } from '@/types';
 
 const AUDIENCES: { id: BroadcastAudience; label: string; icon: typeof Users }[] = [
   { id: 'all', label: 'Все', icon: Globe },
   { id: 'seekers', label: 'Соискатели', icon: Users },
   { id: 'employers', label: 'Работодатели', icon: Briefcase },
+  { id: 'custom', label: 'Выбрать вручную', icon: ListChecks },
 ];
 
 const AUDIENCE_LABEL: Record<BroadcastAudience, string> = {
   all: 'Все',
   seekers: 'Соискатели',
   employers: 'Работодатели',
+  custom: 'Выбранные вручную',
 };
 
 export function BroadcastScreen() {
@@ -42,6 +46,13 @@ export function BroadcastScreen() {
   const [count, setCount] = useState<number | null>(null);
   const [history, setHistory] = useState<Broadcast[]>([]);
 
+  // Hand-picked recipients. Kept as telegram ids because that's what the
+  // send actually addresses — a seeker and an employer can share a row id,
+  // but never a telegram id.
+  const [recipients, setRecipients] = useState<BroadcastRecipient[]>([]);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [pickQuery, setPickQuery] = useState('');
+
   const [confirming, setConfirming] = useState(false);
   const [progress, setProgress] = useState<{ sent: number; failed: number; processed: number; total: number } | null>(null);
   const [sending, setSending] = useState(false);
@@ -50,11 +61,14 @@ export function BroadcastScreen() {
   useEffect(() => {
     fetchBroadcastCities().then(setCities).catch(() => setCities([]));
     fetchBroadcasts().then(setHistory).catch(() => setHistory([]));
+    fetchBroadcastRecipients().then(setRecipients).catch(() => setRecipients([]));
   }, []);
 
   // Recount whenever the audience changes, so the number next to "Отправить"
-  // always matches what's actually selected.
+  // always matches what's actually selected. A hand-picked list is counted
+  // from the checkboxes rather than asked of the server.
   useEffect(() => {
+    if (audience === 'custom') return;
     let cancelled = false;
     setCount(null);
     fetchAudienceCount(audience, city || undefined)
@@ -69,9 +83,14 @@ export function BroadcastScreen() {
     setConfirming(false);
     setSending(true);
     setError(null);
-    setProgress({ sent: 0, failed: 0, processed: 0, total: count ?? 0 });
+    setProgress({ sent: 0, failed: 0, processed: 0, total: effectiveCount });
     try {
-      const { id, total } = await createBroadcast(text.trim(), audience, city || undefined);
+      const { id, total } = await createBroadcast(
+        text.trim(),
+        audience,
+        city || undefined,
+        audience === 'custom' ? [...picked] : undefined,
+      );
       setProgress({ sent: 0, failed: 0, processed: 0, total });
 
       // The server sends a batch per call and reports how far it got —
@@ -98,7 +117,41 @@ export function BroadcastScreen() {
     }
   }
 
-  const canSubmit = canSend && text.trim().length > 0 && (count ?? 0) > 0 && !sending;
+  const effectiveCount = audience === 'custom' ? picked.size : count ?? 0;
+  const canSubmit = canSend && text.trim().length > 0 && effectiveCount > 0 && !sending;
+
+  const visibleRecipients = useMemo(() => {
+    const q = pickQuery.trim().toLowerCase();
+    if (!q) return recipients;
+    return recipients.filter(
+      (r) => r.name.toLowerCase().includes(q) || (r.telegramUsername ?? '').toLowerCase().includes(q),
+    );
+  }, [recipients, pickQuery]);
+
+  function togglePicked(telegramId: number) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(telegramId)) next.delete(telegramId);
+      else next.add(telegramId);
+      return next;
+    });
+  }
+
+  /** Applies to what's currently filtered, not the whole base — otherwise
+   *  searching for "бариста" and pressing "выбрать всех" would quietly
+   *  select everybody. */
+  function toggleAllVisible() {
+    const ids = visibleRecipients.map((r) => r.telegramId);
+    const allPicked = ids.length > 0 && ids.every((id) => picked.has(id));
+    setPicked((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (allPicked) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="pb-10">
@@ -131,15 +184,71 @@ export function BroadcastScreen() {
             ))}
           </div>
 
-          <Label>Город</Label>
-          <Select value={city} disabled={sending} onChange={(e) => setCity(e.target.value)} className="mb-4">
-            <option value="">Все города</option>
-            {cities.map((c) => (
-              <option key={c.city} value={c.city}>
-                {c.city} ({c.n})
-              </option>
-            ))}
-          </Select>
+          {audience === 'custom' ? (
+            <div className="mb-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <Label className="mb-0">Кому отправить · выбрано {picked.size}</Label>
+                <button
+                  onClick={toggleAllVisible}
+                  disabled={sending || visibleRecipients.length === 0}
+                  className="text-[12px] font-semibold text-accent hover:opacity-70 disabled:opacity-40"
+                >
+                  {visibleRecipients.length > 0 && visibleRecipients.every((r) => picked.has(r.telegramId))
+                    ? 'Снять все'
+                    : 'Выбрать все'}
+                </button>
+              </div>
+
+              <Input
+                placeholder="Поиск по имени или @username"
+                value={pickQuery}
+                disabled={sending}
+                onChange={(e) => setPickQuery(e.target.value)}
+                className="mb-2"
+              />
+
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-border-soft divide-y divide-border-soft">
+                {visibleRecipients.length === 0 && (
+                  <p className="text-[13px] text-text-faint text-center py-6">Никого не нашли</p>
+                )}
+                {visibleRecipients.map((r) => (
+                  <label
+                    key={r.telegramId}
+                    className="flex items-center gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-surface-2 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={picked.has(r.telegramId)}
+                      disabled={sending}
+                      onChange={() => togglePicked(r.telegramId)}
+                      className="h-4 w-4 accent-accent shrink-0"
+                    />
+                    <Avatar name={r.name} size={28} square={r.role === 'employer'} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-medium text-text truncate">{r.name}</span>
+                      <span className="block text-[12px] text-text-faint truncate">
+                        {r.telegramUsername ? `@${r.telegramUsername}` : `ID ${r.telegramId}`}
+                        {r.city ? ` · ${r.city}` : ''}
+                      </span>
+                    </span>
+                    <Badge tone="neutral">{r.role === 'employer' ? 'Работодатель' : 'Соискатель'}</Badge>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <Label>Город</Label>
+              <Select value={city} disabled={sending} onChange={(e) => setCity(e.target.value)} className="mb-4">
+                <option value="">Все города</option>
+                {cities.map((c) => (
+                  <option key={c.city} value={c.city}>
+                    {c.city} ({c.n})
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
 
           <Label>Текст сообщения</Label>
           <Textarea
@@ -193,9 +302,13 @@ export function BroadcastScreen() {
             <Send size={15} />
             {sending
               ? 'Отправляем…'
-              : count === null
-                ? 'Считаем получателей…'
-                : `Отправить ${count} получателям`}
+              : audience === 'custom'
+                ? picked.size === 0
+                  ? 'Отметьте получателей'
+                  : `Отправить ${picked.size} получателям`
+                : count === null
+                  ? 'Считаем получателей…'
+                  : `Отправить ${count} получателям`}
           </Button>
         </Card>
 
@@ -228,7 +341,7 @@ export function BroadcastScreen() {
         open={confirming}
         onClose={() => setConfirming(false)}
         title="Отправить рассылку?"
-        description={`Сообщение получат ${count ?? 0} чел. (${AUDIENCE_LABEL[audience].toLowerCase()}${city ? `, ${city}` : ''}). Отменить отправку после старта нельзя.`}
+        description={`Сообщение получат ${effectiveCount} чел. (${AUDIENCE_LABEL[audience].toLowerCase()}${audience !== 'custom' && city ? `, ${city}` : ''}). Отменить отправку после старта нельзя.`}
       >
         <div className="rounded-xl bg-surface-2 p-3 mb-4 text-[13px] text-text leading-relaxed whitespace-pre-line max-h-[200px] overflow-y-auto">
           {text.trim()}
