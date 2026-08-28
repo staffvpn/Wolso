@@ -238,10 +238,13 @@ export interface Vacancy {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  /** What the employer wrote in «Описание» — carried so the edit form can
+   *  prefill it instead of silently blanking it on save. */
+  description: string;
   employmentType: EmploymentType;
   urgent: boolean;
   createdAt: string;
-  status: 'pending_review' | 'active' | 'rejected';
+  status: 'pending_review' | 'active' | 'rejected' | 'closed';
   responseCount: number;
 }
 

@@ -77,6 +77,8 @@ export default function App() {
               </Route>
               {/* Employer pushed screens */}
               <Route path="/e/vacancies/new" element={<NewVacancy />} />
+              {/* Same form, loaded with an existing posting's values. */}
+              <Route path="/e/vacancies/:vacancyId/edit" element={<NewVacancy />} />
               <Route path="/e/vacancies/:vacancyId" element={<VacancyDetail />} />
               <Route path="/e/chats/:chatId" element={<ChatDetail />} />
               <Route path="/e/notifications" element={<Notifications />} />

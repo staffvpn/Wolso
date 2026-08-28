@@ -14,6 +14,8 @@ interface VacancyApiResponse {
   endMin: number;
   hourlyRate: number;
   requirements: string[];
+  /** shiftToJson has always sent this; the type just never declared it. */
+  description?: string;
   employmentType?: string;
   urgency: string;
   status: string;
@@ -34,6 +36,7 @@ function fromApiVacancy(v: VacancyApiResponse): Vacancy {
     endMin: v.endMin,
     hourlyRate: v.hourlyRate,
     requirements: v.requirements,
+    description: v.description ?? '',
     employmentType: (v.employmentType as Vacancy['employmentType']) ?? 'shift',
     urgent: v.urgency === 'urgent',
     createdAt: v.createdAt,
@@ -252,6 +255,30 @@ export async function createVacancy(input: {
       urgency: input.urgent ? 'urgent' : 'normal',
     },
   });
+  return fromApiVacancy({ ...shift, responseCount: shift.responseCount ?? 0 });
+}
+
+/** Edits an existing posting. Only the fields passed are changed; anyone
+ *  already invited or hired is told server-side what actually moved. */
+export async function updateVacancy(
+  vacancyId: string,
+  input: {
+    position: Position;
+    positionLabel: string;
+    date: string;
+    endDate?: string | null;
+    startHour: number;
+    endHour: number;
+    hourlyRate: number;
+    requirements: string[];
+    employmentType: Vacancy['employmentType'];
+    description?: string;
+  },
+): Promise<Vacancy> {
+  const { shift } = await apiFetch<{ shift: VacancyApiResponse & { responseCount?: number } }>(
+    `/employer/vacancies/${vacancyId}`,
+    { method: 'PATCH', as: 'company', body: input },
+  );
   return fromApiVacancy({ ...shift, responseCount: shift.responseCount ?? 0 });
 }
 

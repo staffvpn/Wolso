@@ -293,6 +293,123 @@ employerRoutes.post('/vacancies', async (c) => {
   return c.json({ shift: shiftToJson(row!) });
 });
 
+/** Edits a vacancy in place. Until now the only way to fix a typo in the
+ *  rate or move a shift by an hour was deleting the posting and republishing
+ *  — which threw away the responses it had already collected.
+ *
+ *  Only an active posting can be edited: a closed one is a record of work
+ *  that happened, and rewriting its terms after the fact would rewrite what
+ *  people were paid for.
+ *
+ *  Anyone already invited or confirmed is told what changed rather than
+ *  finding out on the day. Silently moving the time or the pay under
+ *  someone who has agreed to come is the one genuinely dangerous thing this
+ *  route can do, so it is the one thing it refuses to do quietly. */
+employerRoutes.patch('/vacancies/:id', async (c) => {
+  const session = requireCompany(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const id = c.req.param('id');
+
+  const existing = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ? AND s.company_id = ?`)
+    .bind(id, session.companyId)
+    .first<ShiftRow>();
+  if (!existing) return c.json({ error: 'not_found' }, 404);
+  if (existing.status !== 'active') return c.json({ error: 'not_editable' }, 409);
+
+  const body = await c.req.json<{
+    position?: string;
+    positionLabel?: string;
+    date?: string;
+    endDate?: string | null;
+    startHour?: number;
+    endHour?: number;
+    hourlyRate?: number;
+    description?: string;
+    employmentType?: string;
+    requirements?: string[];
+  }>();
+
+  const next = {
+    position: body.position ?? existing.position,
+    positionLabel: body.positionLabel ?? existing.position_label,
+    date: body.date ?? existing.date,
+    startHour: body.startHour ?? existing.start_hour,
+    endHour: body.endHour ?? existing.end_hour,
+    hourlyRate: body.hourlyRate ?? existing.hourly_rate,
+    description: body.description ?? existing.description,
+    employmentType: body.employmentType ?? existing.employment_type,
+    requirements: body.requirements ?? (JSON.parse(existing.requirements || '[]') as string[]),
+  };
+
+  // An ongoing job carries no range; a shift's end date only counts when it
+  // is genuinely later than the start (same rule as creation).
+  const endDate =
+    next.employmentType === 'permanent'
+      ? null
+      : body.endDate === undefined
+        ? existing.end_date
+        : body.endDate && body.endDate > next.date
+          ? body.endDate
+          : null;
+
+  const totalPay = Math.max(0, Math.round((next.endHour - next.startHour) * next.hourlyRate));
+
+  await c.env.DB.prepare(
+    `UPDATE shifts SET position = ?, position_label = ?, date = ?, end_date = ?, start_hour = ?, end_hour = ?,
+       hourly_rate = ?, total_pay = ?, description = ?, employment_type = ?, requirements = ?
+     WHERE id = ? AND company_id = ?`,
+  )
+    .bind(
+      next.position,
+      next.positionLabel,
+      next.date,
+      endDate,
+      next.startHour,
+      next.endHour,
+      next.hourlyRate,
+      totalPay,
+      next.description,
+      next.employmentType,
+      JSON.stringify(next.requirements),
+      id,
+      session.companyId,
+    )
+    .run();
+
+  // What a candidate would actually care about — not every edit is worth a
+  // notification, and pinging people because a typo in the description got
+  // fixed is how notifications start getting ignored.
+  const changes: string[] = [];
+  if (next.date !== existing.date) changes.push(`дата — ${next.date}`);
+  if (next.startHour !== existing.start_hour || next.endHour !== existing.end_hour) {
+    changes.push(`время — ${String(next.startHour).padStart(2, '0')}:00–${String(next.endHour).padStart(2, '0')}:00`);
+  }
+  if (next.hourlyRate !== existing.hourly_rate) changes.push(`ставка — ${next.hourlyRate} ₽/ч`);
+  if (next.positionLabel !== existing.position_label) changes.push(`должность — ${next.positionLabel}`);
+
+  if (changes.length > 0) {
+    const { results: engaged } = await c.env.DB.prepare(
+      `SELECT a.worker_id, w.telegram_id FROM applications a JOIN workers w ON w.id = a.worker_id
+       WHERE a.shift_id = ? AND a.status IN ('invited', 'accepted')`,
+    )
+      .bind(id)
+      .all<{ worker_id: number; telegram_id: number }>();
+
+    const title = `Изменились условия смены «${next.positionLabel}»`;
+    const subtitle = changes.join(', ');
+
+    for (const person of engaged) {
+      await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+        .bind(person.worker_id, 'shift_updated', title, subtitle)
+        .run();
+      c.executionCtx.waitUntil(sendTelegramMessage(c.env, person.telegram_id, `✏️ ${title}\n${subtitle}`));
+    }
+  }
+
+  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
+  return c.json({ shift: shiftToJson(row!) });
+});
+
 /** Reviews workers left about this company, newest first — the list
  *  behind the rating on the employer's own profile. Mirrors
  *  GET /me/reviews on the worker side. */

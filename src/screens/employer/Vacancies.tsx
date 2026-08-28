@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
@@ -86,6 +86,21 @@ export function Vacancies() {
                   <Badge tone={STATUS_TONE[vac.status] ?? 'neutral'}>{STATUS_LABEL[vac.status] ?? vac.status}</Badge>
                   <span className="flex items-center gap-2 shrink-0">
                     <span className="text-[12px] text-text-faint">{timeAgoSince(vac.createdAt)} назад</span>
+                    {/* Editing is offered only while the posting is still
+                        active: a closed one is a record of work that already
+                        happened, and the server refuses to rewrite it. */}
+                    {vac.status === 'active' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/e/vacancies/${vac.id}/edit`);
+                        }}
+                        aria-label="Редактировать вакансию"
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-text-faint active:text-accent"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Check, Mail, X, XCircle } from 'lucide-react';
+import { Check, Mail, Pencil, X, XCircle } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
@@ -103,7 +103,20 @@ export function VacancyDetail() {
         onBack={() => navigate(-1)}
         title={`${vacancy.positionLabel} · ${formatDateRange(vacancy.date, vacancy.endDate)}`}
         subtitle={`${String(vacancy.startHour).padStart(2, '0')}:${String(vacancy.startMin).padStart(2, '0')}–${String(vacancy.endHour).padStart(2, '0')}:${String(vacancy.endMin).padStart(2, '0')} · опубликовано ${timeAgoSince(vacancy.createdAt)} назад`}
-        right={<Badge tone={STATUS_TONE[vacancy.status] ?? 'neutral'}>{STATUS_LABEL[vacancy.status] ?? vacancy.status}</Badge>}
+        right={
+          <span className="flex items-center gap-1.5">
+            <Badge tone={STATUS_TONE[vacancy.status] ?? 'neutral'}>{STATUS_LABEL[vacancy.status] ?? vacancy.status}</Badge>
+            {vacancy.status === 'active' && (
+              <button
+                onClick={() => navigate(`/e/vacancies/${vacancy.id}/edit`)}
+                aria-label="Редактировать вакансию"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-text-faint active:text-accent"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+          </span>
+        }
       />
 
       <div className="flex gap-2 px-5 pb-3 shrink-0">

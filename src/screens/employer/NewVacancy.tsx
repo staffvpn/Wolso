@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Lock, Minus, Plus } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/Badge';
 import { SectionLabel } from '@/components/ui/Card';
 import { POSITIONS, MARKET_AVG_RATE } from '@/data/positions';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatDayMonth, pluralizeShifts } from '@/lib/format';
+import { formatDayMonth, pluralizeShifts, shiftDaysCount } from '@/lib/format';
+import { ApiError } from '@/lib/apiClient';
 import { EMPLOYMENT_TYPES } from '@/data/employmentTypes';
 import type { EmploymentType, Position } from '@/types';
 
@@ -33,9 +34,18 @@ function addDays(date: string, days: number) {
 const TODAY = isoDate(0);
 const TOMORROW = isoDate(1);
 
+/** Doubles as the edit form: same fields, same rules, so a posting can't be
+ *  created one way and corrected another. With :vacancyId in the URL it
+ *  loads that vacancy's values and saves over it instead of publishing a
+ *  new one. */
 export function NewVacancy() {
   const navigate = useNavigate();
+  const { vacancyId } = useParams<{ vacancyId: string }>();
   const createVacancy = useEmployerStore((s) => s.createVacancy);
+  const updateVacancy = useEmployerStore((s) => s.updateVacancy);
+  const vacancies = useEmployerStore((s) => s.vacancies);
+  const loadAll = useEmployerStore((s) => s.loadAll);
+  const editing = vacancyId ? vacancies.find((v) => v.id === vacancyId) : undefined;
 
   const [position, setPosition] = useState<Position>('barista');
   // No default: the employer has to say whether this is a one-off shift or
@@ -50,6 +60,30 @@ export function NewVacancy() {
   const [requirements, setRequirements] = useState<string[]>(['Опыт от 1 года', 'Медкнижка']);
   const [description, setDescription] = useState('');
   const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // The vacancy list may not be in the store yet on a cold open of the edit
+  // URL (a reload, or a link followed straight in).
+  useEffect(() => {
+    if (vacancyId && !editing) loadAll();
+  }, [vacancyId, editing, loadAll]);
+
+  // Fill the form from the vacancy being edited, once. Keyed on the id so
+  // it doesn't fight the user's own typing on every re-render.
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
+  useEffect(() => {
+    if (!editing || filledFrom === editing.id) return;
+    setPosition(editing.position);
+    setEmploymentType(editing.employmentType ?? 'shift');
+    setStartDate(editing.date);
+    setDays(editing.endDate ? shiftDaysCount(editing.date, editing.endDate) : 1);
+    setStartHour(editing.startHour);
+    setEndHour(editing.endHour);
+    setRate(editing.hourlyRate);
+    setRequirements(editing.requirements ?? []);
+    setDescription(editing.description);
+    setFilledFrom(editing.id);
+  }, [editing, filledFrom]);
 
   const marketAvg = MARKET_AVG_RATE[position];
   const positionLabel = POSITIONS.find((p) => p.id === position)!.label;
@@ -82,28 +116,55 @@ export function NewVacancy() {
   async function publish() {
     if (!employmentType) return;
     setPublishing(true);
-    const vac = await createVacancy({
-      position,
-      positionLabel,
-      date: startDate,
-      endDate: days > 1 ? endDate : undefined,
-      startHour,
-      startMin: 0,
-      endHour,
-      endMin: 0,
-      hourlyRate: rate,
-      requirements,
-      employmentType,
-      description: description.trim(),
-      urgent: false, // paid feature — locked for now, see the toggle below
-    });
-    setPublishing(false);
-    navigate(`/e/vacancies/${vac.id}`, { replace: true });
+    setError(null);
+    try {
+      if (editing) {
+        await updateVacancy(editing.id, {
+          position,
+          positionLabel,
+          date: startDate,
+          endDate: days > 1 ? endDate : null,
+          startHour,
+          endHour,
+          hourlyRate: rate,
+          requirements,
+          employmentType,
+          description: description.trim(),
+        });
+        navigate(`/e/vacancies/${editing.id}`, { replace: true });
+        return;
+      }
+
+      const vac = await createVacancy({
+        position,
+        positionLabel,
+        date: startDate,
+        endDate: days > 1 ? endDate : undefined,
+        startHour,
+        startMin: 0,
+        endHour,
+        endMin: 0,
+        hourlyRate: rate,
+        requirements,
+        employmentType,
+        description: description.trim(),
+        urgent: false, // paid feature — locked for now, see the toggle below
+      });
+      navigate(`/e/vacancies/${vac.id}`, { replace: true });
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === 'not_editable'
+          ? 'Смена уже закрыта — её условия менять нельзя.'
+          : 'Не получилось сохранить. Попробуйте ещё раз.',
+      );
+    } finally {
+      setPublishing(false);
+    }
   }
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <TopBar title="Новая смена" onBack={() => navigate(-1)} />
+      <TopBar title={editing ? 'Редактировать' : 'Новая смена'} onBack={() => navigate(-1)} />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6 space-y-6">
         <div>
@@ -272,14 +333,19 @@ export function NewVacancy() {
       </div>
 
       <div className="px-5 pb-5 pt-2 shrink-0">
+        {error && <p className="text-[13px] text-danger mb-2 leading-relaxed">{error}</p>}
         <Button fullWidth disabled={publishing || !employmentType} onClick={publish}>
           {publishing
-            ? 'Публикуем…'
+            ? editing
+              ? 'Сохраняем…'
+              : 'Публикуем…'
             : !employmentType
               ? 'Выберите тип работы'
-              : days > 1
-                ? `Опубликовать · ${days} ${pluralizeShifts(days)}`
-                : 'Опубликовать'}
+              : editing
+                ? 'Сохранить изменения'
+                : days > 1
+                  ? `Опубликовать · ${days} ${pluralizeShifts(days)}`
+                  : 'Опубликовать'}
         </Button>
       </div>
     </div>

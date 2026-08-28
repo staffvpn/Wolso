@@ -8,6 +8,7 @@ import {
   cancelCandidate as cancelCandidateApi,
   closeShift as closeShiftApi,
   createVacancy as createVacancyApi,
+  updateVacancy as updateVacancyApi,
   deleteVacancy as deleteVacancyApi,
 } from '@/services/employerApi';
 import { haptic, hapticNotify } from '@/lib/telegram';
@@ -37,6 +38,7 @@ interface EmployerState {
     description?: string;
     urgent: boolean;
   }) => Promise<Vacancy>;
+  updateVacancy: (vacancyId: string, input: Parameters<typeof updateVacancyApi>[1]) => Promise<Vacancy>;
   deleteVacancy: (vacancyId: string) => Promise<void>;
 }
 
@@ -105,6 +107,12 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
   createVacancy: async (input) => {
     const vacancy = await createVacancyApi(input);
     set((s) => ({ vacancies: [vacancy, ...s.vacancies] }));
+    return vacancy;
+  },
+
+  updateVacancy: async (vacancyId, input) => {
+    const vacancy = await updateVacancyApi(vacancyId, input);
+    set((s) => ({ vacancies: s.vacancies.map((v) => (v.id === vacancyId ? vacancy : v)) }));
     return vacancy;
   },
 
