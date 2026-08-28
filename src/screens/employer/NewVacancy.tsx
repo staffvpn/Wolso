@@ -62,6 +62,7 @@ export function NewVacancy() {
    *  работа» also resets whatever dates were already chosen, so a stale
    *  range can't be published from a section that's no longer visible. */
   const showDates = employmentType === 'shift';
+  const isPermanent = employmentType === 'permanent';
 
   function chooseEmploymentType(id: EmploymentType) {
     setEmploymentType(id);
@@ -129,9 +130,17 @@ export function NewVacancy() {
           </div>
         </div>
 
-        {showDates && (
+        {employmentType && (
         <div>
-          <SectionLabel>Когда</SectionLabel>
+          <SectionLabel>{isPermanent ? 'График работы' : 'Когда'}</SectionLabel>
+          {isPermanent && (
+            <p className="text-[13px] text-text-muted mb-3 leading-relaxed">
+              У постоянной работы нет конкретного дня, но часы всё равно нужны — по ним считается оплата, и соискатель
+              сразу видит, во сколько выходить
+            </p>
+          )}
+          {showDates && (
+          <>
           <p className="text-[13px] text-text-muted mb-3 leading-relaxed">
             Смена публикуется сразу — если человек нужен на несколько дней подряд, это одна вакансия, не несколько
           </p>
@@ -179,6 +188,8 @@ export function NewVacancy() {
               </button>
             </div>
           </div>
+          </>
+          )}
           <div className="flex items-center gap-3">
             <div className="flex-1 rounded-2xl bg-surface border border-border px-3.5 py-3">
               <p className="text-[11px] text-text-faint mb-1">Начало</p>
@@ -210,10 +221,12 @@ export function NewVacancy() {
           <SectionLabel>Оплата</SectionLabel>
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-[28px] font-extrabold">{rate} ₽</span>
-            {/* No per-shift total unless the hours it's derived from are on
-                screen — they live in the «Когда» section. */}
+            {/* The hours are now asked for whichever type is picked, so the
+                derived total is always real — only its wording changes:
+                an ongoing job is paid per working day, not per shift. */}
             <span className="text-[13px] text-text-muted">
-              в час{showDates && ` · ${rate * (endHour - startHour)} ₽ за смену`}
+              в час
+              {employmentType && ` · ${rate * (endHour - startHour)} ₽ ${isPermanent ? 'за день' : 'за смену'}`}
             </span>
           </div>
           <Slider min={200} max={1000} step={10} value={rate} onChange={setRate} className="mt-3" />
