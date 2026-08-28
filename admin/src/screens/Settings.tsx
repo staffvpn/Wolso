@@ -49,6 +49,51 @@ function TestAlertButton() {
   );
 }
 
+/** Ratings are stored on the account and were only ever recalculated when a
+ *  review was left — so anything that removed one (a deleted vacancy, a
+ *  deleted review) left the old stars behind. Deletions recompute now, but
+ *  scores that drifted before that had no way back short of editing the
+ *  database. */
+function RecomputeRatingsCard() {
+  const [state, setState] = useState<'idle' | 'busy'>('idle');
+  const [message, setMessage] = useState('');
+  const [failed, setFailed] = useState(false);
+
+  async function run() {
+    setState('busy');
+    setMessage('');
+    setFailed(false);
+    try {
+      const { workers, companies } = await apiFetch<{ workers: number; companies: number }>(
+        '/admin/users/recompute-ratings',
+        { method: 'POST' },
+      );
+      setMessage(`Готово. Пересчитано: соискателей — ${workers}, работодателей — ${companies}.`);
+    } catch {
+      setFailed(true);
+      setMessage('Не получилось пересчитать. Проверьте, что воркер задеплоен с последними изменениями.');
+    } finally {
+      setState('idle');
+    }
+  }
+
+  return (
+    <Card className="p-6 sm:col-span-2">
+      <SectionLabel className="mb-4">Рейтинги</SectionLabel>
+      <p className="text-[13px] text-text-muted leading-relaxed mb-4">
+        Пересчитывает звёзды у всех по отзывам, которые есть в базе сейчас. Нужно один раз — для тех, у кого рейтинг
+        остался от удалённых отзывов или вакансий. Дальше он пересчитывается сам.
+      </p>
+      <Button variant="dark" disabled={state === 'busy'} onClick={run}>
+        {state === 'busy' ? 'Пересчитываем…' : 'Пересчитать рейтинги'}
+      </Button>
+      {message && (
+        <p className={cn('text-[13px] mt-2.5 leading-relaxed', failed ? 'text-danger' : 'text-accent')}>{message}</p>
+      )}
+    </Card>
+  );
+}
+
 interface WebhookState {
   connected: boolean;
   otherUrl: boolean;
@@ -282,6 +327,8 @@ export function Settings() {
           </p>
           <TestAlertButton />
         </Card>
+
+        <RecomputeRatingsCard />
 
         <WebhookCard />
 

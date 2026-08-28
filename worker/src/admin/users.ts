@@ -4,6 +4,7 @@ import { attachSession, actorLabel, logAction, requirePermission, requireStaff, 
 import { provisionWorker, provisionCompany } from '../routes/auth';
 import { getTelegramUsername } from '../lib/telegramBot';
 import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
+import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -169,6 +170,71 @@ adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
     inconclusive,
     remaining: left?.n ?? 0,
   });
+});
+
+/** Deletes one review and re-derives the score behind it.
+ *
+ *  A review lives on the application it came out of, in one of two sets of
+ *  columns depending on who wrote about whom, so it's addressed by
+ *  application id plus a side. Deleting the vacancy used to be the only way
+ *  to get rid of a review, which took the whole shift and its chat with it
+ *  — and still left the stars.
+ *
+ *  work_stage is deliberately left alone: rolling it back from 'reviewed'
+ *  would put the mandatory review screen in front of the worker again for
+ *  a shift staff have just decided to wipe the review from. */
+adminUserRoutes.delete('/reviews/:appId/:side', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const appId = c.req.param('appId');
+  const side = c.req.param('side');
+  if (side !== 'worker' && side !== 'company') return c.json({ error: 'unknown_side' }, 400);
+
+  const app = await c.env.DB.prepare(
+    `SELECT a.id, a.worker_id, s.company_id, w.name as worker_name, co.name as company_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN workers w ON w.id = a.worker_id
+     JOIN companies co ON co.id = s.company_id
+     WHERE a.id = ?`,
+  )
+    .bind(appId)
+    .first<{ id: number; worker_id: number; company_id: number; worker_name: string; company_name: string }>();
+  if (!app) return c.json({ error: 'not_found' }, 404);
+
+  if (side === 'worker') {
+    await c.env.DB.prepare(
+      'UPDATE applications SET employer_rating = NULL, employer_review_tags = NULL, employer_review_comment = NULL WHERE id = ?',
+    )
+      .bind(appId)
+      .run();
+    await recomputeWorkerRating(c.env, app.worker_id);
+  } else {
+    await c.env.DB.prepare('UPDATE applications SET rating = NULL, review_tags = NULL, review_comment = NULL WHERE id = ?')
+      .bind(appId)
+      .run();
+    await recomputeCompanyRating(c.env, app.company_id);
+  }
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(
+    c.env,
+    actor,
+    `удалила отзыв о ${side === 'worker' ? app.worker_name : app.company_name}`,
+    'danger',
+  );
+
+  return c.json({ ok: true });
+});
+
+/** Rebuilds every stored rating from the reviews that exist right now.
+ *  For scores that already drifted before deletions started recomputing —
+ *  there was no way to fix those short of editing the database. */
+adminUserRoutes.post('/recompute-ratings', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const counts = await recomputeAllRatings(c.env);
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, 'пересчитала рейтинги', 'neutral');
+  return c.json({ ok: true, ...counts });
 });
 
 /** Counts for the "кто отписался" summary above the users table. */

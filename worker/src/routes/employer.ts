@@ -7,6 +7,7 @@ import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
 import { lookupInn } from '../lib/innLookup';
 import { notifyAdmin } from '../lib/adminNotify';
+import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -375,8 +376,23 @@ employerRoutes.delete('/vacancies/:id', async (c) => {
   // on its own leaves the chat alive with a null shift, still sitting in
   // both sides' chat list pointing at a vacancy that no longer exists.
   // Messages cascade off the chat row itself.
+  // Whose scores this shift's reviews were propping up — collected before
+  // the delete, because afterwards there's nothing left to ask.
+  const { results: reviewed } = await c.env.DB.prepare(
+    'SELECT DISTINCT worker_id FROM applications WHERE shift_id = ? AND employer_rating IS NOT NULL',
+  )
+    .bind(id)
+    .all<{ worker_id: number }>();
+
   await c.env.DB.prepare('DELETE FROM chats WHERE shift_id = ?').bind(id).run();
   await c.env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
+
+  // Deleting the shift takes its applications — and the reviews on them —
+  // with it. Without this the stars those reviews produced would just stay
+  // frozen on the accounts.
+  for (const r of reviewed) await recomputeWorkerRating(c.env, r.worker_id);
+  await recomputeCompanyRating(c.env, session.companyId);
+
   return c.json({ ok: true });
 });
 
@@ -707,14 +723,9 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
     .bind(rating, JSON.stringify(tags ?? []), comment ?? '', appId)
     .run();
 
-  // Same "recompute from every real review" approach as the company side
-  // (see applications.ts's /review) — cheap at this scale, never drifts.
-  await c.env.DB.prepare(
-    `UPDATE workers SET rating = (SELECT AVG(employer_rating) FROM applications WHERE worker_id = ? AND employer_rating IS NOT NULL)
-     WHERE id = ?`,
-  )
-    .bind(app.worker_id, app.worker_id)
-    .run();
+  // Shared with every other place a review can appear or disappear, so a
+  // deleted review lowers the score the same way leaving one raises it.
+  await recomputeWorkerRating(c.env, app.worker_id);
 
   // Everything past this point is after-the-fact bookkeeping — the shift is
   // already closed and reviewed in the database. If notifying the worker or

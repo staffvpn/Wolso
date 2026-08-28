@@ -3,6 +3,7 @@ import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { sendTelegramMessage } from '../lib/telegramBot';
+import { recomputeCompanyRating } from '../lib/ratings';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 applicationRoutes.use('*', attachSession);
@@ -242,19 +243,7 @@ applicationRoutes.post('/:id/review', async (c) => {
 
   await c.env.DB.prepare('UPDATE workers SET shifts_completed = shifts_completed + 1 WHERE id = ?').bind(session.workerId).run();
 
-  if (shift) {
-    // Real average from every review the company has actually gotten,
-    // recomputed rather than incrementally nudged — cheap enough at this
-    // scale and never drifts out of sync.
-    await c.env.DB.prepare(
-      `UPDATE companies SET
-         rating = (SELECT AVG(a.rating) FROM applications a JOIN shifts s ON s.id = a.shift_id WHERE s.company_id = ? AND a.rating IS NOT NULL),
-         reviews_count = (SELECT COUNT(*) FROM applications a JOIN shifts s ON s.id = a.shift_id WHERE s.company_id = ? AND a.rating IS NOT NULL)
-       WHERE id = ?`,
-    )
-      .bind(shift.company_id, shift.company_id, shift.company_id)
-      .run();
-  }
+  if (shift) await recomputeCompanyRating(c.env, shift.company_id);
 
   return c.json({ ok: true });
 });

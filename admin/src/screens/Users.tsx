@@ -14,6 +14,7 @@ import { EmptyPanel } from '@/components/EmptyPanel';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useUserDetailStore } from '@/store/useUserDetailStore';
+import { deleteReview } from '@/services/usersApi';
 import { useRolesStore } from '@/store/useRolesStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
@@ -540,13 +541,23 @@ function Stars({ value }: { value: number }) {
  *  same block: what people wrote about this account, and what this account
  *  wrote about everyone else. The second one is what you actually need when
  *  someone disputes a rating or is serially one-starring people. */
-function ReviewsBlock({ received, given, receivedLabel, givenLabel }: {
+/** `receivedSide`/`givenSide` say whose score a review in that tab feeds,
+ *  which is what the delete needs to know: the same application carries the
+ *  employer's review of the worker and the worker's review of the company
+ *  in two different sets of columns. From a seeker's card the received tab
+ *  is about the worker; from an employer's card it's about the company. */
+function ReviewsBlock({ received, given, receivedLabel, givenLabel, receivedSide, givenSide, onDelete }: {
   received: AdminReview[];
   given: AdminReview[];
   receivedLabel: string;
   givenLabel: string;
+  receivedSide: 'worker' | 'company';
+  givenSide: 'worker' | 'company';
+  onDelete: (reviewId: string, side: 'worker' | 'company') => Promise<void>;
 }) {
   const [tab, setTab] = useState<'received' | 'given'>('received');
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const side = tab === 'received' ? receivedSide : givenSide;
   const list = tab === 'received' ? received : given;
   const avg = received.length > 0 ? received.reduce((sum, r) => sum + r.rating, 0) / received.length : 0;
 
@@ -589,7 +600,25 @@ function ReviewsBlock({ received, given, receivedLabel, givenLabel }: {
           <div key={`${tab}-${r.id}`} className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px]">
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold text-text truncate">{r.counterpartyName}</span>
-              <Stars value={r.rating} />
+              <span className="flex items-center gap-2 shrink-0">
+                <Stars value={r.rating} />
+                <button
+                  onClick={async () => {
+                    setDeleting(r.id);
+                    try {
+                      await onDelete(r.id, side);
+                    } finally {
+                      setDeleting(null);
+                    }
+                  }}
+                  disabled={deleting === r.id}
+                  aria-label="Удалить отзыв"
+                  title="Удалить отзыв и пересчитать рейтинг"
+                  className="text-text-faint hover:text-danger transition-colors disabled:opacity-40"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </span>
             </div>
             <p className="text-text-faint text-[12px] mt-0.5">
               {r.positionLabel} · {formatDayMonth(new Date(r.shiftDate))}
@@ -616,6 +645,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
   const deleteUser = useUsersStore((s) => s.deleteUser);
   const detail = useUserDetailStore((s) => s.seeker);
   const loadSeeker = useUserDetailStore((s) => s.loadSeeker);
+  const refreshUsers = useUsersStore((s) => s.load);
   const updateSeeker = useUserDetailStore((s) => s.updateSeeker);
   const canBlock = useCan('blockUsers');
   const canSwitchRole = useCan('switchUserRole');
@@ -741,6 +771,15 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
             given={ready.reviewsGiven}
             receivedLabel="О нём"
             givenLabel="Он оставил"
+            receivedSide="worker"
+            givenSide="company"
+            onDelete={async (reviewId, side) => {
+              await deleteReview(reviewId, side);
+              // Reload both: the card's own review list, and the users list
+              // behind it, whose row carries the star count.
+              await loadSeeker(user.id);
+              await refreshUsers();
+            }}
           />
           <div>
             <SectionLabel>Завершённые смены{completedApplications.length > 0 ? ` (${completedApplications.length})` : ''}</SectionLabel>
@@ -838,6 +877,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
   const deleteUser = useUsersStore((s) => s.deleteUser);
   const detail = useUserDetailStore((s) => s.employer);
   const loadEmployer = useUserDetailStore((s) => s.loadEmployer);
+  const refreshUsers = useUsersStore((s) => s.load);
   const updateEmployer = useUserDetailStore((s) => s.updateEmployer);
   const deleteEmployerVacancy = useUserDetailStore((s) => s.deleteEmployerVacancy);
   const canBlock = useCan('blockUsers');
@@ -970,6 +1010,13 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
             given={ready.reviewsGiven}
             receivedLabel="О компании"
             givenLabel="Компания оставила"
+            receivedSide="company"
+            givenSide="worker"
+            onDelete={async (reviewId, side) => {
+              await deleteReview(reviewId, side);
+              await loadEmployer(user.id);
+              await refreshUsers();
+            }}
           />
           <div>
             <SectionLabel>Завершённые вакансии{closedVacancies.length > 0 ? ` (${closedVacancies.length})` : ''}</SectionLabel>

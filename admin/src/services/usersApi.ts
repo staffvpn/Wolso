@@ -339,6 +339,17 @@ export async function toggleBlockEmployer(id: string, reason?: string): Promise<
   return apiFetch(`/admin/users/employers/${id}/block`, { method: 'POST', body: { reason } });
 }
 
+/** Removes one review and re-derives the score it fed. `side` says whose
+ *  rating that is — the same application holds both directions of review. */
+export async function deleteReview(applicationId: string, side: 'worker' | 'company'): Promise<void> {
+  await apiFetch(`/admin/users/reviews/${applicationId}/${side}`, { method: 'DELETE' });
+}
+
+/** Rebuilds every stored rating from the reviews that exist right now. */
+export async function recomputeRatings(): Promise<{ workers: number; companies: number }> {
+  return apiFetch('/admin/users/recompute-ratings', { method: 'POST' });
+}
+
 export async function deleteSeeker(id: string): Promise<void> {
   await apiFetch(`/admin/users/seekers/${id}`, { method: 'DELETE' });
 }
