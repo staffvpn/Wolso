@@ -11,6 +11,7 @@ import { Input, Label, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyPanel } from '@/components/EmptyPanel';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useUserDetailStore } from '@/store/useUserDetailStore';
 import { useRolesStore } from '@/store/useRolesStore';
@@ -404,6 +405,8 @@ function DetailSkeleton() {
 }
 
 function PhotoStrip({ photos }: { photos: UserPhoto[] }) {
+  const [open, setOpen] = useState<number | null>(null);
+
   if (photos.length === 0) {
     return (
       <div className="flex items-center gap-1.5 text-[13px] text-text-faint">
@@ -412,11 +415,47 @@ function PhotoStrip({ photos }: { photos: UserPhoto[] }) {
     );
   }
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {photos.map((p) => (
-        <img key={p.id} src={p.url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
-      ))}
-    </div>
+    <>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {photos.map((p, i) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setOpen(i)}
+            aria-label="Открыть фото"
+            className="shrink-0 rounded-lg overflow-hidden hover:opacity-80 transition-opacity cursor-zoom-in"
+          >
+            <img src={p.url} alt="" className="w-16 h-16 object-cover" />
+          </button>
+        ))}
+      </div>
+      {open !== null && (
+        <PhotoLightbox photos={photos} index={open} onIndexChange={setOpen} onClose={() => setOpen(null)} />
+      )}
+    </>
+  );
+}
+
+/** The avatar in a detail panel, openable at full size. It's the one photo
+ *  staff look at most (checking a venue is real, checking a face matches an
+ *  anketa) and it was the one you couldn't enlarge. */
+function ZoomableAvatar({ name, url, square }: { name: string; url?: string; square?: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!url) return <Avatar name={name} size={44} square={square} />;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Открыть фото" className="cursor-zoom-in shrink-0">
+        <Avatar name={name} size={44} square={square} src={url} />
+      </button>
+      {open && (
+        <PhotoLightbox
+          photos={[{ id: 'avatar', url }]}
+          index={0}
+          onIndexChange={() => {}}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -574,7 +613,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
-        <Avatar name={user.name} size={44} src={ready?.avatarUrl} />
+        <ZoomableAvatar name={user.name} url={ready?.avatarUrl} />
         <div className="min-w-0">
           <p className="font-bold text-[17px] leading-tight truncate">{user.name}</p>
           <p className="text-[13px] text-text-muted mt-0.5">{user.city}{age !== null ? ` · ${age} лет` : ''}</p>
@@ -779,7 +818,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
-        <Avatar name={user.name} size={44} square src={ready?.avatarUrl} />
+        <ZoomableAvatar name={user.name} url={ready?.avatarUrl} square />
         <div className="min-w-0">
           <p className="font-bold text-[17px] leading-tight truncate">{user.name}</p>
           <p className="text-[13px] text-text-muted mt-0.5">{user.city}{ready?.foundedYear ? ` · с ${ready.foundedYear}` : ''}</p>
