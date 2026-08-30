@@ -8,6 +8,7 @@ import { mskTodayStr } from '../lib/time';
 import { lookupInn } from '../lib/innLookup';
 import { notifyAdmin } from '../lib/adminNotify';
 import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
+import { excludeHiddenSql } from '../lib/hiddenProfiles';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -888,7 +889,8 @@ const PASS_COOLDOWN_DAYS = 1;
  *  position (empty list = empty deck, not "show everyone"). Workers who
  *  already have a chat with this company (invited from here, or hired off
  *  an application) don't show up again; a passed worker comes back after
- *  PASS_COOLDOWN_DAYS. */
+ *  PASS_COOLDOWN_DAYS. Anketas hidden from the dashboard are left out
+ *  entirely — that's the whole point of hiding one. */
 employerRoutes.get('/workers', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -897,6 +899,7 @@ employerRoutes.get('/workers', async (c) => {
   const positions = (c.req.query('positions') ?? '').split(',').filter(Boolean);
   if (positions.length === 0) return c.json({ workers: [] });
 
+  const notHidden = await excludeHiddenSql(c.env, 'w');
   const placeholders = positions.map(() => '?').join(',');
   const { results } = await c.env.DB.prepare(
     `SELECT DISTINCT w.id as worker_id, ${CANDIDATE_WORKER_FIELDS},
@@ -908,6 +911,7 @@ employerRoutes.get('/workers', async (c) => {
      LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
      WHERE wp.position IN (${placeholders})
        AND w.status != 'suspended'
+       ${notHidden}
        AND (t.active_role = 'worker' OR t.active_role IS NULL)
        AND w.id NOT IN (
          SELECT worker_id FROM company_worker_passes

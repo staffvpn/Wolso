@@ -59,6 +59,12 @@ export interface PlatformUser {
   telegramUsername?: string;
   /** Why staff blocked them, shown both here and to the person themselves. */
   suspendedReason?: string;
+  /** Seekers only: the anketa is out of circulation — employers don't see
+   *  it in «найти сотрудников» and the person can't send new responses.
+   *  Softer than a block, which cuts off the app entirely. */
+  hidden?: boolean;
+  /** Optional note left when hiding, shown to the person too. */
+  hiddenReason?: string;
   /** Whether the bot can still reach them — see BotStatus. */
   botStatus: BotStatus;
   /** When that was last established, ISO. */

@@ -57,6 +57,11 @@ async function loadProfile(env: Env, workerId: number) {
   const { complete, percent } = isComplete(worker, positions.length > 0);
   const avatarUrl = worker.avatar_data ? `/media/workers/${worker.id}/avatar` : worker.photo_url;
 
+  // Read off the row rather than named in the SELECT, so this keeps working
+  // on a database where migration 0027 hasn't been applied yet — the columns
+  // are simply absent and the profile reads as not hidden.
+  const moderation = worker as WorkerRow & { hidden?: number; hidden_reason?: string | null };
+
   return {
     worker: {
       ...worker,
@@ -65,6 +70,8 @@ async function loadProfile(env: Env, workerId: number) {
       age: ageFrom(worker.birthdate),
       profileComplete: complete,
       profileCompletion: percent,
+      hidden: !!moderation.hidden,
+      hiddenReason: moderation.hidden_reason ?? null,
     },
     positions,
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${workerId}/photos/${p.id}` })),

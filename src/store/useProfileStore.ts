@@ -21,6 +21,9 @@ interface ProfileState {
   shiftsCompleted: number;
   profileCompletion: number;
   profileComplete: boolean;
+  /** Staff hid the anketa from the dashboard — see ProfileHidden. */
+  hidden: boolean;
+  hiddenReason?: string;
   referralCode: string;
   bio: string;
   skills: string;
@@ -48,6 +51,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
   shiftsCompleted: 0,
   profileCompletion: 0,
   profileComplete: false,
+  hidden: false,
   referralCode: '',
   bio: '',
   skills: '',

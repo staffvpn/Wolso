@@ -7,6 +7,7 @@ import {
   fetchEmployers,
   toggleBlockSeeker,
   toggleBlockEmployer,
+  toggleHideSeeker,
   inviteTeamMember,
   setTeamMemberRole,
   revokeTeamAccess,
@@ -32,6 +33,7 @@ interface UsersState {
   botCheckFailed: boolean;
   load: () => Promise<void>;
   toggleBlock: (id: string, kind: 'seeker' | 'employer', reason?: string) => Promise<void>;
+  toggleHidden: (id: string, reason?: string) => Promise<void>;
   setTeamRole: (memberId: string, roleId: string) => Promise<void>;
   inviteMember: (name: string, telegramId: number, roleId: string) => Promise<void>;
   revokeAccess: (memberId: string) => Promise<void>;
@@ -66,6 +68,14 @@ export const useUsersStore = create<UsersState>((set, get) => ({
       u.id === id ? { ...u, status, statusLabel, suspendedReason: saved ?? undefined } : u;
     if (kind === 'seeker') set({ seekers: get().seekers.map(apply) });
     else set({ employers: get().employers.map(apply) });
+  },
+
+  /** Seekers only — an employer has no anketa to take out of the search. */
+  toggleHidden: async (id, reason) => {
+    const { hidden, reason: saved } = await toggleHideSeeker(id, reason);
+    set({
+      seekers: get().seekers.map((u) => (u.id === id ? { ...u, hidden, hiddenReason: saved ?? undefined } : u)),
+    });
   },
 
   // These two used to update the store optimistically before the request

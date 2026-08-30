@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Pencil, Plus } from 'lucide-react';
+import { ChevronRight, EyeOff, Pencil, Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
@@ -46,6 +46,25 @@ export function WorkerProfileScreen() {
           <Pencil size={15} className="text-text-muted" />
         </button>
       </div>
+
+      {/* The same fact the feed shows, repeated here because this is the
+          screen someone opens when they go looking for what's wrong with
+          their anketa. */}
+      {profile.hidden && (
+        <div className="mt-4 rounded-2xl bg-surface-2 border border-border p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <EyeOff size={15} className="text-text-muted" />
+            <p className="text-[14px] font-bold">Анкета скрыта</p>
+          </div>
+          <p className="text-[13px] text-text-muted leading-relaxed">
+            Работодатели не видят её в поиске, а откликаться на новые смены нельзя.
+            {profile.hiddenReason ? '' : ' Поправьте анкету и напишите в поддержку.'}
+          </p>
+          {profile.hiddenReason && (
+            <p className="text-[13px] text-text leading-relaxed mt-2 whitespace-pre-line">{profile.hiddenReason}</p>
+          )}
+        </div>
+      )}
 
       {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{profile.bio}</p>}
 

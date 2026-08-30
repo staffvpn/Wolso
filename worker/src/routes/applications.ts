@@ -4,6 +4,7 @@ import { attachSession, requireWorker } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { sendTelegramMessage } from '../lib/telegramBot';
 import { recomputeCompanyRating } from '../lib/ratings';
+import { workerIsHidden } from '../lib/hiddenProfiles';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 applicationRoutes.use('*', attachSession);
@@ -64,6 +65,12 @@ applicationRoutes.post('/', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const { shiftId } = await c.req.json<{ shiftId: number }>();
+
+  // A hidden anketa is out of circulation: it isn't offered to employers in
+  // "найти сотрудников", so it shouldn't be able to walk in the other door
+  // either. The app hides the feed for these accounts (see ProfileHidden),
+  // this is the enforcement behind it.
+  if (await workerIsHidden(c.env, session.workerId)) return c.json({ error: 'profile_hidden' }, 403);
 
   const shift = await c.env.DB.prepare("SELECT id, company_id, position_label FROM shifts WHERE id = ? AND status = 'active'")
     .bind(shiftId)

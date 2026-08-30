@@ -13,7 +13,9 @@ import { SafeImage } from '@/components/ui/SafeImage';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { ShiftCard } from '@/components/deck/ShiftCard';
 import { FilterSheet } from '@/components/FilterSheet';
+import { ProfileHidden } from './ProfileHidden';
 import { useShiftsStore } from '@/store/useShiftsStore';
+import { useProfileStore } from '@/store/useProfileStore';
 import { useFiltersStore } from '@/store/useFiltersStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
@@ -33,6 +35,7 @@ export function Feed() {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const { deck, index, loading, lastApplied, loadDeck, swipe, clearLastApplied } = useShiftsStore();
+  const profileHidden = useProfileStore((s) => s.hidden);
   const filters = useFiltersStore((s) => s.filters);
   const unread = useNotificationsStore((s) => s.unreadCount());
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -54,6 +57,10 @@ export function Feed() {
   }, [detailOpen, current]);
 
   const radiusLabel = filters.radiusKm === 'city' ? 'по всему городу' : `в радиусе ${filters.radiusKm} км`;
+
+  // Only the deck is replaced, not the whole app: hiding an anketa stops
+  // new responses, it doesn't cancel the shifts and chats already in play.
+  if (profileHidden) return <ProfileHidden />;
 
   return (
     <div className="flex flex-col h-full min-h-0">

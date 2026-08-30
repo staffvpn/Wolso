@@ -166,6 +166,13 @@ export interface WorkerProfile {
   shiftsCompleted: number;
   profileCompletion: number;
   profileComplete: boolean;
+  /** Staff took the anketa out of circulation from the dashboard: no
+   *  employer sees it in «найти сотрудников» and new responses are
+   *  refused. Everything already agreed keeps working. */
+  hidden: boolean;
+  /** What staff wrote when hiding it, if anything — shown to the person so
+   *  they know what to fix. */
+  hiddenReason?: string;
   positions: WorkerExperience[];
   reviews: WorkerReview[];
   referralCode: string;

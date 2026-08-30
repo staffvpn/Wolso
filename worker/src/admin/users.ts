@@ -4,6 +4,7 @@ import { attachSession, actorLabel, logAction, requirePermission, requireStaff, 
 import { provisionWorker, provisionCompany } from '../routes/auth';
 import { getTelegramUsername } from '../lib/telegramBot';
 import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
+import { hiddenColumnExists } from '../lib/hiddenProfiles';
 import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -541,6 +542,45 @@ adminUserRoutes.post('/seekers/:id/block', requirePermission('blockUsers'), asyn
     next === 'suspended' ? 'danger' : 'neutral',
   );
   return c.json({ ok: true, status: next, reason: next === 'suspended' ? reason : null });
+});
+
+/** Hiding an anketa is the step below blocking: the account keeps working
+ *  normally — chats, shifts already agreed, reviews — it just stops being
+ *  offered to employers in "найти сотрудников" and can't send new
+ *  responses. Use it for a profile that isn't ban-worthy but shouldn't be
+ *  in circulation (half-empty, someone else's photos, a duplicate).
+ *
+ *  The reason is optional here, unlike blocking, because hiding doesn't
+ *  lock anyone out — but it is shown to the person if given, so they don't
+ *  spend a week wondering why the invitations stopped. */
+adminUserRoutes.post('/seekers/:id/hide', requirePermission('blockUsers'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const id = c.req.param('id');
+
+  // Named rather than left to throw: without this an unapplied 0027 comes
+  // back as a bare internal_error and the button just looks dead.
+  if (!(await hiddenColumnExists(c.env))) {
+    return c.json({ error: 'migration_required', migration: '0027_hidden_profiles' }, 400);
+  }
+
+  const worker = await c.env.DB.prepare('SELECT name, hidden FROM workers WHERE id = ?').bind(id).first<{ name: string; hidden: number }>();
+  if (!worker) return c.json({ error: 'not_found' }, 404);
+
+  const next = worker.hidden ? 0 : 1;
+  const reason = await readBlockReason(c);
+
+  await c.env.DB.prepare('UPDATE workers SET hidden = ?, hidden_reason = ?, hidden_at = ? WHERE id = ?')
+    .bind(next, next ? reason || null : null, next ? new Date().toISOString() : null, id)
+    .run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(
+    c.env,
+    actor,
+    next ? `скрыла анкету ${worker.name}${reason ? ` — «${reason}»` : ''}` : `вернула анкету ${worker.name} в поиск`,
+    next ? 'danger' : 'neutral',
+  );
+  return c.json({ ok: true, hidden: !!next, reason: next ? reason || null : null });
 });
 
 adminUserRoutes.post('/employers/:id/block', requirePermission('blockUsers'), async (c) => {

@@ -51,6 +51,8 @@ interface SeekerApiRow {
   bot_status?: string;
   bot_status_at?: string | null;
   suspended_reason?: string | null;
+  hidden?: number;
+  hidden_reason?: string | null;
 }
 
 function fromApiSeeker(w: SeekerApiRow): PlatformUser {
@@ -74,6 +76,8 @@ function fromApiSeeker(w: SeekerApiRow): PlatformUser {
     botStatus: asBotStatus(w.bot_status),
     botStatusAt: w.bot_status_at ?? undefined,
     suspendedReason: w.suspended_reason ?? undefined,
+    hidden: !!w.hidden,
+    hiddenReason: w.hidden_reason ?? undefined,
   };
 }
 
@@ -333,6 +337,13 @@ export async function updateEmployer(
  *  the server enforces the same rule. */
 export async function toggleBlockSeeker(id: string, reason?: string): Promise<{ status: UserStatus; reason: string | null }> {
   return apiFetch(`/admin/users/seekers/${id}/block`, { method: 'POST', body: { reason } });
+}
+
+/** Takes the anketa out of circulation, or puts it back. `reason` is
+ *  optional (hiding doesn't lock anyone out the way a block does) but is
+ *  shown to the person when given. */
+export async function toggleHideSeeker(id: string, reason?: string): Promise<{ hidden: boolean; reason: string | null }> {
+  return apiFetch(`/admin/users/seekers/${id}/hide`, { method: 'POST', body: { reason } });
 }
 
 export async function toggleBlockEmployer(id: string, reason?: string): Promise<{ status: UserStatus; reason: string | null }> {

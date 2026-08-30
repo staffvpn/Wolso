@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star, BellOff } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star, BellOff, Eye, EyeOff } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -182,6 +182,71 @@ function BlockReasonModal({
   );
 }
 
+/** Hiding is the step below blocking — the account keeps working, it just
+ *  stops being offered to employers — so the reason is optional here. It's
+ *  still worth asking for: the person is shown it, and "почему меня никто
+ *  не зовёт" is otherwise a support ticket waiting to happen. */
+function HideReasonModal({
+  open,
+  name,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  name: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm(reason.trim());
+      setReason('');
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === 'migration_required'
+          ? 'Не применена миграция 0027_hidden_profiles. Откройте Настройки → Состояние базы данных → «Проверить миграции», там будет готовый SQL.'
+          : 'Не получилось скрыть анкету — попробуйте ещё раз.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Скрыть анкету ${name}?`}
+      description="Работодатели перестанут видеть её в поиске сотрудников, а сам человек не сможет откликаться на новые смены. Уже начатые смены, приглашения и чаты останутся. Аккаунт не блокируется."
+    >
+      <Label>Причина (необязательно, но её увидит сам человек)</Label>
+      <Textarea
+        rows={3}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Например: на фото не вы — загрузите своё, и мы вернём анкету в поиск."
+      />
+      {error && <p className="text-[12px] text-danger mt-2 leading-relaxed">{error}</p>}
+      <div className="flex gap-2 mt-4">
+        <Button variant="outline" className="flex-1" onClick={onClose} disabled={busy}>
+          Отмена
+        </Button>
+        <Button variant="primary" className="flex-1" onClick={submit} disabled={busy}>
+          {busy ? 'Скрываем…' : 'Скрыть анкету'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export function Users() {
   const { seekers, employers, team, load } = useUsersStore();
   const syncingUsernames = useUsersStore((s) => s.syncingUsernames);
@@ -347,7 +412,14 @@ export function Users() {
                   <span className="hidden sm:block min-w-0 pr-3">
                     <Badge tone={r.kind === 'team' ? 'dark' : 'neutral'}>{roleLabel}</Badge>
                   </span>
-                  <span className={cn('text-[13px] font-medium', STATUS_COLOR[statusKey])}>{statusLabel}</span>
+                  <span className={cn('text-[13px] font-medium', STATUS_COLOR[statusKey])}>
+                    {statusLabel}
+                    {/* Only when they're otherwise active: on a blocked
+                        account the block is the fact that matters. */}
+                    {r.kind === 'seeker' && r.user.hidden && statusKey !== 'suspended' && (
+                      <span className="block text-[12px] font-medium text-warning">Анкета скрыта</span>
+                    )}
+                  </span>
                   <span className="hidden sm:block">
                     {r.kind === 'team' ? (
                       <span className="text-[13px] text-text-faint">—</span>
@@ -640,7 +712,10 @@ function ReviewsBlock({ received, given, receivedLabel, givenLabel, receivedSide
 
 function SeekerDetail({ user }: { user: PlatformUser }) {
   const toggleBlock = useUsersStore((s) => s.toggleBlock);
+  const toggleHidden = useUsersStore((s) => s.toggleHidden);
   const [blocking, setBlocking] = useState(false);
+  const [hiding, setHiding] = useState(false);
+  const [hideError, setHideError] = useState<string | null>(null);
   const switchRole = useUsersStore((s) => s.switchRole);
   const deleteUser = useUsersStore((s) => s.deleteUser);
   const detail = useUserDetailStore((s) => s.seeker);
@@ -710,6 +785,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
 
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Badge tone={blocked ? 'danger' : 'accent'}>{user.statusLabel}</Badge>
+        {user.hidden && <Badge tone="warning">Анкета скрыта</Badge>}
         <BotStatusBadge user={user} />
         {user.rating !== undefined && <Badge tone="neutral">★ {user.rating} · {user.shiftsCompleted} смен</Badge>}
       </div>
@@ -719,6 +795,15 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
           <p className="text-[12px] font-semibold text-danger mb-0.5">Причина блокировки</p>
           <p className="text-[13px] text-text leading-relaxed">
             {user.suspendedReason || 'Не указана — аккаунт заблокирован до того, как причины стали обязательными.'}
+          </p>
+        </div>
+      )}
+
+      {user.hidden && (
+        <div className="rounded-xl bg-warning-soft px-3.5 py-2.5 mt-3">
+          <p className="text-[12px] font-semibold text-warning mb-0.5">Анкета скрыта из поиска</p>
+          <p className="text-[13px] text-text leading-relaxed">
+            {user.hiddenReason || 'Причина не указана.'}
           </p>
         </div>
       )}
@@ -837,6 +922,30 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
 
       <div className="flex flex-col gap-2">
         <Button
+          variant="outline"
+          className="w-full"
+          disabled={!canBlock}
+          onClick={async () => {
+            setHideError(null);
+            if (!user.hidden) return setHiding(true);
+            // Returning an anketa to the search needs no explanation, so it
+            // skips the modal — but it can still hit the missing migration.
+            try {
+              await toggleHidden(user.id);
+            } catch (err) {
+              setHideError(
+                err instanceof ApiError && err.code === 'migration_required'
+                  ? 'Не применена миграция 0027_hidden_profiles — откройте Настройки → «Проверить миграции».'
+                  : 'Не получилось вернуть анкету в поиск — попробуйте ещё раз.',
+              );
+            }
+          }}
+        >
+          {user.hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+          {user.hidden ? 'Вернуть анкету в поиск' : 'Скрыть анкету'}
+        </Button>
+        {hideError && <p className="text-[12px] text-danger leading-relaxed">{hideError}</p>}
+        <Button
           variant={blocked ? 'primary' : 'danger'}
           className="w-full"
           disabled={!canBlock}
@@ -865,6 +974,13 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         name={user.name}
         onClose={() => setBlocking(false)}
         onConfirm={(reason) => toggleBlock(user.id, 'seeker', reason)}
+      />
+
+      <HideReasonModal
+        open={hiding}
+        name={user.name}
+        onClose={() => setHiding(false)}
+        onConfirm={(reason) => toggleHidden(user.id, reason)}
       />
     </div>
   );

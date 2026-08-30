@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useProfileStore } from '@/store/useProfileStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { resolveCompany } from '@/data/companies';
@@ -20,6 +21,9 @@ export function Favorites() {
   const { shifts, companies, loading, load, removeShift, toggleCompany } = useFavoritesStore();
   const apply = useApplicationsStore((s) => s.apply);
   const applications = useApplicationsStore((s) => s.applications);
+  // A hidden anketa can't send new responses (the server refuses them) —
+  // the button says so instead of failing silently on tap.
+  const profileHidden = useProfileStore((s) => s.hidden);
 
   useEffect(() => {
     load();
@@ -60,8 +64,8 @@ export function Favorites() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
-                      <Button className="flex-1" size="md" disabled={already} onClick={() => apply(shift.id)}>
-                        {already ? 'Отклик отправлен' : 'Откликнуться'}
+                      <Button className="flex-1" size="md" disabled={already || profileHidden} onClick={() => apply(shift.id)}>
+                        {profileHidden ? 'Анкета скрыта' : already ? 'Отклик отправлен' : 'Откликнуться'}
                       </Button>
                       <IconButton size={40} onClick={() => removeShift(shift.id)} aria-label="Убрать">
                         <X size={16} />

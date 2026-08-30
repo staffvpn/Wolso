@@ -15,6 +15,8 @@ interface WorkerApiRow {
   avatarUrl: string | null;
   profileCompletion: number;
   profileComplete: boolean;
+  hidden?: boolean;
+  hiddenReason?: string | null;
 }
 
 interface MeResponse {
@@ -31,6 +33,10 @@ function fromApi(r: MeResponse): WorkerProfile {
     shiftsCompleted: r.worker.shifts_completed,
     profileCompletion: r.worker.profileCompletion,
     profileComplete: r.worker.profileComplete,
+    // Absent on a worker deployed before migration 0027 — treat that as
+    // "not hidden" rather than blocking the feed on a missing field.
+    hidden: !!r.worker.hidden,
+    hiddenReason: r.worker.hiddenReason ?? undefined,
     referralCode: r.worker.referral_code ?? '',
     bio: r.worker.bio ?? '',
     skills: r.worker.skills ?? '',
