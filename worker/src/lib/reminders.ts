@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { sendTelegramMessage } from './telegramBot';
-import { notifyWorker } from './notifyPrefs';
+import { notifyCompany, notifyWorker } from './notifyPrefs';
 
 /** The two automatic bot reminders, run from the cron trigger (see
  *  wrangler.toml and the `scheduled` export in index.ts).
@@ -158,9 +158,10 @@ async function remindPendingCandidates(env: Env): Promise<number> {
   for (const co of results) {
     const people =
       co.waiting === 1 ? '1 человек ждёт ответа' : `${co.waiting} ${co.waiting < 5 ? 'человека ждут' : 'человек ждут'} ответа`;
-    await sendTelegramMessage(
+    await notifyCompany(
       env,
-      co.owner_telegram_id,
+      { id: co.id, telegramId: co.owner_telegram_id },
+      'pending_reminder',
       `На вашу смену «${co.position_label}» откликнулись, но решения пока нет — ${people}.\n\n` +
         'Люди обычно не ждут долго и уходят на другую смену. Откройте «Кандидаты» и ответьте — это пара свайпов.',
     );

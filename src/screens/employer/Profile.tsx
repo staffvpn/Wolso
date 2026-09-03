@@ -93,6 +93,9 @@ export function EmployerProfileScreen() {
         <SectionLabel>Поддержка</SectionLabel>
         <Card className="divide-y divide-border-soft px-1">
           <div className="px-3">
+            <ListRow label="Настройки" onClick={() => navigate('/e/settings')} />
+          </div>
+          <div className="px-3">
             <ListRow label="Помощь" onClick={() => navigate('/e/support')} />
           </div>
         </Card>

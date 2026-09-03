@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Send, ChevronLeft, RotateCw } from 'lucide-react';
+import { Send, ChevronLeft, RotateCw, Flag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
+import { ReportSheet } from '@/components/ReportSheet';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
 import { QUICK_REPLIES } from '@/data/chats';
@@ -34,6 +35,7 @@ export function ChatDetail() {
   const markRead = useChatStore((s) => s.markRead);
 
   const [text, setText] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
   const [messagesError, setMessagesError] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -94,6 +96,10 @@ export function ChatDetail() {
   }
   if (!chat) return null;
 
+  // На кого жалуемся: соискатель — на заведение, работодатель — на
+  // соискателя, то есть всегда на другую сторону этого чата.
+  const reportTargetId = actor === 'company' ? chat.workerId : chat.companyId;
+
   function handleSend(value: string) {
     if (!value.trim() || !chatId) return;
     sendMessage(chatId, value.trim(), actor);
@@ -118,6 +124,14 @@ export function ChatDetail() {
         </div>
         {chat.shiftId && (
           <span className="text-[12px] font-semibold text-text-muted bg-surface-2 rounded-full px-3 py-1.5 shrink-0">Смена</span>
+        )}
+        {/* Жаловаться разумнее всего отсюда: в чате видно, на что именно.
+            Кнопка есть у обеих сторон — жалоба нужна и на соискателя, и на
+            заведение. */}
+        {reportTargetId && (
+          <IconButton size={36} onClick={() => setReportOpen(true)} aria-label="Пожаловаться">
+            <Flag size={16} className="text-text-muted" />
+          </IconButton>
         )}
       </div>
 
@@ -196,6 +210,17 @@ export function ChatDetail() {
           <Send size={17} />
         </button>
       </div>
+
+      {reportTargetId && (
+        <ReportSheet
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetKind={actor === 'company' ? 'worker' : 'company'}
+          targetId={reportTargetId}
+          targetName={chat.contactName}
+          as={actor === 'company' ? 'company' : 'worker'}
+        />
+      )}
     </div>
   );
 }

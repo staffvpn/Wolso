@@ -32,6 +32,7 @@ import { Notifications } from './screens/shared/Notifications';
 import { Support } from './screens/shared/Support';
 import { Reviews } from './screens/shared/Reviews';
 import { CompleteWorkerProfile } from './screens/onboarding/CompleteWorkerProfile';
+import { EmployerSettings } from './screens/employer/Settings';
 import { CompleteEmployerProfile } from './screens/onboarding/CompleteEmployerProfile';
 
 /** Where launching the app lands you. A worker always gets the shift deck;
@@ -108,6 +109,7 @@ export default function App() {
               <Route path="/e/chats/:chatId" element={<ChatDetail />} />
               <Route path="/e/notifications" element={<Notifications />} />
               <Route path="/e/support" element={<Support />} />
+              <Route path="/e/settings" element={<EmployerSettings />} />
               <Route path="/e/profile/edit" element={<CompleteEmployerProfile />} />
               <Route path="/e/reviews" element={<Reviews role="employer" />} />
 

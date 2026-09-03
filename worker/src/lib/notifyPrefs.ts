@@ -61,3 +61,48 @@ export async function notifyWorker(
   if (!(await workerWantsNotification(env, worker.id, pref))) return false;
   return sendTelegramMessage(env, worker.telegramId, text);
 }
+
+/** То же самое для работодателей: бот пишет им не меньше — новые отклики,
+ *  подтверждения и отказы соискателей, напоминания о нерассмотренных, — а
+ *  выключить это было нельзя вообще, потому что экрана настроек у них не
+ *  было. */
+export type CompanyNotifyPref = 'new_responses' | 'worker_replies' | 'pending_reminder';
+
+const COMPANY_COLUMN: Record<CompanyNotifyPref, string> = {
+  new_responses: 'notify_new_responses',
+  worker_replies: 'notify_worker_replies',
+  pending_reminder: 'notify_pending_reminder',
+};
+
+let companyColumnsConfirmed = false;
+
+export async function companyNotifyPrefColumnsExist(env: Env): Promise<boolean> {
+  if (companyColumnsConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(companies)').all<{ name: string }>();
+    companyColumnsConfirmed = results.some((r) => r.name === 'notify_new_responses');
+    return companyColumnsConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+export async function companyWantsNotification(env: Env, companyId: number, pref: CompanyNotifyPref): Promise<boolean> {
+  if (!(await companyNotifyPrefColumnsExist(env))) return true;
+  const row = await env.DB.prepare(`SELECT ${COMPANY_COLUMN[pref]} as allowed FROM companies WHERE id = ?`)
+    .bind(companyId)
+    .first<{ allowed: number }>();
+  return row ? !!row.allowed : false;
+}
+
+/** Mirror of notifyWorker for the other side. Same rule: only the Telegram
+ *  push is suppressed, never the in-app notifications row. */
+export async function notifyCompany(
+  env: Env,
+  company: { id: number; telegramId: number },
+  pref: CompanyNotifyPref,
+  text: string,
+): Promise<boolean> {
+  if (!(await companyWantsNotification(env, company.id, pref))) return false;
+  return sendTelegramMessage(env, company.telegramId, text);
+}

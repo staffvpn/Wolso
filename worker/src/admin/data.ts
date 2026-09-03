@@ -24,8 +24,18 @@ const COUNT_QUERIES: Record<string, string> = {
 adminDataRoutes.get('/stats', requireStaffMiddleware, async (c) => {
   const entries = await Promise.all(
     Object.entries(COUNT_QUERIES).map(async ([key, sql]) => {
-      const row = await c.env.DB.prepare(sql).first<{ n: number }>();
-      return [key, row?.n ?? 0] as const;
+      // Per-query try, not one for the lot: this endpoint counted a
+      // `complaints` table that migration 0011 had dropped, the query threw,
+      // and Hono's handler turned the whole screen into internal_error —
+      // so none of the other nine counts loaded either. A table that isn't
+      // there now reports null (rendered as «—») instead of taking the rest
+      // of the screen down with it.
+      try {
+        const row = await c.env.DB.prepare(sql).first<{ n: number }>();
+        return [key, row?.n ?? 0] as const;
+      } catch {
+        return [key, null] as const;
+      }
     }),
   );
   return c.json({ stats: Object.fromEntries(entries) });

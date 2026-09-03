@@ -39,6 +39,11 @@ export interface Company {
   /** Research notes an AI web search turned up for the admin moderating
    *  this profile — informational only, never shown to the employer. */
   aiSummary?: string;
+  /** Which bot messages the owner wants. Only present on the owner's own
+   *  `/employer/me` response. */
+  notifyNewResponses?: boolean;
+  notifyWorkerReplies?: boolean;
+  notifyPendingReminder?: boolean;
 }
 
 export type ShiftUrgency = 'normal' | 'urgent';

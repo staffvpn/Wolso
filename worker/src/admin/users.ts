@@ -5,6 +5,7 @@ import { provisionWorker, provisionCompany } from '../routes/auth';
 import { getTelegramUsername } from '../lib/telegramBot';
 import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
 import { hiddenColumnExists } from '../lib/hiddenProfiles';
+import { userNotesTableExists } from '../lib/complaints';
 import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -720,5 +721,111 @@ adminUserRoutes.post('/team/:id/revoke', requirePermission('manageTeam'), async 
 
   const actor = await actorLabel(c.env, session);
   await logAction(c.env, actor, `отозвала доступ у ${member.name}`, 'danger');
+  return c.json({ ok: true });
+});
+
+/** Переписка работодателя с соискателем — read-only, для разбора спора.
+ *  Раньше у команды были только support-чаты, поэтому «он не вышел»
+ *  против «меня не пустили» решалось наугад: сама переписка, где обычно и
+ *  видно, кто что обещал, была недоступна.
+ *
+ *  Смотреть чужую переписку — сильное право, поэтому оно за тем же
+ *  viewSupportChats, что и support-чаты, и каждый просмотр попадает в
+ *  аудит-лог: за кем-то, кто читает чаты просто так, должен оставаться
+ *  след. Писать в чужой чат нельзя — только читать. */
+adminUserRoutes.get('/chats/:kind/:id', requirePermission('viewSupportChats'), async (c) => {
+  const kind = c.req.param('kind');
+  const id = c.req.param('id');
+  if (kind !== 'seeker' && kind !== 'employer') return c.json({ error: 'not_found' }, 404);
+
+  const column = kind === 'seeker' ? 'worker_id' : 'company_id';
+  const { results: chats } = await c.env.DB.prepare(
+    `SELECT ch.id, ch.shift_id, w.name as worker_name, co.name as company_name,
+            s.position_label, s.date,
+            (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id) as message_count,
+            (SELECT MAX(created_at) FROM messages m WHERE m.chat_id = ch.id) as last_at
+     FROM chats ch
+     JOIN workers w ON w.id = ch.worker_id
+     JOIN companies co ON co.id = ch.company_id
+     LEFT JOIN shifts s ON s.id = ch.shift_id
+     WHERE ch.${column} = ?
+     ORDER BY last_at DESC NULLS LAST, ch.id DESC
+     LIMIT 50`,
+  )
+    .bind(id)
+    .all();
+
+  return c.json({ chats });
+});
+
+/** Отдельный путь, а не /chats/messages/:id: Hono сопоставил бы его с
+ *  /chats/:kind/:id выше (kind = "messages"), и вместо переписки всегда
+ *  приходило бы «not_found». */
+adminUserRoutes.get('/chat-messages/:chatId', requirePermission('viewSupportChats'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const chatId = c.req.param('chatId');
+
+  const chat = await c.env.DB.prepare(
+    `SELECT ch.id, w.name as worker_name, co.name as company_name
+     FROM chats ch JOIN workers w ON w.id = ch.worker_id JOIN companies co ON co.id = ch.company_id
+     WHERE ch.id = ?`,
+  )
+    .bind(chatId)
+    .first<{ id: number; worker_name: string; company_name: string }>();
+  if (!chat) return c.json({ error: 'not_found' }, 404);
+
+  const { results: messages } = await c.env.DB.prepare(
+    'SELECT id, sender, kind, text, visible_to, created_at FROM messages WHERE chat_id = ? ORDER BY created_at ASC LIMIT 500',
+  )
+    .bind(chatId)
+    .all();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `открыла переписку ${chat.worker_name} и «${chat.company_name}»`, 'neutral');
+
+  return c.json({ chat, messages });
+});
+
+/** Заметки команды по человеку. История решений («звонил, обещал заменить
+ *  фото») до сих пор жила в голове того, кто решал, — а решают по очереди
+ *  разные люди. */
+adminUserRoutes.get('/notes/:kind/:id', requireStaffMiddleware, async (c) => {
+  if (!(await userNotesTableExists(c.env))) return c.json({ notes: [] });
+  const kind = c.req.param('kind');
+  const column = kind === 'seeker' ? 'worker_id' : 'company_id';
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, text, author_name, created_at FROM user_notes WHERE ${column} = ? ORDER BY created_at DESC LIMIT 100`,
+  )
+    .bind(c.req.param('id'))
+    .all();
+  return c.json({ notes: results });
+});
+
+adminUserRoutes.post('/notes/:kind/:id', requirePermission('blockUsers'), async (c) => {
+  const session = requireStaff(c as never)!;
+  if (!(await userNotesTableExists(c.env))) {
+    return c.json({ error: 'migration_required', migration: '0031_complaints_and_employer_settings' }, 400);
+  }
+  const kind = c.req.param('kind');
+  if (kind !== 'seeker' && kind !== 'employer') return c.json({ error: 'not_found' }, 404);
+
+  type Body = { text?: string };
+  const { text } = await c.req.json<Body>().catch((): Body => ({}));
+  const note = (text ?? '').trim();
+  if (!note) return c.json({ error: 'empty_note' }, 400);
+
+  const actor = await actorLabel(c.env, session);
+  await c.env.DB.prepare(
+    `INSERT INTO user_notes (subject_kind, worker_id, company_id, text, author_name) VALUES (?, ?, ?, ?, ?)`,
+  )
+    .bind(kind, kind === 'seeker' ? c.req.param('id') : null, kind === 'employer' ? c.req.param('id') : null, note.slice(0, 2000), actor.name)
+    .run();
+
+  return c.json({ ok: true });
+});
+
+adminUserRoutes.delete('/notes/:id', requirePermission('blockUsers'), async (c) => {
+  if (!(await userNotesTableExists(c.env))) return c.json({ ok: true });
+  await c.env.DB.prepare('DELETE FROM user_notes WHERE id = ?').bind(c.req.param('id')).run();
   return c.json({ ok: true });
 });

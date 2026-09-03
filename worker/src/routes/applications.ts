@@ -2,9 +2,10 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
-import { sendTelegramMessage } from '../lib/telegramBot';
 import { recomputeCompanyRating } from '../lib/ratings';
 import { workerIsHidden } from '../lib/hiddenProfiles';
+import { notifyCompany } from '../lib/notifyPrefs';
+import { APPLY_LIMIT, overLimit } from '../lib/rateLimit';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 applicationRoutes.use('*', attachSession);
@@ -72,6 +73,10 @@ applicationRoutes.post('/', async (c) => {
   // this is the enforcement behind it.
   if (await workerIsHidden(c.env, session.workerId)) return c.json({ error: 'profile_hidden' }, 403);
 
+  if (await overLimit(c.env, 'applications', 'worker_id', session.workerId, APPLY_LIMIT)) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+
   const shift = await c.env.DB.prepare("SELECT id, company_id, position_label FROM shifts WHERE id = ? AND status = 'active'")
     .bind(shiftId)
     .first<{ id: number; company_id: number; position_label: string }>();
@@ -116,7 +121,7 @@ applicationRoutes.post('/', async (c) => {
     .first<{ owner_telegram_id: number }>();
   if (company) {
     const text = `📩 Новый отклик на «${shift.position_label}»\n${worker?.name ?? 'Соискатель'} хочет выйти на смену`;
-    c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, text));
+    c.executionCtx.waitUntil(notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'new_responses', text));
   }
 
   return c.json({ application: appToJson(inserted!) });
@@ -153,7 +158,10 @@ applicationRoutes.post('/:id/respond', async (c) => {
       const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
         .bind(shift.company_id)
         .first<{ owner_telegram_id: number }>();
-      if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `✅ ${title}\n${subtitle}`));
+      if (company)
+        c.executionCtx.waitUntil(
+          notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `✅ ${title}\n${subtitle}`),
+        );
     }
   } else {
     await c.env.DB.prepare("UPDATE applications SET status = 'declined' WHERE id = ?").bind(app.id).run();
@@ -167,7 +175,10 @@ applicationRoutes.post('/:id/respond', async (c) => {
       const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
         .bind(shift.company_id)
         .first<{ owner_telegram_id: number }>();
-      if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `↩️ ${title}\n${subtitle}`));
+      if (company)
+        c.executionCtx.waitUntil(
+          notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `↩️ ${title}\n${subtitle}`),
+        );
     }
   }
 
@@ -210,7 +221,10 @@ applicationRoutes.post('/:id/cancel', async (c) => {
     const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
       .bind(shift.company_id)
       .first<{ owner_telegram_id: number }>();
-    if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `❌ ${title}\n${subtitle}`));
+    if (company)
+      c.executionCtx.waitUntil(
+        notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `❌ ${title}\n${subtitle}`),
+      );
   }
 
   return c.json({ ok: true });

@@ -9,7 +9,8 @@ import { notifyAdmin } from '../lib/adminNotify';
 import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 import { excludeHiddenSql } from '../lib/hiddenProfiles';
 import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../lib/workerPrefs';
-import { notifyWorker } from '../lib/notifyPrefs';
+import { companyNotifyPrefColumnsExist, notifyWorker } from '../lib/notifyPrefs';
+import { VACANCY_LIMIT, overLimit } from '../lib/rateLimit';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -40,11 +41,9 @@ function companyIsComplete(company: CompanyRow) {
 }
 
 async function loadCompanyProfile(env: Env, companyId: number) {
-  const company = await env.DB.prepare(
-    `SELECT id, name, address, city, description, founded_year, avatar_data, inn,
-            verification_status, verification_reason, ai_verification_summary
-     FROM companies WHERE id = ?`,
-  )
+  // SELECT * so columns added by later migrations (the notification
+  // switches below) arrive without this list having to be kept in sync.
+  const company = await env.DB.prepare('SELECT * FROM companies WHERE id = ?')
     .bind(companyId)
     .first<CompanyRow>();
   if (!company) return null;
@@ -54,6 +53,15 @@ async function loadCompanyProfile(env: Env, companyId: number) {
     .all<{ id: number }>();
 
   const { complete, percent } = companyIsComplete(company);
+
+  // Read off the row rather than named in the SELECT so this keeps working
+  // before migration 0031 is applied — absent columns read as "on", which
+  // is how the bot behaves until then.
+  const prefs = company as CompanyRow & {
+    notify_new_responses?: number;
+    notify_worker_replies?: number;
+    notify_pending_reminder?: number;
+  };
 
   return {
     company: {
@@ -65,6 +73,9 @@ async function loadCompanyProfile(env: Env, companyId: number) {
       verificationStatus: company.verification_status,
       rejectionReason: company.verification_reason,
       aiSummary: company.ai_verification_summary,
+      notifyNewResponses: (prefs.notify_new_responses ?? 1) === 1,
+      notifyWorkerReplies: (prefs.notify_worker_replies ?? 1) === 1,
+      notifyPendingReminder: (prefs.notify_pending_reminder ?? 1) === 1,
     },
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${companyId}/photos/${p.id}` })),
   };
@@ -99,7 +110,17 @@ function isValidInn(inn: string): boolean {
 employerRoutes.patch('/me', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number; inn?: string }>();
+  const body = await c.req.json<{
+    name?: string;
+    address?: string;
+    city?: string;
+    description?: string;
+    foundedYear?: number;
+    inn?: string;
+    notifyNewResponses?: boolean;
+    notifyWorkerReplies?: boolean;
+    notifyPendingReminder?: boolean;
+  }>();
 
   if (body.inn !== undefined && body.inn !== '' && !isValidInn(body.inn.trim())) {
     return c.json({ error: 'invalid_inn' }, 400);
@@ -128,6 +149,21 @@ employerRoutes.patch('/me', async (c) => {
   if (body.inn) {
     fields.push('inn = ?');
     binds.push(body.inn.trim());
+  }
+  // Ignored rather than fatal while migration 0031 is pending — failing the
+  // whole save would also throw away the name and description typed
+  // alongside it.
+  if (await companyNotifyPrefColumnsExist(c.env)) {
+    for (const [key, column] of [
+      ['notifyNewResponses', 'notify_new_responses'],
+      ['notifyWorkerReplies', 'notify_worker_replies'],
+      ['notifyPendingReminder', 'notify_pending_reminder'],
+    ] as const) {
+      if (typeof body[key] === 'boolean') {
+        fields.push(`${column} = ?`);
+        binds.push(body[key] ? 1 : 0);
+      }
+    }
   }
   if (fields.length) {
     binds.push(session.companyId);
@@ -239,6 +275,13 @@ employerRoutes.post('/vacancies', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
   if (!(await requireVerifiedCompany(c.env, session.companyId))) return c.json({ error: 'not_verified' }, 403);
+
+  // Каждая опубликованная смена рассылает сообщение всем подходящим
+  // соискателям (см. notifyMatchingWorkers), так что двадцать вакансий
+  // подряд — это не двадцать строк в базе, а рассылка живым людям.
+  if (await overLimit(c.env, 'shifts', 'company_id', session.companyId, VACANCY_LIMIT)) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
 
   const body = await c.req.json<{
     position: string;

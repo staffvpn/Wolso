@@ -15,6 +15,7 @@ import { employerRoutes } from './routes/employer';
 import { supportRoutes } from './routes/support';
 import { mediaRoutes } from './routes/media';
 import { botRoutes } from './routes/bot';
+import { complaintRoutes } from './routes/complaints';
 
 import { adminUserRoutes } from './admin/users';
 import { adminRoleRoutes } from './admin/roles';
@@ -26,6 +27,7 @@ import { adminDataRoutes } from './admin/data';
 import { adminVerificationRoutes } from './admin/verification';
 import { adminSchemaHealthRoutes } from './admin/schemaHealth';
 import { adminBroadcastRoutes } from './admin/broadcast';
+import { adminComplaintRoutes } from './admin/complaints';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -48,7 +50,7 @@ app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
 // '/me'. /auth is excluded on purpose: sign-in has to be able to answer
 // with the reason, and /media serves avatars that other people's screens
 // still legitimately show.
-for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support']) {
+for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support', '/complaints']) {
   app.use(base, attachSession, rejectSuspended);
   app.use(`${base}/*`, attachSession, rejectSuspended);
 }
@@ -64,6 +66,7 @@ app.route('/employer', employerRoutes);
 app.route('/support', supportRoutes);
 app.route('/media', mediaRoutes);
 app.route('/bot', botRoutes);
+app.route('/complaints', complaintRoutes);
 
 app.route('/admin/users', adminUserRoutes);
 app.route('/admin/roles', adminRoleRoutes);
@@ -75,6 +78,7 @@ app.route('/admin/data', adminDataRoutes);
 app.route('/admin/verification', adminVerificationRoutes);
 app.route('/admin/health', adminSchemaHealthRoutes);
 app.route('/admin/broadcast', adminBroadcastRoutes);
+app.route('/admin/complaints', adminComplaintRoutes);
 
 app.onError((err, c) => {
   console.error(err);

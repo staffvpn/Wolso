@@ -15,6 +15,9 @@ export interface CompanyApiRow {
   avatarUrl: string | null;
   profileComplete?: boolean;
   profileCompletion?: number;
+  notifyNewResponses?: boolean;
+  notifyWorkerReplies?: boolean;
+  notifyPendingReminder?: boolean;
   /** Only present on the owner's own `/employer/me` response — a company
    *  row embedded elsewhere (e.g. a worker's favorites) never carries
    *  this, since it's nobody else's business. */
@@ -48,6 +51,11 @@ export function fromApiCompanyRow(c: CompanyApiRow): Company {
     avatarUrl: resolveMediaUrl(c.avatarUrl),
     profileComplete: c.profileComplete,
     profileCompletion: c.profileCompletion,
+    // Absent on an API that predates migration 0031 — default to on, which
+    // is how the bot behaves until it's applied.
+    notifyNewResponses: c.notifyNewResponses ?? true,
+    notifyWorkerReplies: c.notifyWorkerReplies ?? true,
+    notifyPendingReminder: c.notifyPendingReminder ?? true,
     inn: c.inn ?? undefined,
     verificationStatus: c.verificationStatus as Company['verificationStatus'],
     rejectionReason: c.rejectionReason ?? undefined,
@@ -74,6 +82,9 @@ export interface CompanyUpdate {
   description?: string;
   foundedYear?: number;
   inn?: string;
+  notifyNewResponses?: boolean;
+  notifyWorkerReplies?: boolean;
+  notifyPendingReminder?: boolean;
 }
 
 export async function updateMyCompany(update: CompanyUpdate): Promise<Company> {

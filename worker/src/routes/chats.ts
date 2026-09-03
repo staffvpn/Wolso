@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
-import { sendTelegramMessage } from '../lib/telegramBot';
-import { notifyWorker } from '../lib/notifyPrefs';
+import { notifyCompany, notifyWorker } from '../lib/notifyPrefs';
+import { MESSAGE_LIMIT, overLimit } from '../lib/rateLimit';
 
 export const chatRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 chatRoutes.use('*', attachSession);
@@ -136,6 +136,10 @@ chatRoutes.post('/:id/messages', async (c) => {
   const { text } = await c.req.json<{ text: string }>();
   if (!text?.trim()) return c.json({ error: 'empty_message' }, 400);
 
+  if (await overLimit(c.env, 'messages', 'chat_id', chatId, MESSAGE_LIMIT)) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+
   const inserted = await c.env.DB.prepare(
     "INSERT INTO messages (chat_id, sender, kind, text) VALUES (?, ?, 'text', ?) RETURNING *",
   )
@@ -152,7 +156,14 @@ chatRoutes.post('/:id/messages', async (c) => {
         .bind(chat.company_id)
         .first<{ owner_telegram_id: number }>();
       if (company) {
-        c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`));
+        c.executionCtx.waitUntil(
+          notifyCompany(
+            c.env,
+            { id: chat.company_id, telegramId: company.owner_telegram_id },
+            'worker_replies',
+            `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`,
+          ),
+        );
         await c.env.DB.prepare("UPDATE chats SET company_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
       }
     }
