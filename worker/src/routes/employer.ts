@@ -11,6 +11,7 @@ import { excludeHiddenSql } from '../lib/hiddenProfiles';
 import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../lib/workerPrefs';
 import { companyNotifyPrefColumnsExist, notifyWorker } from '../lib/notifyPrefs';
 import { VACANCY_LIMIT, overLimit } from '../lib/rateLimit';
+import { reportCancellation } from '../lib/incidents';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -846,6 +847,20 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/cancel', async (c) =>
 
   const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(session.companyId).first<{ name: string }>();
   const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(app.worker_id).first<{ telegram_id: number }>();
+
+  // Отзыв приглашения — не срыв: человек ещё не подтверждал. А вот отмена
+  // уже подтверждённой смены за несколько часов — именно он.
+  if (wasAccepted) {
+    c.executionCtx.waitUntil(
+      reportCancellation(c.env, {
+        shiftId: Number(shiftId),
+        by: 'employer',
+        actorName: company?.name ?? 'Работодатель',
+        reason: reason.trim(),
+        companyId: session.companyId,
+      }),
+    );
+  }
 
   const title = wasAccepted
     ? `${company?.name ?? 'Работодатель'} отменил(а) смену`

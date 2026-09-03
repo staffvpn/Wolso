@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone, Flag } from 'lucide-react';
 import type { RoleDef } from '@/types';
 import { FEATURES } from '@/lib/features';
 
@@ -16,6 +16,9 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/users', label: 'Пользователи', icon: Users, visible: () => true },
   { to: '/vacancies', label: 'Вакансии и смены', icon: Briefcase, visible: (r) => yes(r, 'approveVacancies') },
   { to: '/verification', label: 'Проверка работодателей', icon: BadgeCheck, visible: (r) => yes(r, 'approveVacancies') },
+  // Рядом с «Проверкой работодателей»: обе — очереди, в которые кто-то
+  // должен смотреть каждый день, в отличие от справочных экранов ниже.
+  { to: '/complaints', label: 'Жалобы', icon: Flag, visible: (r) => yes(r, 'blockUsers') },
   { to: '/support', label: 'Поддержка', icon: LifeBuoy, visible: (r) => yes(r, 'viewSupportChats') },
   { to: '/broadcast', label: 'Рассылка', icon: Megaphone, visible: (r) => yes(r, 'manageData') },
   { to: '/finance', label: 'Финансы', icon: Wallet, visible: (r) => FEATURES.payments && yes(r, 'refundsPayouts') },

@@ -6,6 +6,7 @@ import { recomputeCompanyRating } from '../lib/ratings';
 import { workerIsHidden } from '../lib/hiddenProfiles';
 import { notifyCompany } from '../lib/notifyPrefs';
 import { APPLY_LIMIT, overLimit } from '../lib/rateLimit';
+import { reportCancellation } from '../lib/incidents';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 applicationRoutes.use('*', attachSession);
@@ -213,6 +214,15 @@ applicationRoutes.post('/:id/cancel', async (c) => {
     await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
 
     const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
+    c.executionCtx.waitUntil(
+      reportCancellation(c.env, {
+        shiftId: app.shift_id,
+        by: 'worker',
+        actorName: worker?.name ?? 'Соискатель',
+        reason: reason.trim(),
+        workerId: session.workerId,
+      }),
+    );
     const title = `${worker?.name ?? 'Сотрудник'} не сможет выйти на смену`;
     const subtitle = `«${shift.position_label}» — причина: ${reason.trim()}`;
     await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')

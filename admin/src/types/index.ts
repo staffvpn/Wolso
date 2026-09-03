@@ -304,3 +304,28 @@ export interface BroadcastProgress {
   failed: number;
   done: boolean;
 }
+
+
+/** Жалоба от соискателя или работодателя. Ничего автоматически за ней не
+ *  происходит: скрыть анкету, заблокировать или закрыть вакансию —
+ *  отдельные действия, которые совершает человек, посмотрев. */
+export type ComplaintStatus = 'new' | 'reviewing' | 'resolved' | 'rejected';
+
+export interface Complaint {
+  id: string;
+  authorName: string;
+  authorKind: 'seeker' | 'employer';
+  targetKind: 'worker' | 'company' | 'shift';
+  targetId: string;
+  targetName: string;
+  targetShift?: string;
+  /** Сколько всего жалоб на этот же объект. */
+  targetTotal: number;
+  reason: string;
+  reasonLabel: string;
+  comment: string;
+  status: ComplaintStatus;
+  resolution?: string;
+  resolvedBy?: string;
+  createdMinAgo: number;
+}
