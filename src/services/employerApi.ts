@@ -1,4 +1,4 @@
-import type { Candidate, Position, Vacancy, WorkerListing } from '@/types';
+import type { Candidate, LookingFor, Position, Vacancy, WorkerListing } from '@/types';
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
 import { ageFrom } from '@/lib/format';
 
@@ -70,7 +70,14 @@ interface CandidateApiResponse {
   worker_avatar_url: string | null;
   worker_photos: string[];
   worker_experience?: string | null;
+  worker_looking_for?: string | null;
   shift_position_label?: string;
+}
+
+/** Absent on a worker deployed before migration 0029 — undefined then, so
+ *  the card shows nothing rather than claiming they want both. */
+function asLookingFor(raw?: string | null): LookingFor | undefined {
+  return raw === 'any' || raw === 'shift' || raw === 'permanent' ? raw : undefined;
 }
 
 /** D1 hands this back as a JSON string from json_group_array — and as
@@ -108,6 +115,7 @@ function fromApiCandidate(c: CandidateApiResponse, fallbackPositionLabel?: strin
     skills: c.worker_skills ?? undefined,
     age: ageFrom(c.worker_birthdate),
     experience: parseExperience(c.worker_experience),
+    lookingFor: asLookingFor(c.worker_looking_for),
     photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }
@@ -155,6 +163,7 @@ interface WorkerListingApiResponse {
   worker_avatar_url: string | null;
   worker_photos: string[];
   worker_experience?: string | null;
+  worker_looking_for?: string | null;
   matched_position_label: string | null;
 }
 
@@ -173,6 +182,7 @@ function fromApiWorkerListing(w: WorkerListingApiResponse): WorkerListing {
     skills: w.worker_skills ?? undefined,
     age: ageFrom(w.worker_birthdate),
     experience: parseExperience(w.worker_experience),
+    lookingFor: asLookingFor(w.worker_looking_for),
     photos: avatar ? [avatar, ...gallery] : gallery,
   };
 }
@@ -180,9 +190,12 @@ function fromApiWorkerListing(w: WorkerListingApiResponse): WorkerListing {
 /** "Find staff" — workers browsed directly rather than applicants to a
  *  specific vacancy, filtered by position so an employer looking for
  *  waiters never has to page past a hostess. */
-export async function fetchWorkerListings(positions: Position[]): Promise<WorkerListing[]> {
-  const qs = positions.length ? `?positions=${positions.join(',')}` : '';
-  const { workers } = await apiFetch<{ workers: WorkerListingApiResponse[] }>(`/employer/workers${qs}`, { as: 'company' });
+export async function fetchWorkerListings(positions: Position[], lookingFor: LookingFor = 'any'): Promise<WorkerListing[]> {
+  if (positions.length === 0) return [];
+  const params = new URLSearchParams({ positions: positions.join(',') });
+  // 'any' means "не важно" — sending it would only make the URL longer.
+  if (lookingFor !== 'any') params.set('lookingFor', lookingFor);
+  const { workers } = await apiFetch<{ workers: WorkerListingApiResponse[] }>(`/employer/workers?${params}`, { as: 'company' });
   return workers.map(fromApiWorkerListing);
 }
 

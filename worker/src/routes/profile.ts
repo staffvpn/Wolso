@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
+import { asLookingFor, lookingForColumnExists, nameHasDigits } from '../lib/workerPrefs';
 
 export const profileRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 profileRoutes.use('*', attachSession);
@@ -29,7 +30,11 @@ function ageFrom(birthdate: string | null): number | null {
 }
 
 /** Every field on this list must be present for a worker to be able to
- *  browse the feed / apply to shifts — see ProfileGate on the client. */
+ *  browse the feed / apply to shifts — see ProfileGate on the client.
+ *  `hasExperience` means at least one entry with a real duration: signup
+ *  used to seed a "Бариста · 0 месяцев" row, which satisfied a plain
+ *  "is the list non-empty" check and let people through the gate having
+ *  filled in nothing (see migration 0029). */
 function isComplete(worker: WorkerRow, hasExperience: boolean) {
   const fields = [
     !!worker.name,
@@ -54,13 +59,14 @@ async function loadProfile(env: Env, workerId: number) {
     .bind(workerId)
     .all<{ id: number }>();
 
-  const { complete, percent } = isComplete(worker, positions.length > 0);
+  const hasExperience = (positions as { months?: number }[]).some((p) => (p.months ?? 0) > 0);
+  const { complete, percent } = isComplete(worker, hasExperience);
   const avatarUrl = worker.avatar_data ? `/media/workers/${worker.id}/avatar` : worker.photo_url;
 
   // Read off the row rather than named in the SELECT, so this keeps working
-  // on a database where migration 0027 hasn't been applied yet — the columns
-  // are simply absent and the profile reads as not hidden.
-  const moderation = worker as WorkerRow & { hidden?: number; hidden_reason?: string | null };
+  // on a database where migrations 0027/0029 haven't been applied yet — the
+  // columns are simply absent and the defaults apply.
+  const extra = worker as WorkerRow & { hidden?: number; hidden_reason?: string | null; looking_for?: string };
 
   return {
     worker: {
@@ -70,8 +76,15 @@ async function loadProfile(env: Env, workerId: number) {
       age: ageFrom(worker.birthdate),
       profileComplete: complete,
       profileCompletion: percent,
-      hidden: !!moderation.hidden,
-      hiddenReason: moderation.hidden_reason ?? null,
+      hidden: !!extra.hidden,
+      hiddenReason: extra.hidden_reason ?? null,
+      lookingFor: extra.looking_for ?? 'any',
+      // Whether the picture on the anketa is one they chose or the one
+      // Telegram happened to have. Signup copies the Telegram photo across,
+      // so everyone technically "has a photo" — and a lot of those are a
+      // car, a cat or a landscape, which is what employers then have to
+      // pick from. The app uses this to ask for a real one.
+      avatarIsFromTelegram: !worker.avatar_data && !!worker.photo_url,
     },
     positions,
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${workerId}/photos/${p.id}` })),
@@ -142,6 +155,7 @@ profileRoutes.patch('/', async (c) => {
     bio?: string;
     birthdate?: string;
     skills?: string;
+    lookingFor?: string;
   }>();
 
   // App is 18+ — reject a birthdate that implies under-18 rather than just
@@ -151,6 +165,13 @@ profileRoutes.patch('/', async (c) => {
     if (age === null || age < 18) return c.json({ error: 'underage' }, 400);
   }
 
+  // Same reasoning as the birthdate above: the form refuses this too, and
+  // the form is not the thing standing between the database and a name
+  // like "Иван 89031234567".
+  if (body.name !== undefined && nameHasDigits(body.name)) {
+    return c.json({ error: 'name_has_digits' }, 400);
+  }
+
   const fields: string[] = [];
   const binds: unknown[] = [];
   for (const key of ['city', 'name', 'bio', 'birthdate', 'skills'] as const) {
@@ -158,6 +179,14 @@ profileRoutes.patch('/', async (c) => {
       fields.push(`${key} = ?`);
       binds.push(body[key]);
     }
+  }
+  // Silently ignored while migration 0029 is pending, rather than failing
+  // the whole save (which would also lose the name and bio typed alongside
+  // it) — the toggle simply doesn't stick until the SQL is run.
+  const lookingFor = asLookingFor(body.lookingFor);
+  if (lookingFor && (await lookingForColumnExists(c.env))) {
+    fields.push('looking_for = ?');
+    binds.push(lookingFor);
   }
   if (fields.length) {
     binds.push(session.workerId);
@@ -173,8 +202,14 @@ profileRoutes.post('/positions', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const { position, positionLabel, months } = await c.req.json<{ position: string; positionLabel: string; months: number }>();
 
+  // "Повар · 0 месяцев" is not experience, and it used to be both
+  // acceptable here and enough to pass the profile gate (see migration
+  // 0029). The picker can't produce one anymore; this is what stops one
+  // being stored anyway.
+  if (!Number.isFinite(months) || months <= 0) return c.json({ error: 'invalid_months' }, 400);
+
   await c.env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, months) VALUES (?, ?, ?, ?)')
-    .bind(session.workerId, position, positionLabel, months ?? 0)
+    .bind(session.workerId, position, positionLabel, Math.round(months))
     .run();
 
   const profile = await loadProfile(c.env, session.workerId);

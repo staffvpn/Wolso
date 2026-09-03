@@ -13,6 +13,8 @@ import sql0024 from '../../migrations/0024_broadcasts.sql';
 import sql0025 from '../../migrations/0025_bot_status.sql';
 import sql0026 from '../../migrations/0026_suspension_reason.sql';
 import sql0027 from '../../migrations/0027_hidden_profiles.sql';
+import sql0028 from '../../migrations/0028_reminders.sql';
+import sql0029 from '../../migrations/0029_worker_employment_type.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -45,6 +47,9 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'workers', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
   { table: 'companies', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
   { table: 'workers', column: 'hidden', migration: '0027_hidden_profiles', breaks: 'скрытие анкет' },
+  { table: 'workers', column: 'signup_reminded_at', migration: '0028_reminders', breaks: 'авто-напоминания в боте' },
+  { table: 'companies', column: 'pending_reminded_at', migration: '0028_reminders', breaks: 'авто-напоминания в боте' },
+  { table: 'workers', column: 'looking_for', migration: '0029_worker_employment_type', breaks: 'смена или постоянная работа в анкете' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -71,6 +76,8 @@ const MIGRATION_FILES: Record<string, string> = {
   '0025_bot_status': sql0025,
   '0026_suspension_reason': sql0026,
   '0027_hidden_profiles': sql0027,
+  '0028_reminders': sql0028,
+  '0029_worker_employment_type': sql0029,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

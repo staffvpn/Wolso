@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Position, WorkerListing } from '@/types';
+import type { LookingFor, Position, WorkerListing } from '@/types';
 import { fetchWorkerListings, passWorker, inviteWorkerToShift } from '@/services/employerApi';
 import { haptic, hapticNotify } from '@/lib/telegram';
 
@@ -13,7 +13,12 @@ interface WorkerBrowseState {
   index: number;
   loading: boolean;
   loaded: boolean;
+  /** Narrows the deck to people open to that kind of work. 'any' — no
+   *  narrowing, which is also what an anketa that never answered the
+   *  question means, so the default costs nobody any reach. */
+  lookingFor: LookingFor;
   setVacancy: (shiftId: string, position: Position) => void;
+  setLookingFor: (lookingFor: LookingFor) => void;
   loadDeck: () => Promise<void>;
   /** Left swipe — records the pass server-side so this person doesn't
    *  reappear next time, and moves on to the next card. */
@@ -31,14 +36,20 @@ export const useWorkerBrowseStore = create<WorkerBrowseState>((set, get) => ({
   index: 0,
   loading: false,
   loaded: false,
+  lookingFor: 'any',
 
   setVacancy: (shiftId, position) => {
     if (shiftId === get().shiftId) return;
     set({ shiftId, position, deck: [], index: 0, loaded: false });
   },
 
+  setLookingFor: (lookingFor) => {
+    if (lookingFor === get().lookingFor) return;
+    set({ lookingFor, deck: [], index: 0, loaded: false });
+  },
+
   loadDeck: async () => {
-    const { position } = get();
+    const { position, lookingFor } = get();
     // No vacancy picked yet — an empty deck (with its own "pick a shift"
     // empty state) beats silently showing every worker on the platform
     // regardless of what's actually open right now.
@@ -48,7 +59,7 @@ export const useWorkerBrowseStore = create<WorkerBrowseState>((set, get) => ({
     }
     set({ loading: true, index: 0 });
     try {
-      const deck = await fetchWorkerListings([position]);
+      const deck = await fetchWorkerListings([position], lookingFor);
       set({ deck, loading: false, loaded: true });
     } catch {
       set({ loading: false });

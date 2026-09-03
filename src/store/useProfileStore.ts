@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WorkerExperience } from '@/types';
+import type { LookingFor, WorkerExperience } from '@/types';
 import {
   fetchMyProfile,
   updateMyProfile,
@@ -24,6 +24,8 @@ interface ProfileState {
   /** Staff hid the anketa from the dashboard — see ProfileHidden. */
   hidden: boolean;
   hiddenReason?: string;
+  lookingFor: LookingFor;
+  avatarIsFromTelegram: boolean;
   referralCode: string;
   bio: string;
   skills: string;
@@ -52,6 +54,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
   profileCompletion: 0,
   profileComplete: false,
   hidden: false,
+  lookingFor: 'any',
+  avatarIsFromTelegram: false,
   referralCode: '',
   bio: '',
   skills: '',

@@ -1,5 +1,5 @@
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
-import type { Position, WorkerExperience, WorkerProfile } from '@/types';
+import type { LookingFor, Position, WorkerExperience, WorkerProfile } from '@/types';
 
 interface WorkerApiRow {
   id: number;
@@ -17,6 +17,8 @@ interface WorkerApiRow {
   profileComplete: boolean;
   hidden?: boolean;
   hiddenReason?: string | null;
+  lookingFor?: string;
+  avatarIsFromTelegram?: boolean;
 }
 
 interface MeResponse {
@@ -37,6 +39,8 @@ function fromApi(r: MeResponse): WorkerProfile {
     // "not hidden" rather than blocking the feed on a missing field.
     hidden: !!r.worker.hidden,
     hiddenReason: r.worker.hiddenReason ?? undefined,
+    lookingFor: (r.worker.lookingFor as LookingFor) ?? 'any',
+    avatarIsFromTelegram: !!r.worker.avatarIsFromTelegram,
     referralCode: r.worker.referral_code ?? '',
     bio: r.worker.bio ?? '',
     skills: r.worker.skills ?? '',
@@ -60,6 +64,7 @@ export interface ProfileUpdate {
   bio?: string;
   birthdate?: string;
   skills?: string;
+  lookingFor?: LookingFor;
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<WorkerProfile> {

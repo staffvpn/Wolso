@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './types';
 import { attachSession, rejectSuspended } from './middleware/auth';
+import { runReminders } from './lib/reminders';
 
 import { authRoutes } from './routes/auth';
 import { feedRoutes } from './routes/feed';
@@ -80,4 +81,13 @@ app.onError((err, c) => {
   return c.json({ error: 'internal_error' }, 500);
 });
 
-export default app;
+/** The Worker is no longer only a request handler: the cron trigger in
+ *  wrangler.toml calls `scheduled` on its own schedule, with no request
+ *  and nobody watching, which is why runReminders swallows and logs its
+ *  own failures rather than throwing into the void. */
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runReminders(env));
+  },
+};

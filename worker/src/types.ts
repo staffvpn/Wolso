@@ -8,6 +8,10 @@ export interface Env {
   /** Numeric Telegram id that operator alerts go to (see lib/adminNotify).
    *  Falls back to OWNER_TELEGRAM_ID when unset. */
   ADMIN_CHAT_ID?: string;
+  /** Support @username shown to users in automatic reminders, without the
+   *  '@' (see wrangler.toml). A var rather than a literal so changing who
+   *  answers support doesn't need a code change. */
+  SUPPORT_USERNAME?: string;
 }
 
 export type PermissionKey =

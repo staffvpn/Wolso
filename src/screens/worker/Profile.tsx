@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, EyeOff, Pencil, Plus } from 'lucide-react';
+import { Camera, ChevronRight, EyeOff, Pencil, Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
@@ -65,6 +65,33 @@ export function WorkerProfileScreen() {
           )}
         </div>
       )}
+
+      {/* Not a scolding banner: it's the single change that most affects
+          whether this person gets picked, and signup silently copied a
+          Telegram picture that may be a car or a landscape. Gone the
+          moment they upload anything of their own. */}
+      {profile.avatarIsFromTelegram && !profile.hidden && (
+        <button
+          onClick={() => navigate('/w/profile/edit')}
+          className="mt-4 w-full text-left rounded-2xl bg-accent-soft p-4 flex items-start gap-3"
+        >
+          <Camera size={18} className="text-accent shrink-0 mt-0.5" />
+          <span className="min-w-0">
+            <span className="block text-[14px] font-bold">Поставьте своё фото</span>
+            <span className="block text-[13px] text-text-muted leading-relaxed mt-0.5">
+              Сейчас на анкете фото из Telegram. Работодатель выбирает по лицу — с обычным селфи зовут заметно чаще.
+            </span>
+          </span>
+        </button>
+      )}
+
+      <div className="mt-4">
+        <SectionLabel>Ищу</SectionLabel>
+        <div className="flex flex-wrap gap-2">
+          {(profile.lookingFor === 'any' || profile.lookingFor === 'shift') && <Chip selected>Смены</Chip>}
+          {(profile.lookingFor === 'any' || profile.lookingFor === 'permanent') && <Chip selected>Постоянная работа</Chip>}
+        </div>
+      </div>
 
       {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{profile.bio}</p>}
 

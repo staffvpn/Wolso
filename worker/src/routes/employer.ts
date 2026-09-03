@@ -9,6 +9,7 @@ import { lookupInn } from '../lib/innLookup';
 import { notifyAdmin } from '../lib/adminNotify';
 import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 import { excludeHiddenSql } from '../lib/hiddenProfiles';
+import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../lib/workerPrefs';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -565,6 +566,14 @@ const CANDIDATE_WORKER_FIELDS = `
      FROM worker_positions wp2 WHERE wp2.worker_id = w.id) as worker_experience
 `;
 
+/** `looking_for` on top of those, once migration 0029 has been applied.
+ *  Appended separately rather than folded into the list above because
+ *  naming a column the database doesn't have yet doesn't degrade — it
+ *  throws, and takes the employer's whole candidates screen with it. */
+async function lookingForField(env: Env): Promise<string> {
+  return (await lookingForColumnExists(env)) ? ", w.looking_for as worker_looking_for" : '';
+}
+
 interface CandidateWorkerRow {
   worker_id: number;
   worker_has_avatar: number;
@@ -594,7 +603,7 @@ employerRoutes.get('/candidates', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS},
+    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS}${await lookingForField(c.env)},
             s.position_label as shift_position_label, s.date as shift_date, s.start_hour as shift_start_hour, s.start_min as shift_start_min
      FROM applications a
      JOIN shifts s ON s.id = a.shift_id
@@ -617,7 +626,7 @@ employerRoutes.get('/vacancies/:id/candidates', async (c) => {
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS}
+    `SELECT a.*, ${CANDIDATE_WORKER_FIELDS}${await lookingForField(c.env)}
      FROM applications a JOIN workers w ON w.id = a.worker_id WHERE a.shift_id = ? ORDER BY a.created_at ASC`,
   )
     .bind(shiftId)
@@ -900,9 +909,14 @@ employerRoutes.get('/workers', async (c) => {
   if (positions.length === 0) return c.json({ workers: [] });
 
   const notHidden = await excludeHiddenSql(c.env, 'w');
+  // Someone who only wants weekend shifts is a bad match for a permanent
+  // job and vice versa — both sides used to find that out in the chat.
+  // 'any' on either side means no narrowing, so the default costs nobody
+  // any reach.
+  const wantsType = await matchesLookingForSql(c.env, 'w', asLookingFor(c.req.query('lookingFor')));
   const placeholders = positions.map(() => '?').join(',');
   const { results } = await c.env.DB.prepare(
-    `SELECT DISTINCT w.id as worker_id, ${CANDIDATE_WORKER_FIELDS},
+    `SELECT DISTINCT w.id as worker_id, ${CANDIDATE_WORKER_FIELDS}${await lookingForField(c.env)},
             (SELECT wp2.position_label FROM worker_positions wp2
              WHERE wp2.worker_id = w.id AND wp2.position IN (${placeholders})
              ORDER BY wp2.months DESC LIMIT 1) as matched_position_label
@@ -912,6 +926,7 @@ employerRoutes.get('/workers', async (c) => {
      WHERE wp.position IN (${placeholders})
        AND w.status != 'suspended'
        ${notHidden}
+       ${wantsType}
        AND (t.active_role = 'worker' OR t.active_role IS NULL)
        AND w.id NOT IN (
          SELECT worker_id FROM company_worker_passes

@@ -4,15 +4,17 @@ import { Camera, Plus, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { TopBar } from '@/components/ui/TopBar';
 import { SectionLabel } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
+import { ExperienceSheet } from '@/components/ExperienceSheet';
 import { useProfileStore } from '@/store/useProfileStore';
 import { POSITIONS } from '@/data/positions';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 import { formatExperience } from '@/lib/format';
-import type { Position } from '@/types';
+import type { LookingFor, Position } from '@/types';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -47,9 +49,8 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   const [bio, setBio] = useState('');
   const [skills, setSkills] = useState('');
   const [birthdate, setBirthdate] = useState('');
-  const [newPosition, setNewPosition] = useState<Position>('barista');
-  const [newAmount, setNewAmount] = useState('');
-  const [newUnit, setNewUnit] = useState<'months' | 'years'>('years');
+  const [lookingFor, setLookingFor] = useState<LookingFor>('any');
+  const [pickingPosition, setPickingPosition] = useState<Position | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -67,10 +68,28 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     setBio(profile.bio);
     setSkills(profile.skills);
     setBirthdate(profile.birthdate ?? '');
+    setLookingFor(profile.lookingFor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
   if (!loaded) return null;
+
+  // 'any' is both toggles on, which is also what an anketa written before
+  // this question existed means — see migration 0029.
+  const wantsShift = lookingFor === 'any' || lookingFor === 'shift';
+  const wantsPermanent = lookingFor === 'any' || lookingFor === 'permanent';
+
+  /** "Looking for nothing" isn't an answer, so tapping the only lit-up
+   *  chip does nothing rather than clearing it — and deliberately not
+   *  "flip to the other one" either, which would mean tapping «Постоянная
+   *  работа» lights up «Смены». */
+  function toggleLookingFor(which: 'shift' | 'permanent') {
+    const shift = which === 'shift' ? !wantsShift : wantsShift;
+    const permanent = which === 'permanent' ? !wantsPermanent : wantsPermanent;
+    if (shift && permanent) setLookingFor('any');
+    else if (shift) setLookingFor('shift');
+    else if (permanent) setLookingFor('permanent');
+  }
 
   const missing: string[] = [];
   if (!name.trim()) missing.push('имя');
@@ -79,12 +98,14 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   if (!skills.trim()) missing.push('навыки');
   if (!birthdate) missing.push('дата рождения');
   const underage = !!birthdate && !isAtLeast18(birthdate);
+  const nameHasDigits = /\d/.test(name);
   // "фото" alone was ambiguous next to the «Дополнительные фото» block —
   // name the field the screen actually labels.
   if (!profile.avatarUrl) missing.push('главное фото');
   if (profile.positions.length === 0) missing.push('опыт работы');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    setError(null);
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -106,16 +127,10 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     }
   }
 
-  async function addExperienceRow() {
-    const amount = Number(newAmount);
-    if (!amount || amount <= 0) {
-      setError('Укажите, сколько месяцев или лет опыта');
-      return;
-    }
-    const months = newUnit === 'years' ? Math.round(amount * 12) : Math.round(amount);
+  async function addExperienceRow(position: Position, months: number) {
+    setError(null);
     try {
-      await addPosition({ position: newPosition, positionLabel: POSITIONS.find((p) => p.id === newPosition)!.label, months });
-      setNewAmount('');
+      await addPosition({ position, positionLabel: POSITIONS.find((p) => p.id === position)!.label, months });
     } catch {
       setError('Не получилось добавить опыт — попробуйте ещё раз');
     }
@@ -139,9 +154,13 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
       setError('Wolso доступен только совершеннолетним — с 18 лет');
       return;
     }
+    if (nameHasDigits) {
+      setError('В имени и фамилии не должно быть цифр');
+      return;
+    }
     setSaving(true);
     try {
-      await updateProfile({ name: name.trim(), city: city.trim(), bio: bio.trim(), skills: skills.trim(), birthdate });
+      await updateProfile({ name: name.trim(), city: city.trim(), bio: bio.trim(), skills: skills.trim(), birthdate, lookingFor });
       if (!gate) navigate(-1);
     } catch {
       setError('Не получилось сохранить — попробуйте ещё раз');
@@ -180,6 +199,14 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
             </span>
           </button>
           <p className="text-[12px] text-text-faint">Главное фото</p>
+          {/* Signup copies whatever picture Telegram had, so everyone
+              technically has one — and half of those are a car or a
+              landscape. This is the moment to say what the photo is for. */}
+          <p className="text-[13px] text-text-muted text-center leading-relaxed max-w-[300px]">
+            {profile.avatarIsFromTelegram
+              ? 'Сейчас здесь фото из Telegram. Работодатель выбирает человека на смену по лицу — поставьте своё, вас будут звать заметно чаще.'
+              : 'Обычное селфи при дневном свете, лицо видно — этого достаточно. Анкеты с фото зовут на смены заметно чаще.'}
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -194,6 +221,11 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
               className={FIELD_CLASS}
               required
             />
+            {nameHasDigits && (
+              <p className="text-[12px] text-danger mt-1.5">
+                В имени и фамилии не должно быть цифр — телефон и ник сюда писать не нужно
+              </p>
+            )}
           </div>
 
           <div>
@@ -240,7 +272,13 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
 
           <div>
-            <SectionLabel>Опыт работы</SectionLabel>
+            <SectionLabel>
+              Опыт работы <span className="text-danger">*</span>
+            </SectionLabel>
+            <p className="text-[13px] text-text-muted -mt-1 mb-3 leading-relaxed">
+              Нажмите на должность, где вы уже работали, — и выберите, сколько. Можно добавить несколько.
+            </p>
+
             {profile.positions.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {profile.positions.map((p) => (
@@ -262,38 +300,33 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
                 ))}
               </div>
             )}
-            <select
-              value={newPosition}
-              onChange={(e) => setNewPosition(e.target.value as Position)}
-              className="w-full h-11 rounded-2xl bg-surface border border-border px-3 text-[14px] outline-none focus:border-accent"
-            >
+
+            <div className="flex flex-wrap gap-2">
               {POSITIONS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
+                <Chip key={p.id} onClick={() => setPickingPosition(p.id)}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Plus size={13} /> {p.label}
+                  </span>
+                </Chip>
               ))}
-            </select>
-            <div className="flex items-center gap-2 mt-2">
-              <input
-                type="number"
-                min={0}
-                inputMode="decimal"
-                value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                placeholder="Сколько?"
-                className="flex-1 h-11 rounded-2xl bg-surface border border-border px-3.5 text-[14px] outline-none focus:border-accent placeholder:text-text-faint"
-              />
-              <select
-                value={newUnit}
-                onChange={(e) => setNewUnit(e.target.value as typeof newUnit)}
-                className="h-11 rounded-2xl bg-surface border border-border px-3 text-[14px] outline-none focus:border-accent"
-              >
-                <option value="months">мес.</option>
-                <option value="years">лет</option>
-              </select>
-              <button onClick={addExperienceRow} className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
-                <Plus size={18} />
-              </button>
+            </div>
+          </div>
+
+          {/* Deliberately above «О себе» rather than at the end of the form:
+              it's a one-tap answer that shapes which employers ever see the
+              anketa, and nobody scrolls to the bottom to find it. */}
+          <div>
+            <SectionLabel>Что вы ищете</SectionLabel>
+            <p className="text-[13px] text-text-muted -mt-1 mb-3 leading-relaxed">
+              Работодатели видят это в анкете и ищут по этому — выберите одно или оба.
+            </p>
+            <div className="flex gap-2">
+              <Chip selected={wantsShift} onClick={() => toggleLookingFor('shift')} className="flex-1">
+                Смены
+              </Chip>
+              <Chip selected={wantsPermanent} onClick={() => toggleLookingFor('permanent')} className="flex-1">
+                Постоянная работа
+              </Chip>
             </div>
           </div>
 
@@ -336,6 +369,12 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           {saving ? 'Сохраняем…' : gate ? 'Готово' : 'Сохранить'}
         </Button>
       </div>
+
+      <ExperienceSheet
+        position={pickingPosition}
+        onClose={() => setPickingPosition(null)}
+        onPick={(months) => addExperienceRow(pickingPosition!, months)}
+      />
     </div>
   );
 }

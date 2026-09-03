@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { OfflineBanner } from './components/OfflineBanner';
 import { PaywallSheet } from './components/PaywallSheet';
 import { AuthGate } from './components/AuthGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingScreen } from './components/ui/Loader';
 import { useAuthStore } from './store/useAuthStore';
+import { useEmployerStore } from './store/useEmployerStore';
 import { TabShell } from './components/nav/TabShell';
 
 import { Feed } from './screens/worker/Feed';
@@ -31,9 +34,31 @@ import { Reviews } from './screens/shared/Reviews';
 import { CompleteWorkerProfile } from './screens/onboarding/CompleteWorkerProfile';
 import { CompleteEmployerProfile } from './screens/onboarding/CompleteEmployerProfile';
 
+/** Where launching the app lands you. A worker always gets the shift deck;
+ *  an employer gets the anketa deck as soon as they have something to
+ *  invite people onto, and «Кандидаты» only until then — that screen is
+ *  empty for everyone who hasn't been applied to yet, which is exactly the
+ *  employers who just posted their first shift and have nothing to do
+ *  there. FindWorkers needs an active vacancy to work at all (it invites
+ *  onto one), so the condition matches what that screen can actually do. */
 function HomeRedirect() {
   const role = useAuthStore((s) => s.role);
-  return <Navigate to={role === 'employer' ? '/e/candidates' : '/w/feed'} replace />;
+  const vacancies = useEmployerStore((s) => s.vacancies);
+  const loaded = useEmployerStore((s) => s.loaded);
+  const loadAll = useEmployerStore((s) => s.loadAll);
+
+  useEffect(() => {
+    if (role === 'employer' && !loaded) loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, loaded]);
+
+  if (role !== 'employer') return <Navigate to="/w/feed" replace />;
+  // Wait for the vacancy list rather than guessing: redirecting to
+  // «Кандидаты» first and bouncing to «Поиск» a moment later would show
+  // the wrong screen flashing on every launch.
+  if (!loaded) return <LoadingScreen label="Загружаем…" />;
+  const hasActiveVacancy = vacancies.some((v) => v.status === 'active');
+  return <Navigate to={hasActiveVacancy ? '/e/find' : '/e/candidates'} replace />;
 }
 
 export default function App() {

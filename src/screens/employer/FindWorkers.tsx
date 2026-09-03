@@ -30,7 +30,7 @@ export function FindWorkers() {
   const loadVacancies = useEmployerStore((s) => s.loadAll);
   const activeVacancies = useMemo(() => vacancies.filter((v) => v.status === 'active'), [vacancies]);
 
-  const { shiftId, deck, index, loading, loaded, setVacancy, loadDeck, pass, invite } = useWorkerBrowseStore();
+  const { shiftId, deck, index, loading, loaded, lookingFor, setVacancy, setLookingFor, loadDeck, pass, invite } = useWorkerBrowseStore();
   const selectedVacancy = activeVacancies.find((v) => v.id === shiftId) ?? null;
 
   useEffect(() => {
@@ -45,10 +45,12 @@ export function FindWorkers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVacancies]);
 
+  // lookingFor as well as shiftId: changing the filter clears the deck and
+  // drops `loaded`, and without it in the deps nothing would refetch.
   useEffect(() => {
     if (shiftId && !loaded) loadDeck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shiftId]);
+  }, [shiftId, lookingFor]);
 
   const remaining = deck.slice(index);
   const current = remaining[0];
@@ -107,6 +109,22 @@ export function FindWorkers() {
         </Chip>
       </div>
 
+      {/* Who to show: everyone, or only people who said they want that
+          kind of work. An anketa that never answered counts as "и то и
+          другое", so «Все» and the two filters overlap rather than
+          partitioning the deck. */}
+      <div className="flex gap-2 px-5 pb-2 shrink-0 overflow-x-auto">
+        <Chip selected={lookingFor === 'any'} onClick={() => setLookingFor('any')}>
+          Все
+        </Chip>
+        <Chip selected={lookingFor === 'shift'} onClick={() => setLookingFor('shift')}>
+          На смены
+        </Chip>
+        <Chip selected={lookingFor === 'permanent'} onClick={() => setLookingFor('permanent')}>
+          На постоянку
+        </Chip>
+      </div>
+
       {deck.length > 0 && (
         <p className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-wide text-text-faint shrink-0">
           Анкета {Math.min(index + 1, deck.length)} из {deck.length}
@@ -125,9 +143,17 @@ export function FindWorkers() {
         empty={
           <EmptyState
             title="Подходящих анкет пока нет"
-            description="Все, кто подошёл под эту смену, уже просмотрены — загляните позже или выберите другую вакансию."
+            description={
+              lookingFor === 'any'
+                ? 'Все, кто подошёл под эту смену, уже просмотрены — загляните позже или выберите другую вакансию.'
+                : `Никого, кто ищет ${lookingFor === 'shift' ? 'смены' : 'постоянную работу'} по этой должности. Попробуйте «Все» — там же и те, кто согласен на любой формат.`
+            }
             actions={
-              activeVacancies.length > 1 ? (
+              lookingFor !== 'any' ? (
+                <Button fullWidth onClick={() => setLookingFor('any')}>
+                  Показать всех
+                </Button>
+              ) : activeVacancies.length > 1 ? (
                 <Button fullWidth onClick={() => setSheetOpen(true)}>
                   Выбрать другую смену
                 </Button>

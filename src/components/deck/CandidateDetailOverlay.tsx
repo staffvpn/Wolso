@@ -100,6 +100,12 @@ export function CandidateDetailOverlay({
           <div className="flex flex-wrap gap-2 mt-3">
             <Badge tone="accent">{formatRating(candidate.rating)}</Badge>
             <Badge tone="dark">{candidate.shiftsCompleted} смен отработано</Badge>
+            {/* Worth knowing before the chat rather than after: someone
+                after weekend shifts isn't a candidate for a permanent job.
+                Absent on an anketa that predates the question. */}
+            {candidate.lookingFor && candidate.lookingFor !== 'any' && (
+              <Badge tone="dark">{candidate.lookingFor === 'shift' ? 'Ищет смены' : 'Ищет постоянную работу'}</Badge>
+            )}
           </div>
 
           {candidate.bio && (

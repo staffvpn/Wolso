@@ -43,6 +43,10 @@ export interface Company {
 
 export type ShiftUrgency = 'normal' | 'urgent';
 
+/** What a worker is after. 'any' — both, which is what every anketa
+ *  written before the question existed means (see migration 0029). */
+export type LookingFor = 'any' | 'shift' | 'permanent';
+
 /** Whether a posting is a one-off (or multi-day) shift or an ongoing job —
  *  picked by the employer when publishing, shown on every card, and
  *  filterable from the worker's feed. */
@@ -166,6 +170,12 @@ export interface WorkerProfile {
   shiftsCompleted: number;
   profileCompletion: number;
   profileComplete: boolean;
+  /** Shifts, permanent work, or both — shown on the anketa employers read
+   *  and used by their search filter. */
+  lookingFor: LookingFor;
+  /** The picture is the one Telegram had at signup, not one they chose.
+   *  Drives the "поставьте своё фото" nudge — see Profile.tsx. */
+  avatarIsFromTelegram: boolean;
   /** Staff took the anketa out of circulation from the dashboard: no
    *  employer sees it in «найти сотрудников» and new responses are
    *  refused. Everything already agreed keeps working. */
@@ -215,6 +225,9 @@ export interface CandidateProfile {
   /** Avatar first, then any portfolio photos — the card taps through this
    *  whole list left-to-right, Tinder-style. */
   photos: string[];
+  /** What they're looking for — undefined on an API that predates
+   *  migration 0029, in which case the card simply doesn't show it. */
+  lookingFor?: LookingFor;
 }
 
 /** A pending applicant, as seen by the employer swiping candidates. */

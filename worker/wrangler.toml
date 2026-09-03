@@ -17,6 +17,15 @@ fallthrough = true
 [vars]
 ADMIN_ORIGIN = "https://wolso-admin.pages.dev"
 APP_ORIGIN = "https://wolso.pages.dev"
+# Support account the automatic reminders point people at. Without the '@'.
+SUPPORT_USERNAME = "nchtsupport"
+
+# Automatic bot reminders — see src/lib/reminders.ts. Hourly rather than
+# daily so a batch that hits the per-run cap is picked up soon after,
+# not tomorrow; the reminders themselves are rate-limited by their own
+# "already sent" bookkeeping, not by how often this fires.
+[triggers]
+crons = ["0 * * * *"]
 
 # Created with: wrangler d1 create wolso
 # Paste the database_id it prints below.

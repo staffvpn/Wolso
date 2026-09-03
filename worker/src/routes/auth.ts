@@ -6,7 +6,13 @@ import { notifyAdmin, adminNotifyHandle } from '../lib/adminNotify';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
-const DEFAULT_POSITIONS = [{ position: 'barista', position_label: 'Бариста', months: 0 }];
+/** Registration used to seed every new worker with a "Бариста · 0 месяцев"
+ *  row. It was meant as a starting point and worked out as the opposite:
+ *  the completeness check only asked whether the list was non-empty, so
+ *  the placeholder satisfied the "опыт работы" requirement outright, and
+ *  people sailed past the gate with an anketa saying they'd worked zero
+ *  months as a barista. Experience is typed in by hand now, and a
+ *  zero-length entry no longer counts as any (see migration 0029). */
 
 /** The suspension on this Telegram id's active role, if any. */
 async function suspensionFor(
@@ -46,13 +52,7 @@ export async function provisionWorker(env: Env, user: TelegramUser, name: string
   )
     .bind(user.id, name, user.photo_url ?? null, referralCode, user.username ?? null)
     .first<{ id: number }>();
-  worker = inserted!;
-  for (const p of DEFAULT_POSITIONS) {
-    await env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, months) VALUES (?, ?, ?, ?)')
-      .bind(worker.id, p.position, p.position_label, p.months)
-      .run();
-  }
-  return worker.id;
+  return inserted!.id;
 }
 
 /** Deliberately no name/logo_initial derived from the Telegram account —

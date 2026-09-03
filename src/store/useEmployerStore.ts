@@ -17,6 +17,11 @@ interface EmployerState {
   vacancies: Vacancy[];
   candidates: Candidate[];
   loading: boolean;
+  /** Settles true once loadAll has finished, however it finished. Read by
+   *  HomeRedirect (App.tsx), which has to know whether this employer has a
+   *  vacancy before it can pick a landing screen — and must not sit on a
+   *  spinner forever if the request fails. */
+  loaded: boolean;
   loadAll: () => Promise<void>;
   loadVacancyCandidates: (vacancyId: string, positionLabel?: string) => Promise<void>;
   pendingCandidates: () => Candidate[];
@@ -46,11 +51,16 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
   vacancies: [],
   candidates: [],
   loading: true,
+  loaded: false,
 
   loadAll: async () => {
     set({ loading: true });
-    const [vacancies, candidates] = await Promise.all([fetchVacancies(), fetchCandidates()]);
-    set({ vacancies, candidates, loading: false });
+    try {
+      const [vacancies, candidates] = await Promise.all([fetchVacancies(), fetchCandidates()]);
+      set({ vacancies, candidates, loading: false, loaded: true });
+    } catch {
+      set({ loading: false, loaded: true });
+    }
   },
 
   /** Merges in candidates for one vacancy — used by VacancyDetail so it works
