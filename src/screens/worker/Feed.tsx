@@ -56,7 +56,10 @@ export function Feed() {
     if (detailOpen && !current) setDetailOpen(false);
   }, [detailOpen, current]);
 
-  const radiusLabel = filters.radiusKm === 'city' ? 'по всему городу' : `в радиусе ${filters.radiusKm} км`;
+  // Only honest while FEATURES.geo is off: the radius filter isn't applied
+  // server-side, so claiming "в радиусе 5 км" would describe a deck that
+  // wasn't filtered by distance at all.
+  const radiusLabel = FEATURES.geo && filters.radiusKm !== 'city' ? `в радиусе ${filters.radiusKm} км` : 'по всему городу';
 
   // Only the deck is replaced, not the whole app: hiding an anketa stops
   // new responses, it doesn't cancel the shifts and chats already in play.
@@ -101,20 +104,16 @@ export function Feed() {
         empty={
           <EmptyState
             title="Смены закончились"
-            description={`Вы посмотрели все ${deck.length} смен по вашим фильтрам. Расширьте радиус или снизьте порог ставки — покажем ещё.`}
+            description={`Вы посмотрели все ${deck.length} смен по вашим фильтрам. Ослабьте их — покажем ещё.`}
             actions={
               <>
-                <Button
-                  fullWidth
-                  onClick={() => {
-                    useFiltersStore.getState().setRadius(5);
-                    loadDeck();
-                  }}
-                >
-                  Расширить радиус до 5 км
+                <Button fullWidth onClick={() => setFilterOpen(true)}>
+                  Изменить фильтры
                 </Button>
-                <Button fullWidth variant="dark">
-                  Уведомить о новых
+                {/* Was a button with no onClick at all. Now it goes where
+                    the setting actually lives — the bot does send this. */}
+                <Button fullWidth variant="dark" onClick={() => navigate('/w/settings')}>
+                  Уведомлять о новых сменах
                 </Button>
               </>
             }
@@ -130,9 +129,11 @@ export function Feed() {
           <Button size="lg" className="flex-1 max-w-[220px]" onClick={() => deckRef.current?.swipeRight()}>
             <Check size={18} /> Откликнуться
           </Button>
-          <IconButton size={56} onClick={() => openPaywall('boost')} aria-label="Поднять отклик" className="text-warning">
-            <Rocket size={20} />
-          </IconButton>
+          {FEATURES.premium && (
+            <IconButton size={56} onClick={() => openPaywall('boost')} aria-label="Поднять отклик" className="text-warning">
+              <Rocket size={20} />
+            </IconButton>
+          )}
         </div>
       )}
 

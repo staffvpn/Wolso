@@ -9,6 +9,7 @@ import { useFiltersStore } from '@/store/useFiltersStore';
 import { POSITIONS, TOP_POSITIONS } from '@/data/positions';
 import { fetchShifts } from '@/services/shiftsApi';
 import { EMPLOYMENT_TYPES as ALL_EMPLOYMENT_TYPES } from '@/data/employmentTypes';
+import { FEATURES } from '@/lib/features';
 import type { Filters } from '@/types';
 
 interface FilterSheetProps {
@@ -107,7 +108,9 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
           <div className="flex flex-wrap gap-2">
             <Chip selected={filters.when === 'today'} onClick={() => setWhen('today')}>Сегодня</Chip>
             <Chip selected={filters.when === 'tomorrow'} onClick={() => setWhen('tomorrow')}>Завтра</Chip>
-            <Chip tone="dark" selected={filters.when === 'custom'} onClick={() => setWhen('custom')}>Выбрать даты</Chip>
+            {/* «Выбрать даты» never picked any dates — it fell through to
+                the same "всё, начиная с сегодня" as the default, so it was
+                a chip that changed the highlight and nothing else. */}
           </div>
         </div>
 
@@ -137,16 +140,20 @@ export function FilterSheet({ open, onClose, onApply }: FilterSheetProps) {
           </div>
         </div>
 
-        <div>
-          <SectionLabel>Радиус</SectionLabel>
-          <div className="flex flex-wrap gap-2">
-            {RADIUS_OPTIONS.map((r) => (
-              <Chip key={String(r.id)} selected={filters.radiusKm === r.id} onClick={() => setRadius(r.id)}>
-                {r.label}
-              </Chip>
-            ))}
+        {/* Hidden until coordinates exist: the server takes radiusKm and
+            throws it away, so picking "5 км" changed nothing at all. */}
+        {FEATURES.geo && (
+          <div>
+            <SectionLabel>Радиус</SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              {RADIUS_OPTIONS.map((r) => (
+                <Chip key={String(r.id)} selected={filters.radiusKm === r.id} onClick={() => setRadius(r.id)}>
+                  {r.label}
+                </Chip>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <label className="flex items-center justify-between gap-3 py-1">
           <div>
