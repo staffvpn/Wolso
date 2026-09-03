@@ -35,7 +35,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 20 GitHub уже помечает как устаревшую и в какой-то момент
+          # перестанет запускать — тогда деплой упадёт без изменений в коде.
+          node-version: 22
           cache: npm
           cache-dependency-path: worker/package-lock.json
 
