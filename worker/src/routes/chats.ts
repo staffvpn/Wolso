@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
 import { sendTelegramMessage } from '../lib/telegramBot';
+import { notifyWorker } from '../lib/notifyPrefs';
 
 export const chatRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 chatRoutes.use('*', attachSession);
@@ -162,7 +163,12 @@ chatRoutes.post('/:id/messages', async (c) => {
         .bind(chat.worker_id)
         .first<{ telegram_id: number }>();
       if (worker) {
-        c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`));
+        c.executionCtx.waitUntil(
+          notifyWorker(c.env, { id: chat.worker_id, telegramId: worker.telegram_id }, 'employer_replies', `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`),
+        );
+        // Stamped either way: the cooldown is about not pinging on every
+        // message, and a worker who switched these off shouldn't have the
+        // cooldown re-armed for them on every send instead.
         await c.env.DB.prepare("UPDATE chats SET worker_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
       }
     }

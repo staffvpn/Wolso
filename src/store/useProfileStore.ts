@@ -26,6 +26,9 @@ interface ProfileState {
   hiddenReason?: string;
   lookingFor: LookingFor;
   avatarIsFromTelegram: boolean;
+  notifyNewShifts: boolean;
+  notifyEmployerReplies: boolean;
+  notifyShiftReminder: boolean;
   referralCode: string;
   bio: string;
   skills: string;
@@ -56,6 +59,9 @@ export const useProfileStore = create<ProfileState>((set) => ({
   hidden: false,
   lookingFor: 'any',
   avatarIsFromTelegram: false,
+  notifyNewShifts: true,
+  notifyEmployerReplies: true,
+  notifyShiftReminder: true,
   referralCode: '',
   bio: '',
   skills: '',

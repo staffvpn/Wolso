@@ -173,6 +173,11 @@ export interface WorkerProfile {
   /** Shifts, permanent work, or both — shown on the anketa employers read
    *  and used by their search filter. */
   lookingFor: LookingFor;
+  /** Which bot messages this person wants. Stored on the account, not the
+   *  device — they used to sit in localStorage where nothing read them. */
+  notifyNewShifts: boolean;
+  notifyEmployerReplies: boolean;
+  notifyShiftReminder: boolean;
   /** The picture is the one Telegram had at signup, not one they chose.
    *  Drives the "поставьте своё фото" nudge — see Profile.tsx. */
   avatarIsFromTelegram: boolean;

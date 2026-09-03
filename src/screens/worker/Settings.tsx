@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy, Users2 } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
@@ -5,16 +6,31 @@ import { Toggle } from '@/components/ui/Toggle';
 import { SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { IconButton } from '@/components/ui/IconButton';
-import { useSettingsStore } from '@/store/useSettingsStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { hapticNotify } from '@/lib/telegram';
 import { FEATURES } from '@/lib/features';
+import type { ProfileUpdate } from '@/services/profileApi';
 
 export function Settings() {
   const navigate = useNavigate();
-  const s = useSettingsStore();
-  const referralCode = useProfileStore((st) => st.referralCode);
-  const referralLink = `wolso.app/i/${referralCode}`;
+  const profile = useProfileStore();
+  const updateProfile = useProfileStore((s) => s.updateProfile);
+  const [error, setError] = useState<string | null>(null);
+  const referralLink = `wolso.app/i/${profile.referralCode}`;
+
+  /** These are the account's settings, not the phone's — they used to be
+   *  written to localStorage and read by nothing, so switching one off
+   *  changed nothing and the messages kept coming. Saved immediately
+   *  rather than behind a «Сохранить»: a switch that needs confirming
+   *  doesn't read like a switch. */
+  async function save(update: ProfileUpdate) {
+    setError(null);
+    try {
+      await updateProfile(update);
+    } catch {
+      setError('Не получилось сохранить — проверьте связь и попробуйте ещё раз');
+    }
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -51,34 +67,46 @@ export function Settings() {
           </div>
         )}
 
-        <SectionLabel>Уведомления</SectionLabel>
+        <SectionLabel>Уведомления в боте</SectionLabel>
+        <p className="text-[13px] text-text-muted -mt-1 mb-1 leading-relaxed">
+          Выключенное сюда приходить перестанет. В самом приложении уведомления всё равно сохраняются — так вы ничего не
+          пропустите, даже если выключите всё.
+        </p>
         <div className="divide-y divide-border-soft">
-          <div className="flex items-center justify-between py-3">
-            <span className="text-[15px] font-medium">Новые смены рядом</span>
-            <Toggle checked={s.notifyNewShifts} onChange={s.setNotifyNewShifts} />
+          <div className="flex items-center justify-between py-3 gap-3">
+            {/* Labelled by what it actually does: the match is by position,
+                not by distance — the app has no location data at all. */}
+            <span className="text-[15px] font-medium">Новые смены по вашим должностям</span>
+            <Toggle checked={profile.notifyNewShifts} onChange={(v) => save({ notifyNewShifts: v })} />
           </div>
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between py-3 gap-3">
             <span className="text-[15px] font-medium">Ответы работодателей</span>
-            <Toggle checked={s.notifyEmployerReplies} onChange={s.setNotifyEmployerReplies} />
+            <Toggle checked={profile.notifyEmployerReplies} onChange={(v) => save({ notifyEmployerReplies: v })} />
           </div>
-          <div className="flex items-center justify-between py-3">
-            <span className="text-[15px] font-medium">Напоминание за час до смены</span>
-            <Toggle checked={s.notifyReminder} onChange={s.setNotifyReminder} />
+          <div className="flex items-center justify-between py-3 gap-3">
+            <span className="text-[15px] font-medium">Напоминание перед сменой</span>
+            <Toggle checked={profile.notifyShiftReminder} onChange={(v) => save({ notifyShiftReminder: v })} />
           </div>
         </div>
+        {error && <p className="text-[13px] text-danger mt-2 leading-relaxed">{error}</p>}
 
         <SectionLabel className="mt-6">Аккаунт</SectionLabel>
         <div className="divide-y divide-border-soft">
-          <ListRow label="Город" value={s.city} />
+          {/* The real city off the profile — this used to show a hardcoded
+              «Москва» from the same dead store the switches lived in. */}
+          <ListRow label="Город" value={profile.city || '—'} onClick={() => navigate('/w/profile/edit')} />
+          <ListRow label="Анкета" onClick={() => navigate('/w/profile/edit')} />
         </div>
 
         <SectionLabel className="mt-6">Поддержка</SectionLabel>
         <div className="divide-y divide-border-soft">
           <ListRow label="Помощь" onClick={() => navigate('/w/support')} />
-        </div>
-
-        <div className="mt-4">
-          <ListRow label="Удалить аккаунт" danger showChevron={false} onClick={() => {}} />
+          {/* Was a button with an empty onClick — it looked like account
+              deletion and did nothing at all. Routed to support rather
+              than wired to a self-service delete: erasing an account takes
+              its shifts, chats and reviews with it, and staff already have
+              that action in the dashboard. */}
+          <ListRow label="Удалить аккаунт" danger onClick={() => navigate('/w/support')} />
         </div>
       </div>
     </div>

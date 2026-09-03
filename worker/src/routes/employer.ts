@@ -3,13 +3,13 @@ import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
-import { sendTelegramMessage } from '../lib/telegramBot';
 import { mskTodayStr } from '../lib/time';
 import { lookupInn } from '../lib/innLookup';
 import { notifyAdmin } from '../lib/adminNotify';
 import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 import { excludeHiddenSql } from '../lib/hiddenProfiles';
 import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../lib/workerPrefs';
+import { notifyWorker } from '../lib/notifyPrefs';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 employerRoutes.use('*', attachSession);
@@ -404,7 +404,9 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
       await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
         .bind(person.worker_id, 'shift_updated', title, subtitle)
         .run();
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, person.telegram_id, `✏️ ${title}\n${subtitle}`));
+      c.executionCtx.waitUntil(
+        notifyWorker(c.env, { id: person.worker_id, telegramId: person.telegram_id }, 'employer_replies', `✏️ ${title}\n${subtitle}`),
+      );
     }
   }
 
@@ -488,7 +490,9 @@ employerRoutes.delete('/vacancies/:id', async (c) => {
     await c.env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
       .bind(person.worker_id, 'cancelled_by_employer', title, subtitle)
       .run();
-    c.executionCtx.waitUntil(sendTelegramMessage(c.env, person.telegram_id, `❌ ${title}\n${subtitle}`));
+    c.executionCtx.waitUntil(
+      notifyWorker(c.env, { id: person.worker_id, telegramId: person.telegram_id }, 'employer_replies', `❌ ${title}\n${subtitle}`),
+    );
   }
 
   // chats.shift_id is ON DELETE SET NULL, not CASCADE — deleting the shift
@@ -549,7 +553,7 @@ async function notifyMatchingWorkers(env: Env, shift: ShiftRow): Promise<void> {
       await env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
         .bind(m.id, 'new_shifts', title, subtitle)
         .run();
-      await sendTelegramMessage(env, m.telegram_id, text);
+      await notifyWorker(env, { id: m.id, telegramId: m.telegram_id }, 'new_shifts', text);
     }),
   );
 }
@@ -676,7 +680,9 @@ async function notifyInvite(
 
   const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?').bind(workerId).first<{ telegram_id: number }>();
   if (worker) {
-    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🎉 ${title}\n${subtitle}`));
+    c.executionCtx.waitUntil(
+      notifyWorker(c.env, { id: workerId, telegramId: worker.telegram_id }, 'employer_replies', `🎉 ${title}\n${subtitle}`),
+    );
   }
 
   return { chatId: chat!.id };
@@ -806,7 +812,9 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/cancel', async (c) =>
     .bind(app.worker_id, 'cancelled_by_employer', title, subtitle)
     .run();
   if (worker) {
-    c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `❌ ${title}\n${subtitle}`));
+    c.executionCtx.waitUntil(
+      notifyWorker(c.env, { id: app.worker_id, telegramId: worker.telegram_id }, 'employer_replies', `❌ ${title}\n${subtitle}`),
+    );
   }
 
   return c.json({ ok: true });
@@ -870,7 +878,9 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/close', async (c) => 
       .run();
 
     if (worker) {
-      c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `✅ ${title}\n${subtitle}`));
+      c.executionCtx.waitUntil(
+        notifyWorker(c.env, { id: app.worker_id, telegramId: worker.telegram_id }, 'employer_replies', `✅ ${title}\n${subtitle}`),
+      );
     }
 
     // The chat was only ever meant to last for the duration of this hire —

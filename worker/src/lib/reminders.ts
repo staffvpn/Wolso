@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { sendTelegramMessage } from './telegramBot';
+import { notifyWorker } from './notifyPrefs';
 
 /** The two automatic bot reminders, run from the cron trigger (see
  *  wrangler.toml and the `scheduled` export in index.ts).
@@ -169,6 +170,81 @@ async function remindPendingCandidates(env: Env): Promise<number> {
   return results.length;
 }
 
+/** «Напоминание перед сменой» in Настройки used to be a switch with
+ *  nothing behind it — no code anywhere sent such a message. This is it.
+ *
+ *  Shifts are stored as a local date plus an hour, with no timezone, and
+ *  the rest of the app treats that as Moscow time (see lib/time.ts), so
+ *  the window is computed the same way rather than in the Worker's UTC.
+ *  Anything starting within the next couple of hours that hasn't been
+ *  reminded about yet gets one message — the cron runs hourly, so "an
+ *  hour before" is really "some time in the hour or two before", and
+ *  promising to the minute would be a lie. */
+async function remindUpcomingShifts(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT a.id, a.worker_id, w.telegram_id, s.position_label, s.start_hour, s.start_min, co.name as company_name, co.address
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE a.status = 'accepted'
+       AND a.work_stage = 'upcoming'
+       AND a.shift_reminded_at IS NULL
+       AND s.date = date('now', '+3 hours')
+       AND (s.start_hour * 60 + s.start_min) BETWEEN
+             (CAST(strftime('%H', datetime('now', '+3 hours')) AS INTEGER) * 60
+              + CAST(strftime('%M', datetime('now', '+3 hours')) AS INTEGER))
+         AND (CAST(strftime('%H', datetime('now', '+3 hours')) AS INTEGER) * 60
+              + CAST(strftime('%M', datetime('now', '+3 hours')) AS INTEGER) + 120)
+     LIMIT ?`,
+  )
+    .bind(BATCH)
+    .all<{
+      id: number;
+      worker_id: number;
+      telegram_id: number;
+      position_label: string;
+      start_hour: number;
+      start_min: number;
+      company_name: string;
+      address: string | null;
+    }>();
+
+  const now = new Date().toISOString();
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  for (const r of results) {
+    await notifyWorker(
+      env,
+      { id: r.worker_id, telegramId: r.telegram_id },
+      'shift_reminder',
+      `⏰ Скоро смена: «${r.position_label}»\n${r.company_name} — сегодня в ${pad(r.start_hour)}:${pad(r.start_min)}` +
+        (r.address ? `\nАдрес: ${r.address}` : ''),
+    );
+    // Stamped whether or not the message went out — including when the
+    // worker has these switched off — so the hourly run doesn't reconsider
+    // the same shift every hour until it starts.
+    await env.DB.prepare('UPDATE applications SET shift_reminded_at = ? WHERE id = ?').bind(now, r.id).run();
+  }
+
+  return results.length;
+}
+
+/** Whether migration 0030 has been applied — the pre-shift reminder needs
+ *  applications.shift_reminded_at, which the other two jobs don't. */
+let shiftReminderColumnConfirmed = false;
+
+async function shiftReminderColumnExists(env: Env): Promise<boolean> {
+  if (shiftReminderColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(applications)').all<{ name: string }>();
+    shiftReminderColumnConfirmed = results.some((r) => r.name === 'shift_reminded_at');
+    return shiftReminderColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
+
 /** Entry point for the cron trigger. Never throws: a scheduled handler
  *  that fails does so invisibly, so each job is isolated and logged. */
 export async function runReminders(env: Env): Promise<void> {
@@ -189,5 +265,15 @@ export async function runReminders(env: Env): Promise<void> {
     console.log('pending-candidate reminders sent', pending);
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
+  }
+
+  try {
+    if (await shiftReminderColumnExists(env)) {
+      console.log('shift reminders sent', await remindUpcomingShifts(env));
+    } else {
+      console.error('shift reminders skipped — migration 0030_notification_settings is not applied');
+    }
+  } catch (err) {
+    console.error('shift reminders failed', err);
   }
 }

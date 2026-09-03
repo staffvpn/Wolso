@@ -3,6 +3,7 @@ import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { asLookingFor, lookingForColumnExists, nameHasDigits } from '../lib/workerPrefs';
+import { notifyPrefColumnsExist } from '../lib/notifyPrefs';
 
 export const profileRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 profileRoutes.use('*', attachSession);
@@ -66,7 +67,14 @@ async function loadProfile(env: Env, workerId: number) {
   // Read off the row rather than named in the SELECT, so this keeps working
   // on a database where migrations 0027/0029 haven't been applied yet — the
   // columns are simply absent and the defaults apply.
-  const extra = worker as WorkerRow & { hidden?: number; hidden_reason?: string | null; looking_for?: string };
+  const extra = worker as WorkerRow & {
+    hidden?: number;
+    hidden_reason?: string | null;
+    looking_for?: string;
+    notify_new_shifts?: number;
+    notify_employer_replies?: number;
+    notify_shift_reminder?: number;
+  };
 
   return {
     worker: {
@@ -85,6 +93,14 @@ async function loadProfile(env: Env, workerId: number) {
       // car, a cat or a landscape, which is what employers then have to
       // pick from. The app uses this to ask for a real one.
       avatarIsFromTelegram: !worker.avatar_data && !!worker.photo_url,
+      // These used to live only in the phone's localStorage and were read
+      // by nothing, so switching one off changed nothing at all. They're
+      // the account's settings now — see lib/notifyPrefs.ts. `?? 1` covers
+      // a database where migration 0030 is still pending: the switches
+      // read as on, which is how the bot behaves until it's applied.
+      notifyNewShifts: (extra.notify_new_shifts ?? 1) === 1,
+      notifyEmployerReplies: (extra.notify_employer_replies ?? 1) === 1,
+      notifyShiftReminder: (extra.notify_shift_reminder ?? 1) === 1,
     },
     positions,
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/workers/${workerId}/photos/${p.id}` })),
@@ -156,6 +172,9 @@ profileRoutes.patch('/', async (c) => {
     birthdate?: string;
     skills?: string;
     lookingFor?: string;
+    notifyNewShifts?: boolean;
+    notifyEmployerReplies?: boolean;
+    notifyShiftReminder?: boolean;
   }>();
 
   // App is 18+ — reject a birthdate that implies under-18 rather than just
@@ -187,6 +206,21 @@ profileRoutes.patch('/', async (c) => {
   if (lookingFor && (await lookingForColumnExists(c.env))) {
     fields.push('looking_for = ?');
     binds.push(lookingFor);
+  }
+  // Same "ignore until the migration lands" treatment as lookingFor above:
+  // failing the whole save would also throw away the name and bio typed
+  // alongside it.
+  if (await notifyPrefColumnsExist(c.env)) {
+    for (const [key, column] of [
+      ['notifyNewShifts', 'notify_new_shifts'],
+      ['notifyEmployerReplies', 'notify_employer_replies'],
+      ['notifyShiftReminder', 'notify_shift_reminder'],
+    ] as const) {
+      if (typeof body[key] === 'boolean') {
+        fields.push(`${column} = ?`);
+        binds.push(body[key] ? 1 : 0);
+      }
+    }
   }
   if (fields.length) {
     binds.push(session.workerId);

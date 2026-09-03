@@ -19,6 +19,9 @@ interface WorkerApiRow {
   hiddenReason?: string | null;
   lookingFor?: string;
   avatarIsFromTelegram?: boolean;
+  notifyNewShifts?: boolean;
+  notifyEmployerReplies?: boolean;
+  notifyShiftReminder?: boolean;
 }
 
 interface MeResponse {
@@ -41,6 +44,11 @@ function fromApi(r: MeResponse): WorkerProfile {
     hiddenReason: r.worker.hiddenReason ?? undefined,
     lookingFor: (r.worker.lookingFor as LookingFor) ?? 'any',
     avatarIsFromTelegram: !!r.worker.avatarIsFromTelegram,
+    // Default to on for an API that predates migration 0030 — which is
+    // also how the bot behaves until it's applied.
+    notifyNewShifts: r.worker.notifyNewShifts ?? true,
+    notifyEmployerReplies: r.worker.notifyEmployerReplies ?? true,
+    notifyShiftReminder: r.worker.notifyShiftReminder ?? true,
     referralCode: r.worker.referral_code ?? '',
     bio: r.worker.bio ?? '',
     skills: r.worker.skills ?? '',
@@ -65,6 +73,9 @@ export interface ProfileUpdate {
   birthdate?: string;
   skills?: string;
   lookingFor?: LookingFor;
+  notifyNewShifts?: boolean;
+  notifyEmployerReplies?: boolean;
+  notifyShiftReminder?: boolean;
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<WorkerProfile> {
