@@ -85,13 +85,11 @@ export function WorkerProfileScreen() {
         </button>
       )}
 
-      <div className="mt-4">
-        <SectionLabel>Ищу</SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          {(profile.lookingFor === 'any' || profile.lookingFor === 'shift') && <Chip selected>Смены</Chip>}
-          {(profile.lookingFor === 'any' || profile.lookingFor === 'permanent') && <Chip selected>Постоянная работа</Chip>}
-        </div>
-      </div>
+      {/* Одной строкой, а не секцией с чипами: это справочный факт об
+          анкете, а не то, ради чего человек открыл экран. */}
+      <p className="text-[13px] text-text-muted mt-3">
+        Ищу: {profile.lookingFor === 'shift' ? 'смены' : profile.lookingFor === 'permanent' ? 'постоянную работу' : 'смены и постоянную работу'}
+      </p>
 
       {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{profile.bio}</p>}
 

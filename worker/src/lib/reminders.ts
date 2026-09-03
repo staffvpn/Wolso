@@ -61,24 +61,37 @@ function supportLine(env: Env): string {
   return handle ? `Если что-то не получается или есть вопросы — напишите в поддержку @${handle}.` : '';
 }
 
-/** Registered, then stopped. Both roles land here: a worker with no real
- *  anketa is invisible to employers, and an employer with no filled-in
- *  profile can't publish anything — in both cases the account exists and
- *  does nothing, which is exactly what one message can fix.
+/** Один текст на обе роли. Раньше их было два — «не закончили анкету» и
+ *  «не закончили профиль заведения», — и человек, у которого есть строки в
+ *  обеих таблицах (регистрировался обеими ролями, или роль переключали из
+ *  дашборда), получал оба письма подряд, включая то, которое к его
+ *  сегодняшней роли отношения не имеет. Отсюда две правки: текст без
+ *  упоминания роли и фильтр по active_role ниже.
  *
- *  "Incomplete" mirrors the gates the app itself enforces (see isComplete
- *  in routes/profile.ts and companyIsComplete in routes/employer.ts). It's
- *  expressed in SQL rather than by loading every row: this runs over the
- *  whole table on a schedule, not for one person on request. */
+ *  "Не заполнено" повторяет проверки, которые приложение и так применяет
+ *  (isComplete в routes/profile.ts, companyIsComplete в routes/employer.ts)
+ *  — выражено в SQL, а не перебором строк: это ходит по всей таблице по
+ *  расписанию, а не по одному человеку по запросу. */
+const SIGNUP_REMINDER_TEXT =
+  'Вы заходили в Wolso, но не заполнили профиль до конца.\n\n' +
+  'Пока он пустой, ничего не начнётся: анкету не увидят работодатели, а смену не получится опубликовать. ' +
+  'Это пара минут — заполните профиль, и можно начинать.';
+
 async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; companies: number }> {
   const cutoff = `-${SIGNUP_REMINDER_AFTER_HOURS} hours`;
 
+  // Роль берём из telegram_accounts — там она и живёт. Когда её нет
+  // (аккаунты, заведённые до появления таблицы), приоритет у соискателя,
+  // как и при входе (см. routes/auth.ts), а вторая роль пропускается —
+  // иначе одному человеку уходят два письма.
   const { results: workers } = await env.DB.prepare(
     `SELECT w.id, w.telegram_id
      FROM workers w
+     LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
      WHERE w.signup_reminded_at IS NULL
        AND w.status != 'suspended'
        AND w.created_at <= datetime('now', ?)
+       AND (t.active_role = 'worker' OR t.active_role IS NULL)
        AND (
          w.name = '' OR w.city = '' OR w.bio = '' OR w.skills = '' OR w.birthdate IS NULL
          OR NOT EXISTS (SELECT 1 FROM worker_positions wp WHERE wp.worker_id = w.id AND wp.months > 0)
@@ -91,9 +104,14 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
   const { results: companies } = await env.DB.prepare(
     `SELECT co.id, co.owner_telegram_id
      FROM companies co
+     LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
      WHERE co.signup_reminded_at IS NULL
        AND co.status != 'suspended'
        AND co.created_at <= datetime('now', ?)
+       AND (
+         t.active_role = 'employer'
+         OR (t.active_role IS NULL AND NOT EXISTS (SELECT 1 FROM workers w2 WHERE w2.telegram_id = co.owner_telegram_id))
+       )
        AND (co.name = '' OR co.description = '' OR co.founded_year IS NULL OR co.avatar_data IS NULL OR co.inn IS NULL)
      ORDER BY co.created_at ASC LIMIT ?`,
   )
@@ -101,17 +119,11 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
     .all<{ id: number; owner_telegram_id: number }>();
 
   const support = supportLine(env);
+  const text = support ? `${SIGNUP_REMINDER_TEXT}\n\n${support}` : SIGNUP_REMINDER_TEXT;
   const now = new Date().toISOString();
 
   for (const w of workers) {
-    await sendTelegramMessage(
-      env,
-      w.telegram_id,
-      'Вы заходили в Wolso, но не закончили анкету.\n\n' +
-        'Работодатели выбирают людей именно по ней — пока анкета пустая, вас просто не видно. ' +
-        'Это пара минут: фото, город, пара слов о себе и где вы уже работали.\n\n' +
-        support,
-    );
+    await sendTelegramMessage(env, w.telegram_id, text);
     // Stamped whatever the send returned. A person who blocked the bot
     // won't get this message no matter how many times we retry, and
     // retrying is what would make this loop never terminate.
@@ -119,14 +131,7 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
   }
 
   for (const co of companies) {
-    await sendTelegramMessage(
-      env,
-      co.owner_telegram_id,
-      'Вы заходили в Wolso, но не закончили профиль заведения.\n\n' +
-        'Без него нельзя опубликовать смену и посмотреть, кто откликнулся. ' +
-        'Осталось немного: название, фото, пара слов о заведении и ИНН для проверки.\n\n' +
-        support,
-    );
+    await sendTelegramMessage(env, co.owner_telegram_id, text);
     await env.DB.prepare('UPDATE companies SET signup_reminded_at = ? WHERE id = ?').bind(now, co.id).run();
   }
 

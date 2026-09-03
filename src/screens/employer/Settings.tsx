@@ -58,7 +58,6 @@ export function EmployerSettings() {
         <SectionLabel className="mt-6">Заведение</SectionLabel>
         <div className="divide-y divide-border-soft">
           <ListRow label="Город" value={company.city || '—'} onClick={() => navigate('/e/profile/edit')} />
-          <ListRow label="Профиль" onClick={() => navigate('/e/profile/edit')} />
         </div>
 
         <SectionLabel className="mt-6">Поддержка</SectionLabel>

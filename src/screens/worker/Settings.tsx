@@ -95,7 +95,6 @@ export function Settings() {
           {/* The real city off the profile — this used to show a hardcoded
               «Москва» from the same dead store the switches lived in. */}
           <ListRow label="Город" value={profile.city || '—'} onClick={() => navigate('/w/profile/edit')} />
-          <ListRow label="Анкета" onClick={() => navigate('/w/profile/edit')} />
         </div>
 
         <SectionLabel className="mt-6">Поддержка</SectionLabel>
