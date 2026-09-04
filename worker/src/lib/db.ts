@@ -1,4 +1,5 @@
 import type { Env, PermissionKey, PermissionValue } from '../types';
+import { expandDates } from './shiftDates';
 
 /** Row shapes as they come back from D1 (snake_case, SQLite types). */
 
@@ -11,6 +12,10 @@ export interface ShiftRow {
   /** Last day of a multi-day posting — NULL (or equal to `date`) means a
    *  single-day shift, unchanged from before this column existed. */
   end_date: string | null;
+  /** JSON-список конкретных дней, когда дни идут с пропусками (13-е и
+   *  27-е). Пусто или отсутствует — все дни от date до end_date подряд,
+   *  ровно как до миграции 0034. */
+  dates?: string | null;
   start_hour: number;
   start_min: number;
   end_hour: number;
@@ -51,6 +56,12 @@ export function shiftToJson(r: ShiftRow) {
     positionLabel: r.position_label,
     date: r.date,
     endDate: r.end_date && r.end_date !== r.date ? r.end_date : undefined,
+    // Полный список дней отдаём только когда их правда несколько — для
+    // обычной однодневной смены это был бы шум в каждом ответе ленты.
+    dates: (() => {
+      const all = expandDates(r.date, r.end_date, r.dates);
+      return all.length > 1 ? all : undefined;
+    })(),
     startHour: r.start_hour,
     startMin: r.start_min,
     endHour: r.end_hour,

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { resolveCompany } from '@/data/companies';
-import { relativeDayRange } from '@/lib/format';
+import { relativeShiftDays } from '@/lib/format';
 import { useShiftsStore } from '@/store/useShiftsStore';
 import { FEATURES } from '@/lib/features';
 
@@ -102,7 +102,7 @@ export function FeedMap() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
                   <p className="text-[12px] text-text-muted truncate">
-                    {relativeDayRange(shift.date, shift.endDate)} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · 7 мин пешком
+                    {relativeShiftDays(shift)} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · 7 мин пешком
                   </p>
                 </div>
                 <div className="text-right shrink-0">

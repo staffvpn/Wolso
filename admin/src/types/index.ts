@@ -171,6 +171,10 @@ export interface EmployerVacancy {
   positionLabel: string;
   date: string;
   endDate?: string;
+  /** Все дни вакансии — разовая смена может стоять на разрозненных днях
+   *  («13-е и 27-е»), которые парой date/endDate не описать. Сервер
+   *  присылает их развёрнутым списком. */
+  days: string[];
   status: string;
   responseCount: number;
 }

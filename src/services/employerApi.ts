@@ -8,6 +8,7 @@ interface VacancyApiResponse {
   positionLabel: string;
   date: string;
   endDate?: string;
+  dates?: string[];
   startHour: number;
   startMin: number;
   endHour: number;
@@ -30,6 +31,7 @@ function fromApiVacancy(v: VacancyApiResponse): Vacancy {
     positionLabel: v.positionLabel,
     date: v.date,
     endDate: v.endDate,
+    dates: v.dates,
     startHour: v.startHour,
     startMin: v.startMin,
     endHour: v.endHour,
@@ -239,6 +241,11 @@ export async function createVacancy(input: {
   positionLabel: string;
   date: string;
   endDate?: string;
+  /** Конкретные дни разовой смены, включая разрозненные. */
+  dates?: string[];
+  /** «Нужен человек на каждый день отдельно» — сервер публикует по
+   *  вакансии на день вместо одной на все дни. */
+  splitPerDay?: boolean;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -248,8 +255,11 @@ export async function createVacancy(input: {
   employmentType: Vacancy['employmentType'];
   description?: string;
   urgent: boolean;
-}): Promise<Vacancy> {
-  const { shift } = await apiFetch<{ shift: VacancyApiResponse & { responseCount?: number } }>('/employer/vacancies', {
+}): Promise<{ first: Vacancy; all: Vacancy[] }> {
+  const { shift, shifts } = await apiFetch<{
+    shift: VacancyApiResponse & { responseCount?: number };
+    shifts?: (VacancyApiResponse & { responseCount?: number })[];
+  }>('/employer/vacancies', {
     method: 'POST',
     as: 'company',
     body: {
@@ -257,6 +267,8 @@ export async function createVacancy(input: {
       positionLabel: input.positionLabel,
       date: input.date,
       endDate: input.endDate,
+      dates: input.dates,
+      splitPerDay: input.splitPerDay,
       startHour: input.startHour,
       startMin: input.startMin,
       endHour: input.endHour,
@@ -268,7 +280,11 @@ export async function createVacancy(input: {
       urgency: input.urgent ? 'urgent' : 'normal',
     },
   });
-  return fromApiVacancy({ ...shift, responseCount: shift.responseCount ?? 0 });
+  const toVacancy = (v: VacancyApiResponse & { responseCount?: number }) =>
+    fromApiVacancy({ ...v, responseCount: v.responseCount ?? 0 });
+  // При публикации по дню сервер возвращает все созданные вакансии — так
+  // список у работодателя обновляется без повторного запроса.
+  return { first: toVacancy(shift), all: (shifts ?? [shift]).map(toVacancy) };
 }
 
 /** Edits an existing posting. Only the fields passed are changed; anyone
@@ -280,6 +296,7 @@ export async function updateVacancy(
     positionLabel: string;
     date: string;
     endDate?: string | null;
+    dates?: string[];
     startHour: number;
     endHour: number;
     hourlyRate: number;

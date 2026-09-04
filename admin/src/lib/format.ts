@@ -27,12 +27,25 @@ export function formatDayMonth(date: Date) {
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
-/** A multi-day vacancy ("нужен человек на 3 дня") is one posting with a
- *  start and end date, not several separate ones — shows as a range when
- *  it spans more than a day, same single date as before otherwise. */
-export function formatDateRange(date: string, endDate?: string): string {
-  if (!endDate || endDate === date) return formatDayMonth(new Date(date));
-  return `${formatDayMonth(new Date(date))} – ${formatDayMonth(new Date(endDate))}`;
+/** Набор дней вакансии. Подряд — отрезком, с пропусками — перечислением:
+ *  «13, 27 сент» вместо «13 – 27 сент», которое в разборе спора выглядело
+ *  бы как две недели работы вместо двух выходов. */
+export function formatDays(days: string[], maxListed = 4): string {
+  if (days.length === 0) return '';
+  if (days.length === 1) return formatDayMonth(new Date(days[0]));
+
+  const consecutive = days.every((d, i) => {
+    if (i === 0) return true;
+    return new Date(`${d}T00:00:00Z`).getTime() - new Date(`${days[i - 1]}T00:00:00Z`).getTime() === 86400000;
+  });
+  if (consecutive) return `${formatDayMonth(new Date(days[0]))} – ${formatDayMonth(new Date(days[days.length - 1]))}`;
+
+  const shown = days.slice(0, maxListed);
+  const sameMonth = shown.every((d) => new Date(d).getMonth() === new Date(shown[0]).getMonth());
+  const head = sameMonth
+    ? `${shown.map((d) => new Date(d).getDate()).join(', ')} ${MONTHS[new Date(shown[0]).getMonth()].slice(0, 3)}`
+    : shown.map((d) => formatDayMonth(new Date(d))).join(', ');
+  return days.length > maxListed ? `${head} и ещё ${days.length - maxListed}` : head;
 }
 
 export function formatMonthYear(date: Date) {

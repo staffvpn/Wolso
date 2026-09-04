@@ -11,7 +11,7 @@ import { useProfileStore } from '@/store/useProfileStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatMoney, relativeDayRange } from '@/lib/format';
+import { formatMoney, relativeShiftDays } from '@/lib/format';
 
 type Tab = 'shifts' | 'companies';
 
@@ -59,7 +59,7 @@ export function Favorites() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-[15px] truncate">{shift.positionLabel} · {company.name}</p>
                         <p className="text-[13px] text-text-muted truncate">
-                          {relativeDayRange(shift.date, shift.endDate)} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · {formatMoney(shift.hourlyRate)}/ч
+                          {relativeShiftDays(shift)} {String(shift.startHour).padStart(2, '0')}:{String(shift.startMin).padStart(2, '0')} · {formatMoney(shift.hourlyRate)}/ч
                         </p>
                       </div>
                     </div>

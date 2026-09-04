@@ -21,7 +21,7 @@ import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatDistance, formatMoney, localDateStr, relativeDayRange, shiftDaysCount, pluralizeShifts, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, localDateStr, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { FEATURES } from '@/lib/features';
 import { hapticSelect } from '@/lib/telegram';
@@ -182,8 +182,8 @@ function ShiftDetailOverlay({
   onApply: () => void;
 }) {
   const company = resolveCompany(shift);
-  const day = relativeDayRange(shift.date, shift.endDate);
-  const days = shiftDaysCount(shift.date, shift.endDate);
+  const day = relativeShiftDays(shift);
+  const days = shiftDays(shift).length;
   const durationH = shift.endHour - shift.startHour;
   const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleShift);

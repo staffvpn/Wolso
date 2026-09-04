@@ -66,9 +66,14 @@ export interface Shift {
   position: Position;
   positionLabel: string;
   date: string; // ISO date, day only — first (or only) day
-  /** Last day of a multi-day posting — one shift, several consecutive
-   *  days, not several separate shifts. Absent means single-day. */
+  /** Last day of a multi-day posting — one shift, several days, not
+   *  several separate shifts. Absent means single-day. */
   endDate?: string;
+  /** Все дни смены целиком, когда их больше одного — в том числе с
+   *  пропусками («13-е и 27-е»), которые парой date/endDate не описать.
+   *  Отсутствует у однодневной смены и у API до миграции 0034, поэтому
+   *  везде читается через `shiftDays()`, а не напрямую. */
+  dates?: string[];
   startHour: number;
   startMin: number;
   endHour: number;
@@ -262,6 +267,9 @@ export interface Vacancy {
   positionLabel: string;
   date: string;
   endDate?: string;
+  /** См. Shift.dates — те же дни, та же вакансия, просто со стороны
+   *  работодателя. */
+  dates?: string[];
   startHour: number;
   startMin: number;
   endHour: number;

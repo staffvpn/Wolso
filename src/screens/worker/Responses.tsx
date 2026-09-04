@@ -13,7 +13,7 @@ import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
 import { resolveCompany } from '@/data/companies';
-import { formatDateRange, formatMoney, relativeDayRange, timeRange } from '@/lib/format';
+import { formatShiftDays, formatMoney, relativeShiftDays, timeRange } from '@/lib/format';
 import { hapticNotify } from '@/lib/telegram';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { cn } from '@/lib/cn';
@@ -179,7 +179,7 @@ function ResponseCard({
             <Badge tone={status.tone} className="shrink-0">{status.label}</Badge>
           </div>
           <p className="text-[13px] text-text-muted truncate mt-0.5">
-            {relativeDayRange(shift.date, shift.endDate)} · {formatMoney(shift.totalPay)}
+            {relativeShiftDays(shift)} · {formatMoney(shift.totalPay)}
           </p>
         </div>
         <ChevronRight size={16} className={cn('text-text-faint shrink-0 transition-transform', open && 'rotate-90')} />
@@ -193,7 +193,7 @@ function ResponseCard({
             <DetailRow label="Должность" value={shift.positionLabel} />
             <DetailRow label="Тип работы" value={employmentTypeLabel(shift.employmentType)} />
             {shift.employmentType !== 'permanent' && (
-              <DetailRow label="Дата" value={formatDateRange(shift.date, shift.endDate)} />
+              <DetailRow label="Дата" value={formatShiftDays(shift)} />
             )}
             <DetailRow label="Время" value={`${times} · ${hours} ч`} />
             <DetailRow label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />

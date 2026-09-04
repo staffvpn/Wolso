@@ -6,7 +6,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatDateRange, formatMoney, localDateStr, timeAgoSince } from '@/lib/format';
+import { formatShiftDays, formatMoney, localDateStr, timeAgoSince } from '@/lib/format';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { DeleteVacancySheet } from '@/components/DeleteVacancySheet';
 import type { Vacancy } from '@/types';
@@ -113,7 +113,7 @@ export function Vacancies() {
                     </button>
                   </span>
                 </div>
-                <p className="font-bold text-[17px]">{vac.positionLabel} · {formatDateRange(vac.date, vac.endDate)}</p>
+                <p className="font-bold text-[17px]">{vac.positionLabel} · {formatShiftDays(vac)}</p>
                 <p className="text-[13px] text-text-muted mt-0.5">
                   {String(vac.startHour).padStart(2, '0')}:{String(vac.startMin).padStart(2, '0')}–{String(vac.endHour).padStart(2, '0')}:{String(vac.endMin).padStart(2, '0')} · {formatMoney(vac.hourlyRate)}/ч
                 </p>

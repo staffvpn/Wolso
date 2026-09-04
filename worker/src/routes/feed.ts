@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
 import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { datesColumnExists } from '../lib/shiftDates';
 
 export const feedRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 feedRoutes.use('*', attachSession);
@@ -49,18 +50,34 @@ feedRoutes.get('/', async (c) => {
   // permanent job is open today, tomorrow and next week alike, so it
   // passes whatever the date filter is set to.
   const ongoing = "s.employment_type = 'permanent'";
+  // Последний день вакансии, а не первый. Смена может стоять на нескольких
+  // днях — подряд или вразнобой (13-е и 27-е), — и пока хоть один из них
+  // впереди, вакансия открыта и её надо показывать. По первому дню она
+  // пропадала из ленты 14-го, хотя работодатель всё ещё ищет человека на
+  // 27-е.
+  const lastDay = "COALESCE(NULLIF(s.end_date, ''), s.date)";
+  // Столбец dates называем, только когда он есть: миграции накатываются
+  // руками, а лента без ленты — это весь экран соискателя.
+  const hasDates = await datesColumnExists(c.env);
+
   if (when === 'today' || when === 'tomorrow') {
     const target = new Date();
     if (when === 'tomorrow') target.setDate(target.getDate() + 1);
-    clauses.push(`(${ongoing} OR s.date = ?)`);
-    binds.push(target.toISOString().slice(0, 10));
+    const day = target.toISOString().slice(0, 10);
+    // День попадает в вакансию, если он внутри её границ и (когда дни
+    // перечислены явно) есть в самом списке. instr по ISO-дате не может
+    // случайно совпасть с другой датой — формат фиксированной длины.
+    const inSet = hasDates ? ` AND (s.dates = '' OR instr(s.dates, ?) > 0)` : '';
+    clauses.push(`(${ongoing} OR (? BETWEEN s.date AND ${lastDay}${inSet}))`);
+    binds.push(day);
+    if (hasDates) binds.push(day);
   } else {
     // 'upcoming' (default — no date chip explicitly picked) and 'custom'
     // (not actually wired to specific dates yet) both show every shift
     // from today on, so a shift posted for tomorrow or later doesn't
     // silently disappear from the feed just because nobody narrowed the
-    // date filter. Still excludes shifts dated in the past.
-    clauses.push(`(${ongoing} OR s.date >= ?)`);
+    // date filter. Still excludes shifts whose every day is in the past.
+    clauses.push(`(${ongoing} OR ${lastDay} >= ?)`);
     binds.push(new Date().toISOString().slice(0, 10));
   }
 

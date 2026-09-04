@@ -66,11 +66,53 @@ export function shiftDaysCount(date: string, endDate?: string): number {
   return Math.max(1, Math.round(ms / 86400000) + 1);
 }
 
+/** Реальные дни смены. Вакансия может стоять на разрозненных днях («13-е
+ *  и 27-е»), которые парой date/endDate не описать, — тогда сервер
+ *  присылает их списком. Для однодневной смены и для старого API
+ *  (до миграции 0034) это по-прежнему отрезок или один день, поэтому
+ *  читать `dates` напрямую нигде не нужно: всё идёт сюда. */
+export function shiftDays(shift: { date: string; endDate?: string; dates?: string[] }): string[] {
+  if (shift.dates && shift.dates.length > 0) return shift.dates;
+  const count = shiftDaysCount(shift.date, shift.endDate);
+  if (count === 1) return [shift.date];
+  const start = new Date(`${shift.date}T00:00:00Z`).getTime();
+  return Array.from({ length: count }, (_, i) => new Date(start + i * 86400000).toISOString().slice(0, 10));
+}
+
+/** Идут ли дни подряд без пропусков — от этого зависит, показывать их
+ *  отрезком («10–12 авг») или перечислением («13, 27 сент»). */
+export function daysAreConsecutive(days: string[]): boolean {
+  for (let i = 1; i < days.length; i++) {
+    const prev = new Date(`${days[i - 1]}T00:00:00Z`).getTime();
+    const cur = new Date(`${days[i]}T00:00:00Z`).getTime();
+    if (cur - prev !== 86400000) return false;
+  }
+  return true;
+}
+
 /** A multi-day vacancy shows as a range ("10–12 авг"); a single-day one is
  *  just the one date, same as `formatDayMonth` always did. */
 export function formatDateRange(date: string, endDate?: string): string {
   if (!endDate || endDate === date) return formatDayMonth(new Date(date));
   return `${formatDayMonth(new Date(date))} – ${formatDayMonth(new Date(endDate))}`;
+}
+
+/** Как назвать набор дней. Подряд — отрезком, с пропусками —
+ *  перечислением: «13, 27 сент» вместо «13 – 27 сент», которое обещало бы
+ *  две недели работы вместо двух выходов. Длинный список подрезаем — в
+ *  строку карточки он всё равно не влезет. */
+export function formatDays(days: string[], maxListed = 4): string {
+  if (days.length === 0) return '';
+  if (days.length === 1) return formatDayMonth(new Date(days[0]));
+  if (daysAreConsecutive(days)) return `${formatDayMonth(new Date(days[0]))} – ${formatDayMonth(new Date(days[days.length - 1]))}`;
+
+  const shown = days.slice(0, maxListed);
+  const sameMonth = shown.every((d) => new Date(d).getMonth() === new Date(shown[0]).getMonth());
+  // В пределах одного месяца название месяца повторять незачем: «13, 27 сент».
+  const head = sameMonth
+    ? `${shown.map((d) => new Date(d).getDate()).join(', ')} ${MONTHS[new Date(shown[0]).getMonth()].slice(0, 3)}`
+    : shown.map((d) => formatDayMonth(new Date(d))).join(', ');
+  return days.length > maxListed ? `${head} и ещё ${days.length - maxListed}` : head;
 }
 
 /** Same as `relativeDay`, but a multi-day shift keeps "Сегодня"/"Завтра"
@@ -80,6 +122,22 @@ export function relativeDayRange(date: string, endDate: string | undefined, now 
   const startLabel = relativeDay(new Date(date), now);
   if (!endDate || endDate === date) return startLabel;
   return `${startLabel} – ${formatDayMonth(new Date(endDate))}`;
+}
+
+/** Дни смены строкой — единственное, что стоит показывать в карточке.
+ *  Берёт набор целиком, поэтому вакансия с пропусками не притворяется
+ *  двухнедельной («13, 27 сент», а не «13 – 27 сент»). */
+export function formatShiftDays(shift: { date: string; endDate?: string; dates?: string[] }): string {
+  return formatDays(shiftDays(shift));
+}
+
+/** То же самое, но с «Сегодня»/«Завтра» для однодневной смены — как
+ *  `relativeDayRange` до появления разрозненных дней. */
+export function relativeShiftDays(shift: { date: string; endDate?: string; dates?: string[] }, now = new Date()): string {
+  const days = shiftDays(shift);
+  if (days.length === 1) return relativeDay(new Date(days[0]), now);
+  if (daysAreConsecutive(days)) return relativeDayRange(days[0], days[days.length - 1], now);
+  return formatDays(days);
 }
 
 export function timeRange(startHour: number, startMin: number, endHour: number, endMin: number) {

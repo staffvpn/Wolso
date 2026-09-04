@@ -30,8 +30,29 @@ export const MESSAGE_LIMIT: RateLimit = { max: 60, window: '-1 hour' };
 /** Публикация смен: у заведения их не бывает по двадцать в час. */
 export const VACANCY_LIMIT: RateLimit = { max: 20, window: '-1 hour' };
 
-/** Возвращает true, если лимит уже выбран. Ошибку не бросает: свалившийся
- *  счётчик не должен ронять действие, ради которого пришёл человек. */
+/** Сколько таких действий ещё осталось в окне. Ошибку не бросает:
+ *  свалившийся счётчик не должен ронять действие, ради которого пришёл
+ *  человек, — считаем, что лимит цел. */
+export async function remainingAllowance(
+  env: Env,
+  table: 'applications' | 'messages' | 'shifts',
+  column: string,
+  id: number | string,
+  limit: RateLimit,
+): Promise<number> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) as n FROM ${table} WHERE ${column} = ? AND created_at >= datetime('now', ?)`,
+    )
+      .bind(id, limit.window)
+      .first<{ n: number }>();
+    return Math.max(0, limit.max - (row?.n ?? 0));
+  } catch {
+    return limit.max;
+  }
+}
+
+/** Возвращает true, если лимит уже выбран. */
 export async function overLimit(
   env: Env,
   table: 'applications' | 'messages' | 'shifts',
@@ -39,14 +60,5 @@ export async function overLimit(
   id: number | string,
   limit: RateLimit,
 ): Promise<boolean> {
-  try {
-    const row = await env.DB.prepare(
-      `SELECT COUNT(*) as n FROM ${table} WHERE ${column} = ? AND created_at >= datetime('now', ?)`,
-    )
-      .bind(id, limit.window)
-      .first<{ n: number }>();
-    return (row?.n ?? 0) >= limit.max;
-  } catch {
-    return false;
-  }
+  return (await remainingAllowance(env, table, column, id, limit)) <= 0;
 }

@@ -7,6 +7,7 @@ import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
 import { hiddenColumnExists } from '../lib/hiddenProfiles';
 import { userNotesTableExists } from '../lib/complaints';
 import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
+import { datesColumnExists, expandDates } from '../lib/shiftDates';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -369,8 +370,12 @@ adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
   const { results: photoRows } = await c.env.DB.prepare('SELECT id FROM company_photos WHERE company_id = ? ORDER BY position ASC')
     .bind(id)
     .all<{ id: number }>();
+  // Столбец dates называем только когда он есть: миграции накатываются
+  // руками, и запрос к отсутствующей колонке уронил бы весь экран
+  // работодателя, а не одну строку с датами.
+  const datesField = (await datesColumnExists(c.env)) ? ', s.dates' : '';
   const { results: vacancies } = await c.env.DB.prepare(
-    `SELECT s.id, s.position_label, s.date, s.end_date, s.status,
+    `SELECT s.id, s.position_label, s.date, s.end_date${datesField}, s.status,
             (SELECT COUNT(*) FROM applications a WHERE a.shift_id = s.id) as response_count
      FROM shifts s WHERE s.company_id = ? ORDER BY s.created_at DESC LIMIT 50`,
   )
@@ -408,7 +413,12 @@ adminUserRoutes.get('/employers/:id', requireStaffMiddleware, async (c) => {
       avatarUrl: company.avatar_data ? `/media/companies/${id}/avatar` : null,
     },
     photos: photoRows.map((p) => ({ id: p.id, url: `/media/companies/${id}/photos/${p.id}` })),
-    vacancies,
+    // Дни разворачиваем здесь, а не в дашборде: на клиенте формат столбца
+    // (пусто = отрезок, JSON = набор) знать незачем.
+    vacancies: (vacancies as { date: string; end_date: string | null; dates?: string | null }[]).map((v) => ({
+      ...v,
+      days: expandDates(v.date, v.end_date, v.dates),
+    })),
     reviewsReceived: reviewsReceived.map(reviewToJson),
     reviewsGiven: reviewsGiven.map(reviewToJson),
   });

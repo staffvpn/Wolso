@@ -4,7 +4,7 @@ import { resolveCompany } from '@/data/companies';
 import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
-import { formatDistance, formatMoney, relativeDayRange, shiftDaysCount, pluralizeShifts, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { ChevronRight, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
@@ -13,8 +13,8 @@ import { employmentTypeLabel } from '@/data/employmentTypes';
 
 export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?: () => void }) {
   const company = resolveCompany(shift);
-  const day = relativeDayRange(shift.date, shift.endDate);
-  const days = shiftDaysCount(shift.date, shift.endDate);
+  const day = relativeShiftDays(shift);
+  const days = shiftDays(shift).length;
   const durationH = shift.endHour - shift.startHour;
   const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleShift);

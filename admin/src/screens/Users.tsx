@@ -19,7 +19,7 @@ import { deleteReview } from '@/services/usersApi';
 import { useRolesStore } from '@/store/useRolesStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
-import { timeAgo, telegramLink, telegramLabel, formatDayMonth, formatDateRange } from '@/lib/format';
+import { timeAgo, telegramLink, telegramLabel, formatDayMonth, formatDays } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { ApiError } from '@/lib/apiClient';
 import { BOT_STATUS_LABEL, BOT_STATUS_SHORT, BOT_STATUS_TONE, type AdminReview, type PlatformUser, type TeamMember, type UserPhoto } from '@/types';
@@ -1117,7 +1117,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
                         </button>
                       </span>
                     </div>
-                    <p className="text-text-faint mt-0.5">{formatDateRange(v.date, v.endDate)} · откликов: {v.responseCount}</p>
+                    <p className="text-text-faint mt-0.5">{formatDays(v.days)} · откликов: {v.responseCount}</p>
                   </div>
                 );
               })}
@@ -1160,7 +1160,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
                         </button>
                       </span>
                     </div>
-                    <p className="text-text-faint mt-0.5">{formatDateRange(v.date, v.endDate)} · откликов: {v.responseCount}</p>
+                    <p className="text-text-faint mt-0.5">{formatDays(v.days)} · откликов: {v.responseCount}</p>
                   </div>
                 );
               })}

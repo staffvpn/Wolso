@@ -13,7 +13,7 @@ import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { usePersonalShiftsStore } from '@/store/usePersonalShiftsStore';
 import { resolveCompany } from '@/data/companies';
 import { foundViaLabel } from '@/data/foundVia';
-import { formatDateRange, formatDayMonth, formatMoney, isSameDay, localDateStr, weekdayShort } from '@/lib/format';
+import { formatShiftDays, formatDayMonth, formatMoney, isSameDay, localDateStr, shiftDays, weekdayShort } from '@/lib/format';
 import { hapticNotify, hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
 import type { Application, PersonalShift, Shift } from '@/types';
@@ -28,15 +28,13 @@ function stripTime(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** True if `day` falls anywhere within the shift's date (or date range,
- *  for a multi-day posting) — a shift spanning several days should show
- *  as "today" on every one of those days, and mark all of them on the
- *  calendar, not just its first day. */
+/** True if `day` is one of the shift's days — a multi-day posting should
+ *  show as "today" on every one of them and mark all of them on the
+ *  calendar, not just its first day. Идёт по реальному набору дней, а не
+ *  по отрезку: у вакансии на 13-е и 27-е между этими днями работы нет, и
+ *  закрашивать две недели подряд было бы враньём. */
 function shiftCoversDay(shift: Shift, day: Date) {
-  const d = stripTime(day);
-  const start = stripTime(new Date(shift.date));
-  const end = shift.endDate ? stripTime(new Date(shift.endDate)) : start;
-  return d >= start && d <= end;
+  return shiftDays(shift).includes(localDateStr(day));
 }
 
 function timeUntil(shift: Shift): string | null {
@@ -112,8 +110,8 @@ function dayClasses(dayEntries: Entry[]): string {
       ? 'bg-[linear-gradient(135deg,var(--color-accent)_0_50%,var(--color-info)_50%_100%)] text-accent-fg'
       : 'bg-[linear-gradient(135deg,var(--color-accent-soft)_0_50%,var(--color-info-soft)_50%_100%)] text-text';
   }
-  if (hasPersonal) return worked ? 'bg-info text-info-fg' : 'bg-info-soft text-info ring-1 ring-info/40';
-  return worked ? 'bg-accent text-accent-fg' : 'bg-accent-soft text-accent ring-1 ring-accent/40';
+  if (hasPersonal) return worked ? 'bg-info text-info-fg' : 'bg-info-soft text-info ring-1 ring-info/60';
+  return worked ? 'bg-accent text-accent-fg' : 'bg-accent-soft text-accent ring-1 ring-accent/60';
 }
 
 export function Shifts() {
@@ -314,7 +312,7 @@ export function Shifts() {
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
                       <p className="text-[12px] text-text-muted truncate">
-                        {shift.endDate ? `${formatDateRange(shift.date, shift.endDate)} · ` : ''}
+                        {shiftDays(shift).length > 1 ? `${formatShiftDays(shift)} · ` : ''}
                         {timeRangeOf(shift)} · {formatMoney(shift.totalPay)}
                       </p>
                     </div>
@@ -425,7 +423,7 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
           <p className="text-[12px] text-text-muted truncate">
-            {formatDateRange(shift.date, shift.endDate)} · {timeRangeOf(shift)} · {formatMoney(shift.totalPay)}
+            {formatShiftDays(shift)} · {timeRangeOf(shift)} · {formatMoney(shift.totalPay)}
           </p>
         </div>
         <ChevronRight size={16} className={cn('text-text-faint shrink-0 transition-transform', open && 'rotate-90')} />
@@ -437,7 +435,7 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
             <DetailRow label="Заведение" value={company.name} />
             {company.address && <DetailRow label="Адрес" value={company.address} />}
             <DetailRow label="Должность" value={shift.positionLabel} />
-            <DetailRow label="Дата" value={formatDateRange(shift.date, shift.endDate)} />
+            <DetailRow label="Дата" value={formatShiftDays(shift)} />
             <DetailRow label="Время" value={`${timeRangeOf(shift)} · ${hours} ч`} />
             <DetailRow label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />
             <DetailRow label="Итого" value={formatMoney(shift.totalPay)} />
@@ -581,9 +579,9 @@ function CalendarOverlay({
             он значит. Четыре состояния — ровно те, что рисует dayClasses. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5">
           <LegendDot className="bg-accent" label="Wolso — отработана" />
-          <LegendDot className="bg-accent-soft ring-1 ring-accent/40" label="Wolso — впереди" />
+          <LegendDot className="bg-accent-soft ring-1 ring-accent/60" label="Wolso — впереди" />
           <LegendDot className="bg-info" label="Своя — отработана" />
-          <LegendDot className="bg-info-soft ring-1 ring-info/40" label="Своя — впереди" />
+          <LegendDot className="bg-info-soft ring-1 ring-info/60" label="Своя — впереди" />
         </div>
       </div>
 

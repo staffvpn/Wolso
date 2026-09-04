@@ -24,6 +24,7 @@ interface ApiApplication {
     positionLabel: string;
     date: string;
     endDate?: string;
+    dates?: string[];
     startHour: number;
     startMin: number;
     endHour: number;
@@ -65,6 +66,7 @@ function fromApi(a: ApiApplication): Application {
           positionLabel: a.shift.positionLabel,
           date: a.shift.date,
           endDate: a.shift.endDate,
+          dates: a.shift.dates,
           startHour: a.shift.startHour,
           startMin: a.shift.startMin,
           endHour: a.shift.endHour,

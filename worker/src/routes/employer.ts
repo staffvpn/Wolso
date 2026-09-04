@@ -10,7 +10,8 @@ import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 import { excludeHiddenSql } from '../lib/hiddenProfiles';
 import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../lib/workerPrefs';
 import { companyNotifyPrefColumnsExist, notifyWorker } from '../lib/notifyPrefs';
-import { VACANCY_LIMIT, overLimit } from '../lib/rateLimit';
+import { VACANCY_LIMIT, remainingAllowance } from '../lib/rateLimit';
+import { datesColumnExists, datesColumnValue, expandDates, isConsecutive, normalizeDates } from '../lib/shiftDates';
 import { reportCancellation } from '../lib/incidents';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
@@ -277,18 +278,19 @@ employerRoutes.post('/vacancies', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
   if (!(await requireVerifiedCompany(c.env, session.companyId))) return c.json({ error: 'not_verified' }, 403);
 
-  // Каждая опубликованная смена рассылает сообщение всем подходящим
-  // соискателям (см. notifyMatchingWorkers), так что двадцать вакансий
-  // подряд — это не двадцать строк в базе, а рассылка живым людям.
-  if (await overLimit(c.env, 'shifts', 'company_id', session.companyId, VACANCY_LIMIT)) {
-    return c.json({ error: 'rate_limited' }, 429);
-  }
-
   const body = await c.req.json<{
     position: string;
     positionLabel: string;
     date: string;
     endDate?: string;
+    /** Конкретные дни разовой смены — в том числе с пропусками (13-е и
+     *  27-е). Если не прислан, дни берутся из отрезка date–endDate, как и
+     *  до появления этого поля. */
+    dates?: string[];
+    /** «Нужен человек на каждый день отдельно»: тогда каждый выбранный
+     *  день публикуется своей вакансией со своим набором откликов, а не
+     *  одной вакансией на все дни. */
+    splitPerDay?: boolean;
     startHour: number;
     startMin: number;
     endHour: number;
@@ -302,20 +304,56 @@ employerRoutes.post('/vacancies', async (c) => {
     requirements?: string[];
   }>();
 
+  const employmentType = body.employmentType ?? 'shift';
+
+  // Какие дни реально нужны. У постоянной работы дня нет — там date это
+  // просто «с какого числа», и никакого набора не бывает.
+  const explicit = normalizeDates(body.dates);
+  const picked =
+    employmentType === 'permanent'
+      ? [body.date]
+      : explicit.length > 0
+        ? explicit
+        : expandDates(body.date, body.endDate ?? null, null);
+
+  if (picked.length === 0 || !picked[0]) return c.json({ error: 'date_required' }, 400);
+
+  // Одна вакансия на все дни — или по вакансии на каждый день, если
+  // работодателю нужен на каждый день свой человек.
+  const groups: string[][] = employmentType !== 'permanent' && body.splitPerDay ? picked.map((d) => [d]) : [picked];
+
+  // Каждая опубликованная вакансия рассылает сообщение всем подходящим
+  // соискателям (см. notifyMatchingWorkers), так что двадцать вакансий
+  // подряд — это не двадцать строк в базе, а рассылка живым людям. Поэтому
+  // лимит проверяется на весь пакет, а не на одну вставку: иначе
+  // «опубликовать 20 дней по отдельности» обходило бы его целиком.
+  const allowance = await remainingAllowance(c.env, 'shifts', 'company_id', session.companyId, VACANCY_LIMIT);
+  if (allowance < groups.length) return c.json({ error: 'rate_limited' }, 429);
+
   const durationHours = body.endHour - body.startHour;
   const totalPay = Math.max(0, Math.round(durationHours * body.hourlyRate));
+  const withDates = await datesColumnExists(c.env);
 
-  const inserted = await c.env.DB.prepare(
-    `INSERT INTO shifts (company_id, position, position_label, date, end_date, start_hour, start_min, end_hour, end_min,
-       hourly_rate, total_pay, description, meal, urgency, employment_type, time_of_day, requirements, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active') RETURNING id`,
-  )
-    .bind(
+  // Пропуски между днями хранить пока негде (миграция 0034 не применена).
+  // Молча превратить «13-е и 27-е» в пятнадцать дней подряд нельзя: это
+  // уже не та вакансия, которую опубликовали, и человек придёт 14-го.
+  // Лучше честно отказать — работодатель увидит, в чём дело.
+  if (!withDates && groups.some((g) => !isConsecutive(g))) {
+    return c.json({ error: 'migration_required', migration: '0034_shift_date_set' }, 400);
+  }
+
+  const rows: ShiftRow[] = [];
+  for (const group of groups) {
+    const columns = [
+      'company_id', 'position', 'position_label', 'date', 'end_date', 'start_hour', 'start_min', 'end_hour', 'end_min',
+      'hourly_rate', 'total_pay', 'description', 'meal', 'urgency', 'employment_type', 'time_of_day', 'requirements', 'status',
+    ];
+    const values: unknown[] = [
       session.companyId,
       body.position,
       body.positionLabel,
-      body.date,
-      body.endDate && body.endDate > body.date ? body.endDate : null,
+      group[0],
+      group.length > 1 ? group[group.length - 1] : null,
       body.startHour,
       body.startMin ?? 0,
       body.endHour,
@@ -325,18 +363,37 @@ employerRoutes.post('/vacancies', async (c) => {
       body.description ?? '',
       body.meal ? 1 : 0,
       body.urgency ?? 'normal',
-      body.employmentType ?? 'shift',
+      employmentType,
       body.timeOfDay ?? 'day',
       JSON.stringify(body.requirements ?? []),
-    )
-    .first<{ id: number }>();
+      'active',
+    ];
+    if (withDates) {
+      columns.push('dates');
+      values.push(datesColumnValue(group));
+    }
 
-  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
+    const inserted = await c.env.DB.prepare(
+      `INSERT INTO shifts (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')}) RETURNING id`,
+    )
+      .bind(...values)
+      .first<{ id: number }>();
+
+    const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
+    rows.push(row!);
+  }
+
   // Runs after the response is sent (waitUntil) — an employer posting a
   // shift shouldn't sit waiting on however many Telegram API calls this
-  // turns into.
-  c.executionCtx.waitUntil(notifyMatchingWorkers(c.env, row!));
-  return c.json({ shift: shiftToJson(row!) });
+  // turns into. Одно сообщение на всю публикацию, даже когда вакансий
+  // получилось несколько: три пуша подряд об одном и том же заведении —
+  // это то, после чего бота выключают.
+  c.executionCtx.waitUntil(notifyMatchingWorkers(c.env, rows[0]!, picked, groups.length));
+
+  // Первая вакансия — та, на экран которой уходит работодатель; остальные
+  // (при публикации по дню) отдаём рядом, чтобы список обновился без
+  // повторного запроса.
+  return c.json({ shift: shiftToJson(rows[0]!), shifts: rows.map(shiftToJson) });
 });
 
 /** Edits a vacancy in place. Until now the only way to fix a typo in the
@@ -367,6 +424,7 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
     positionLabel?: string;
     date?: string;
     endDate?: string | null;
+    dates?: string[];
     startHour?: number;
     endHour?: number;
     hourlyRate?: number;
@@ -375,10 +433,14 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
     requirements?: string[];
   }>();
 
+  // Явный набор дней перебивает date/endDate: форма присылает его целиком,
+  // и это единственный способ убрать пропуск между днями или добавить его.
+  const pickedDates = body.dates === undefined ? [] : normalizeDates(body.dates);
+
   const next = {
     position: body.position ?? existing.position,
     positionLabel: body.positionLabel ?? existing.position_label,
-    date: body.date ?? existing.date,
+    date: pickedDates[0] ?? body.date ?? existing.date,
     startHour: body.startHour ?? existing.start_hour,
     endHour: body.endHour ?? existing.end_hour,
     hourlyRate: body.hourlyRate ?? existing.hourly_rate,
@@ -392,34 +454,52 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
   const endDate =
     next.employmentType === 'permanent'
       ? null
-      : body.endDate === undefined
-        ? existing.end_date
-        : body.endDate && body.endDate > next.date
-          ? body.endDate
-          : null;
+      : pickedDates.length > 1
+        ? pickedDates[pickedDates.length - 1]!
+        : pickedDates.length === 1
+          ? null
+          : body.endDate === undefined
+            ? existing.end_date
+            : body.endDate && body.endDate > next.date
+              ? body.endDate
+              : null;
 
   const totalPay = Math.max(0, Math.round((next.endHour - next.startHour) * next.hourlyRate));
 
-  await c.env.DB.prepare(
-    `UPDATE shifts SET position = ?, position_label = ?, date = ?, end_date = ?, start_hour = ?, end_hour = ?,
-       hourly_rate = ?, total_pay = ?, description = ?, employment_type = ?, requirements = ?
-     WHERE id = ? AND company_id = ?`,
-  )
-    .bind(
-      next.position,
-      next.positionLabel,
-      next.date,
-      endDate,
-      next.startHour,
-      next.endHour,
-      next.hourlyRate,
-      totalPay,
-      next.description,
-      next.employmentType,
-      JSON.stringify(next.requirements),
-      id,
-      session.companyId,
-    )
+  const sets = [
+    'position = ?', 'position_label = ?', 'date = ?', 'end_date = ?', 'start_hour = ?', 'end_hour = ?',
+    'hourly_rate = ?', 'total_pay = ?', 'description = ?', 'employment_type = ?', 'requirements = ?',
+  ];
+  const values: unknown[] = [
+    next.position,
+    next.positionLabel,
+    next.date,
+    endDate,
+    next.startHour,
+    next.endHour,
+    next.hourlyRate,
+    totalPay,
+    next.description,
+    next.employmentType,
+    JSON.stringify(next.requirements),
+  ];
+  // Набор дней переписываем только когда форма его прислала — правка одной
+  // ставки не должна молча схлопывать вакансию с пропусками в отрезок.
+  if (body.dates !== undefined) {
+    if (!(await datesColumnExists(c.env))) {
+      // Та же причина, что и при публикации: расширить «13-е и 27-е» до
+      // двух недель подряд — значит подменить вакансию, а не сохранить её.
+      if (!isConsecutive(pickedDates)) {
+        return c.json({ error: 'migration_required', migration: '0034_shift_date_set' }, 400);
+      }
+    } else {
+      sets.push('dates = ?');
+      values.push(next.employmentType === 'permanent' ? '' : datesColumnValue(pickedDates));
+    }
+  }
+
+  await c.env.DB.prepare(`UPDATE shifts SET ${sets.join(', ')} WHERE id = ? AND company_id = ?`)
+    .bind(...values, id, session.companyId)
     .run();
 
   // What a candidate would actually care about — not every edit is worth a
@@ -568,7 +648,7 @@ employerRoutes.delete('/vacancies/:id', async (c) => {
  *  match a worker would get by filtering the feed for it. Deliberately
  *  narrow: broadcasting every new shift to every worker regardless of
  *  what they do would just train people to ignore the bot. */
-async function notifyMatchingWorkers(env: Env, shift: ShiftRow): Promise<void> {
+async function notifyMatchingWorkers(env: Env, shift: ShiftRow, days: string[] = [], postings = 1): Promise<void> {
   const { results: matches } = await env.DB.prepare(
     `SELECT DISTINCT w.id, w.telegram_id FROM workers w
      JOIN worker_positions wp ON wp.worker_id = w.id
@@ -580,11 +660,19 @@ async function notifyMatchingWorkers(env: Env, shift: ShiftRow): Promise<void> {
   if (matches.length === 0) return;
 
   const pad = (n: number) => String(n).padStart(2, '0');
-  // shift.date is stored as ISO (YYYY-MM-DD) — the bot message shows the
-  // ru-RU-familiar dd.mm.yyyy instead.
-  const [year, month, day] = shift.date.split('-');
-  const dateLabel = `${day}.${month}.${year}`;
-  const title = `Новая смена: ${shift.position_label}`;
+  // Даты хранятся как ISO (YYYY-MM-DD) — в сообщении показываем привычные
+  // dd.mm. Несколько дней перечисляем целиком, но не больше пяти: длинный
+  // хвост дат в пуше всё равно не читают.
+  const dateLabel = (() => {
+    const list = days.length > 0 ? days : [shift.date];
+    const short = (d: string) => d.slice(8, 10) + '.' + d.slice(5, 7);
+    if (list.length === 1) return `${short(list[0]!)}.${list[0]!.slice(0, 4)}`;
+    const shown = list.slice(0, 5).map(short).join(', ');
+    return list.length > 5 ? `${shown} и ещё ${list.length - 5}` : shown;
+  })();
+  // «3 смены» вместо «новая смена», когда каждый день опубликован своей
+  // вакансией: иначе сообщение обещает одну, а в ленте их несколько.
+  const title = postings > 1 ? `${postings} новых смены: ${shift.position_label}` : `Новая смена: ${shift.position_label}`;
   const subtitle = `${shift.company_name ?? 'Компания'} · ${shift.company_city ?? ''} · ${shift.hourly_rate} ₽/ч`;
   const text = [
     `🆕 ${title}`,

@@ -33,6 +33,8 @@ interface EmployerState {
     positionLabel: string;
     date: string;
     endDate?: string;
+    dates?: string[];
+    splitPerDay?: boolean;
     startHour: number;
     startMin: number;
     endHour: number;
@@ -115,9 +117,12 @@ export const useEmployerStore = create<EmployerState>((set, get) => ({
   },
 
   createVacancy: async (input) => {
-    const vacancy = await createVacancyApi(input);
-    set((s) => ({ vacancies: [vacancy, ...s.vacancies] }));
-    return vacancy;
+    // Публикация «по человеку на каждый день» создаёт несколько вакансий
+    // за один раз — в список кладём все, а наружу отдаём первую: на её
+    // экран уходит работодатель.
+    const { first, all } = await createVacancyApi(input);
+    set((s) => ({ vacancies: [...all, ...s.vacancies] }));
+    return first;
   },
 
   updateVacancy: async (vacancyId, input) => {
