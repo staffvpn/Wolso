@@ -20,12 +20,20 @@ APP_ORIGIN = "https://wolso.pages.dev"
 # Support account the automatic reminders point people at. Without the '@'.
 SUPPORT_USERNAME = "nchtsupport"
 
-# Automatic bot reminders — see src/lib/reminders.ts. Hourly rather than
-# daily so a batch that hits the per-run cap is picked up soon after,
-# not tomorrow; the reminders themselves are rate-limited by their own
-# "already sent" bookkeeping, not by how often this fires.
+# Two schedules, разведённые по смыслу (диспетчеризация — по event.cron
+# в `scheduled`, см. src/index.ts).
+#
+# "0 * * * *" — automatic bot reminders, see src/lib/reminders.ts. Hourly
+# rather than daily so a batch that hits the per-run cap is picked up soon
+# after, not tomorrow; the reminders themselves are rate-limited by their
+# own "already sent" bookkeeping, not by how often this fires.
+#
+# "* * * * *" — напоминание о непрочитанной переписке (src/lib/unreadChats.ts).
+# Раз в минуту, потому что порог там — две минуты: реже означало бы, что
+# «через 2 минуты» на деле превращается в «когда-нибудь в течение часа».
+# Сам запуск почти всегда пустой: один запрос, ноль строк.
 [triggers]
-crons = ["0 * * * *"]
+crons = ["0 * * * *", "* * * * *"]
 
 # Created with: wrangler d1 create wolso
 # Paste the database_id it prints below.

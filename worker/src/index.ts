@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import type { Env } from './types';
 import { attachSession, rejectSuspended } from './middleware/auth';
 import { runReminders } from './lib/reminders';
+import { runUnreadChatPings } from './lib/unreadChats';
 
 import { authRoutes } from './routes/auth';
 import { feedRoutes } from './routes/feed';
@@ -89,13 +90,26 @@ app.onError((err, c) => {
   return c.json({ error: 'internal_error' }, 500);
 });
 
-/** The Worker is no longer only a request handler: the cron trigger in
- *  wrangler.toml calls `scheduled` on its own schedule, with no request
- *  and nobody watching, which is why runReminders swallows and logs its
- *  own failures rather than throwing into the void. */
+/** The Worker is no longer only a request handler: the cron triggers in
+ *  wrangler.toml call `scheduled` on their own schedule, with no request
+ *  and nobody watching, which is why both jobs below swallow and log their
+ *  own failures rather than throwing into the void.
+ *
+ *  Расписаний два, и они делают разное. Минутное — только напоминание о
+ *  непрочитанной переписке: у него порог в две минуты, и раз в час его
+ *  проверять бессмысленно. Всё остальное (незаконченные регистрации,
+ *  неотвеченные отклики, напоминание перед сменой) ходит раз в час — там
+ *  пороги измеряются часами, и гонять их каждую минуту значило бы делать
+ *  шестьдесят пустых проходов по всем таблицам вместо одного. */
+const UNREAD_CRON = '* * * * *';
+
 export default {
   fetch: app.fetch,
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    if (event.cron === UNREAD_CRON) {
+      ctx.waitUntil(runUnreadChatPings(env));
+      return;
+    }
     ctx.waitUntil(runReminders(env));
   },
 };

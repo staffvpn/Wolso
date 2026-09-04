@@ -45,7 +45,7 @@ export function EmployerSettings() {
             <Toggle checked={company.notifyNewResponses ?? true} onChange={(v) => save({ notifyNewResponses: v })} />
           </div>
           <div className="flex items-center justify-between py-3 gap-3">
-            <span className="text-[15px] font-medium">Подтверждения и отказы</span>
+            <span className="text-[15px] font-medium">Ответы и сообщения</span>
             <Toggle checked={company.notifyWorkerReplies ?? true} onChange={(v) => save({ notifyWorkerReplies: v })} />
           </div>
           <div className="flex items-center justify-between py-3 gap-3">

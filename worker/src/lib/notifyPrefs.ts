@@ -3,9 +3,10 @@ import { sendTelegramMessage } from './telegramBot';
 
 /** Which switch in «Настройки» governs a given bot message.
  *  - `new_shifts`        — "появилась смена по вашей должности"
- *  - `employer_replies`  — приглашения, отмены, изменения условий смены
- *    (сообщения из чата сюда больше не входят: переписка живёт в
- *     приложении и обновляется сама, см. routes/chats.ts)
+ *  - `employer_replies`  — приглашения, отмены, изменения условий смены и
+ *    одно напоминание о непрочитанной переписке (lib/unreadChats.ts).
+ *    Пуша на каждое сообщение здесь нет: переписка живёт в приложении и
+ *    обновляется сама, см. routes/chats.ts
  *  - `shift_reminder`    — напоминание незадолго до начала смены */
 export type WorkerNotifyPref = 'new_shifts' | 'employer_replies' | 'shift_reminder';
 

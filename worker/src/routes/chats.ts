@@ -121,6 +121,13 @@ chatRoutes.get('/:id/messages', async (c) => {
     await c.env.DB.prepare('UPDATE messages SET read = 1 WHERE chat_id = ? AND sender != ? AND read = 0')
       .bind(chatId, actor.role)
       .run();
+    // Человек открыл переписку — значит, следующая непрочитанная серия
+    // начинается с нуля, и напоминание о ней (см. lib/unreadChats.ts)
+    // должно уйти сразу, а не досиживать старый интервал.
+    const notifiedCol = actor.role === 'worker' ? 'worker_notified_at' : 'company_notified_at';
+    await c.env.DB.prepare(`UPDATE chats SET ${notifiedCol} = NULL WHERE id = ? AND ${notifiedCol} IS NOT NULL`)
+      .bind(chatId)
+      .run();
   }
 
   return c.json({ messages: results });
