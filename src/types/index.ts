@@ -312,3 +312,28 @@ export interface Filters {
   when: 'upcoming' | 'today' | 'tomorrow' | 'custom';
   timeOfDay: ('morning' | 'day' | 'evening' | 'night')[];
 }
+
+
+/** Смена, которую человек нашёл сам — через знакомых, чат, напрямую у
+ *  заведения. Wolso её не искал, не подтверждал и о ней не знает: она
+ *  живёт в отдельной таблице (миграция 0032), не попадает ни в поиск, ни к
+ *  работодателям, ни в статистику платформы. Нужна только самому
+ *  соискателю — вести свой рабочий календарь целиком, а не наполовину.
+ *
+ *  Статуса в данных нет: «запланирована» или «отработана» определяется
+ *  датой. Колонка, которую надо переключать по расписанию, — это ещё один
+ *  способ разъехаться с реальностью. */
+export interface PersonalShift {
+  id: string;
+  placeName: string;
+  address: string;
+  positionLabel: string;
+  date: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  /** Оплата за смену целиком, не ставка в час. */
+  pay: number;
+  notes: string;
+}

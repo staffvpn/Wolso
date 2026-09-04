@@ -16,6 +16,7 @@ import sql0027 from '../../migrations/0027_hidden_profiles.sql';
 import sql0028 from '../../migrations/0028_reminders.sql';
 import sql0029 from '../../migrations/0029_worker_employment_type.sql';
 import sql0030 from '../../migrations/0030_notification_settings.sql';
+import sql0032 from '../../migrations/0032_personal_shifts.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -61,6 +62,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
  *  the same silent way a missing column does. */
 const REQUIRED_TABLES: { table: string; migration: string; breaks: string }[] = [
   { table: 'broadcasts', migration: '0024_broadcasts', breaks: 'рассылки из дашборда' },
+  { table: 'personal_shifts', migration: '0032_personal_shifts', breaks: 'личные смены в календаре соискателя' },
   { table: 'complaints', migration: '0031_complaints_and_employer_settings', breaks: 'жалобы' },
   { table: 'user_notes', migration: '0031_complaints_and_employer_settings', breaks: 'заметки по пользователю' },
 ];
@@ -87,6 +89,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0029_worker_employment_type': sql0029,
   '0030_notification_settings': sql0030,
   '0031_complaints_and_employer_settings': sql0031,
+  '0032_personal_shifts': sql0032,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

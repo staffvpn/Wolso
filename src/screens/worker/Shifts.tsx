@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Mail, Star, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Mail, Plus, Star, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Card } from '@/components/ui/Card';
@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DetailRow } from '@/components/ui/DetailRow';
 import { CancelSheet } from '@/components/CancelSheet';
+import { PersonalShiftSheet } from '@/components/PersonalShiftSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
+import { usePersonalShiftsStore } from '@/store/usePersonalShiftsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatDateRange, formatDayMonth, formatMoney, isSameDay, weekdayShort } from '@/lib/format';
+import { formatDateRange, formatDayMonth, formatMoney, isSameDay, localDateStr, weekdayShort } from '@/lib/format';
 import { hapticNotify, hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
-import type { Application, Shift } from '@/types';
+import type { Application, PersonalShift, Shift } from '@/types';
 
 const MONTHS_NOM = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -50,27 +52,73 @@ function timeRangeOf(shift: Shift) {
   return `${pad(shift.startHour)}:${pad(shift.startMin)}–${pad(shift.endHour)}:${pad(shift.endMin)}`;
 }
 
-type Entry = { app: Application; shift: Shift };
+/** Одна запись календаря. Источник — часть типа, а не поле-флаг: так
+ *  ни один экран не может случайно показать личную смену как работу через
+ *  Wolso, потому что у неё просто нет ни отклика, ни компании. */
+type Entry =
+  | { source: 'wolso'; app: Application; shift: Shift }
+  | { source: 'personal'; personal: PersonalShift };
+
+function entryKey(e: Entry) {
+  return e.source === 'wolso' ? `w:${e.app.id}` : `p:${e.personal.id}`;
+}
+
+function entryDate(e: Entry) {
+  return e.source === 'wolso' ? e.shift.date : e.personal.date;
+}
+
+/** Отработана ли запись. У смены Wolso это решает работодатель, закрывая
+ *  её; у личной — календарь: её никто не подтверждает, поэтому «прошла
+ *  дата» и есть весь статус. */
+function entryDone(e: Entry, today: Date) {
+  if (e.source === 'wolso') return e.app.workStage === 'employer_closed' || e.app.workStage === 'reviewed';
+  return stripTime(new Date(e.personal.date)) < stripTime(today);
+}
+
+function entryCoversDay(e: Entry, day: Date) {
+  if (e.source === 'wolso') return shiftCoversDay(e.shift, day);
+  return stripTime(new Date(e.personal.date)) === stripTime(day);
+}
+
+function entryPay(e: Entry) {
+  return e.source === 'wolso' ? e.shift.totalPay : e.personal.pay;
+}
+
+function entryHours(e: Entry) {
+  const s = e.source === 'wolso' ? e.shift : e.personal;
+  return Math.max(0, s.endHour - s.startHour);
+}
+
+function personalTimeRange(p: PersonalShift) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(p.startHour)}:${pad(p.startMin)}–${pad(p.endHour)}:${pad(p.endMin)}`;
+}
 
 export function Shifts() {
   const applications = useApplicationsStore((s) => s.applications);
   const load = useApplicationsStore((s) => s.load);
   const checkIn = useApplicationsStore((s) => s.checkIn);
   const cancelApplication = useApplicationsStore((s) => s.cancelApplication);
+  const personal = usePersonalShiftsStore((s) => s.shifts);
+  const loadPersonal = usePersonalShiftsStore((s) => s.load);
   const [cancelling, setCancelling] = useState<Application | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [personalSheet, setPersonalSheet] = useState<{ editing: PersonalShift | null; date?: string } | null>(null);
 
   useEffect(() => {
     load();
+    loadPersonal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const withShift = (list: Application[]): Entry[] =>
-    list.map((a) => ({ app: a, shift: a.shift })).filter((x): x is Entry => !!x.shift);
+    list
+      .map((a) => (a.shift ? ({ source: 'wolso', app: a, shift: a.shift } as Entry) : null))
+      .filter((x): x is Entry => x !== null);
 
   const confirmed = useMemo(
     () => withShift(applications.filter((a) => a.status === 'accepted' && a.workStage !== 'employer_closed' && a.workStage !== 'reviewed'))
-      .sort((a, b) => a.shift.date.localeCompare(b.shift.date)),
+      .sort((a, b) => entryDate(a).localeCompare(entryDate(b))),
     [applications],
   );
 
@@ -79,19 +127,47 @@ export function Shifts() {
   // claiming "Вы подтвердили".
   const completed = useMemo(
     () => withShift(applications.filter((a) => a.workStage === 'employer_closed' || a.workStage === 'reviewed'))
-      .sort((a, b) => b.shift.date.localeCompare(a.shift.date)),
+      .sort((a, b) => entryDate(b).localeCompare(entryDate(a))),
     [applications],
   );
 
   const today = new Date();
-  const todays = confirmed.filter((x) => shiftCoversDay(x.shift, today));
-  const upcoming = confirmed.filter((x) => !shiftCoversDay(x.shift, today));
+
+  // Личные смены — те же записи календаря, просто другого происхождения.
+  // Разделение на «впереди» и «отработана» у них по дате: подтверждать их
+  // некому.
+  const personalEntries = useMemo<Entry[]>(() => personal.map((p) => ({ source: 'personal', personal: p })), [personal]);
+  const personalUpcoming = useMemo(
+    () => personalEntries.filter((e) => !entryDone(e, today)).sort((a, b) => entryDate(a).localeCompare(entryDate(b))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [personalEntries],
+  );
+  const personalDone = useMemo(
+    () => personalEntries.filter((e) => entryDone(e, today)).sort((a, b) => entryDate(b).localeCompare(entryDate(a))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [personalEntries],
+  );
+
+  // Списки на экране объединённые: человеку нужен его рабочий день целиком,
+  // а не отдельно «через Wolso» и отдельно «своё». Источник виден на самой
+  // карточке меткой.
+  const allUpcoming = useMemo(
+    () => [...confirmed, ...personalUpcoming].sort((a, b) => entryDate(a).localeCompare(entryDate(b))),
+    [confirmed, personalUpcoming],
+  );
+  const allCompleted = useMemo(
+    () => [...completed, ...personalDone].sort((a, b) => entryDate(b).localeCompare(entryDate(a))),
+    [completed, personalDone],
+  );
+
+  const todays = allUpcoming.filter((e) => entryCoversDay(e, today));
+  const upcoming = allUpcoming.filter((e) => !entryCoversDay(e, today));
 
   // Everything with a date goes on the calendar, past work included —
   // that's the point of opening it on an old month.
-  const allDated = useMemo(() => [...confirmed, ...completed], [confirmed, completed]);
+  const allDated = useMemo(() => [...allUpcoming, ...allCompleted], [allUpcoming, allCompleted]);
 
-  const totalEarned = useMemo(() => completed.reduce((sum, x) => sum + x.shift.totalPay, 0), [completed]);
+  const totalEarned = useMemo(() => allCompleted.reduce((sum, e) => sum + entryPay(e), 0), [allCompleted]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -113,12 +189,12 @@ export function Shifts() {
 
       <div className="px-5 flex gap-3 shrink-0">
         <Card className="flex-1 p-4">
-          <p className="text-[22px] font-extrabold">{completed.length}</p>
+          <p className="text-[22px] font-extrabold">{allCompleted.length}</p>
           <p className="text-[12px] text-text-muted mt-0.5">смен отработано</p>
         </Card>
         <Card className="flex-1 p-4">
-          <p className="text-[22px] font-extrabold">{confirmed.length}</p>
-          <p className="text-[12px] text-text-muted mt-0.5">подтверждённых впереди</p>
+          <p className="text-[22px] font-extrabold">{allUpcoming.length}</p>
+          <p className="text-[12px] text-text-muted mt-0.5">смен впереди</p>
         </Card>
       </div>
 
@@ -127,7 +203,17 @@ export function Shifts() {
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-2.5">Сегодня</p>
             <div className="space-y-3">
-              {todays.map(({ app, shift }) => {
+              {todays.map((entry) => {
+                if (entry.source === 'personal') {
+                  return (
+                    <PersonalShiftCard
+                      key={entryKey(entry)}
+                      shift={entry.personal}
+                      onEdit={() => setPersonalSheet({ editing: entry.personal })}
+                    />
+                  );
+                }
+                const { app, shift } = entry;
                 const company = resolveCompany(shift);
                 return (
                   <motion.div key={app.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-card bg-surface border border-border-soft p-4">
@@ -175,7 +261,17 @@ export function Shifts() {
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-2.5">Дальше</p>
             <div className="space-y-2.5">
-              {upcoming.map(({ app, shift }) => {
+              {upcoming.map((entry) => {
+                if (entry.source === 'personal') {
+                  return (
+                    <PersonalShiftRow
+                      key={entryKey(entry)}
+                      shift={entry.personal}
+                      onEdit={() => setPersonalSheet({ editing: entry.personal })}
+                    />
+                  );
+                }
+                const { app, shift } = entry;
                 const company = resolveCompany(shift);
                 const d = new Date(shift.date);
                 return (
@@ -207,33 +303,64 @@ export function Shifts() {
           </div>
         )}
 
-        {completed.length > 0 && (
+        {allCompleted.length > 0 && (
           <div>
             <div className="flex items-baseline justify-between mb-2.5">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint">
-                Отработанные · {completed.length}
+                Отработанные · {allCompleted.length}
               </p>
               <p className="text-[12px] text-text-faint">заработано {formatMoney(totalEarned)}</p>
             </div>
             <div className="space-y-2.5">
-              {completed.map(({ app, shift }) => (
-                <CompletedShiftRow key={app.id} app={app} shift={shift} />
-              ))}
+              {allCompleted.map((entry) =>
+                entry.source === 'personal' ? (
+                  <PersonalShiftRow
+                    key={entryKey(entry)}
+                    shift={entry.personal}
+                    done
+                    onEdit={() => setPersonalSheet({ editing: entry.personal })}
+                  />
+                ) : (
+                  <CompletedShiftRow key={entryKey(entry)} app={entry.app} shift={entry.shift} />
+                ),
+              )}
             </div>
           </div>
         )}
 
-        {todays.length === 0 && upcoming.length === 0 && completed.length === 0 && (
+        {todays.length === 0 && upcoming.length === 0 && allCompleted.length === 0 && (
           <EmptyState
-            title="Нет подтверждённых смен"
-            description="Как только работодатель примет ваш отклик, смена появится здесь."
+            title="Смен пока нет"
+            description="Как только работодатель примет ваш отклик, смена появится здесь. А работу, которую вы нашли сами, можно занести кнопкой ниже."
           />
         )}
       </div>
 
       <AnimatePresence>
-        {calendarOpen && <CalendarOverlay entries={allDated} onClose={() => setCalendarOpen(false)} />}
+        {calendarOpen && (
+          <CalendarOverlay
+            entries={allDated}
+            onClose={() => setCalendarOpen(false)}
+            onAddPersonal={(date) => setPersonalSheet({ editing: null, date })}
+            onEditPersonal={(shift) => setPersonalSheet({ editing: shift })}
+          />
+        )}
       </AnimatePresence>
+
+      {/* Своя смена добавляется отсюда и из календаря: человек заносит её
+          либо сразу после разговора, либо когда планирует неделю. */}
+      <div className="px-5 pb-4 pt-1 shrink-0">
+        <Button variant="dark" fullWidth onClick={() => setPersonalSheet({ editing: null })}>
+          <Plus size={17} /> Добавить свою смену
+        </Button>
+      </div>
+
+      <PersonalShiftSheet
+        open={personalSheet !== null}
+        editing={personalSheet?.editing}
+        defaultDate={personalSheet?.date}
+        onClose={() => setPersonalSheet(null)}
+      />
 
       {cancelling && (
         <CancelSheet
@@ -305,7 +432,17 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
 /** A real month calendar: days with shifts are marked, tapping one lists
  *  everything on it. Replaces a fixed six-day strip that couldn't be
  *  scrolled or tapped and only ever showed the current week. */
-function CalendarOverlay({ entries, onClose }: { entries: Entry[]; onClose: () => void }) {
+function CalendarOverlay({
+  entries,
+  onClose,
+  onAddPersonal,
+  onEditPersonal,
+}: {
+  entries: Entry[];
+  onClose: () => void;
+  onAddPersonal: (date: string) => void;
+  onEditPersonal: (shift: PersonalShift) => void;
+}) {
   const today = new Date();
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<Date | null>(today);
@@ -318,8 +455,30 @@ function CalendarOverlay({ entries, onClose }: { entries: Entry[]; onClose: () =
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1)),
   ];
 
-  const shiftsOn = (day: Date) => entries.filter((e) => shiftCoversDay(e.shift, day));
+  const shiftsOn = (day: Date) => entries.filter((e) => entryCoversDay(e, day));
   const selectedShifts = selected ? shiftsOn(selected) : [];
+
+  /** Итоги за показанный месяц, с разделением по источнику. Считается по
+   *  тому же списку, который рисует сетку, поэтому цифры под календарём и
+   *  отметки на нём не могут разойтись. В счёт идут только отработанные:
+   *  запланированная смена — это ещё не заработок. */
+  const monthStats = useMemo(() => {
+    const inMonth = entries.filter((e) => {
+      const d = new Date(entryDate(e));
+      return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth() && entryDone(e, today);
+    });
+    const wolso = inMonth.filter((e) => e.source === 'wolso');
+    const own = inMonth.filter((e) => e.source === 'personal');
+    return {
+      days: new Set(inMonth.map((e) => entryDate(e))).size,
+      wolsoCount: wolso.length,
+      personalCount: own.length,
+      hours: inMonth.reduce((sum, e) => sum + entryHours(e), 0),
+      wolsoPay: wolso.reduce((sum, e) => sum + entryPay(e), 0),
+      personalPay: own.reduce((sum, e) => sum + entryPay(e), 0),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, month]);
 
   function shiftMonth(delta: number) {
     hapticSelect();
@@ -335,7 +494,7 @@ function CalendarOverlay({ entries, onClose }: { entries: Entry[]; onClose: () =
       className="absolute inset-0 z-[300] bg-bg flex flex-col safe-top safe-bottom"
     >
       <div className="flex items-center justify-between px-5 pt-3 pb-2 shrink-0">
-        <h2 className="text-[18px] font-bold">Календарь смен</h2>
+        <h2 className="text-[18px] font-bold">Рабочий календарь</h2>
         <button onClick={onClose} aria-label="Закрыть" className="h-9 w-9 rounded-full bg-surface-2 flex items-center justify-center">
           <X size={17} />
         </button>
@@ -402,14 +561,37 @@ function CalendarOverlay({ entries, onClose }: { entries: Entry[]; onClose: () =
         )}
 
         <div className="space-y-2.5">
-          {selectedShifts.map(({ app, shift }) => {
+          {selectedShifts.map((entry) => {
+            if (entry.source === 'personal') {
+              const p = entry.personal;
+              return (
+                <button
+                  key={entryKey(entry)}
+                  onClick={() => onEditPersonal(p)}
+                  className="w-full text-left rounded-card bg-surface border border-dashed border-border p-3.5"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="font-semibold text-[14px] truncate">{p.positionLabel} · {p.placeName}</p>
+                    {/* Источник виден на каждой карточке: личная смена не
+                        должна выглядеть как работа через Wolso. */}
+                    <Badge tone="neutral">Личная</Badge>
+                  </div>
+                  <p className="text-[12px] text-text-muted">
+                    {personalTimeRange(p)}
+                    {p.pay > 0 ? ` · ${formatMoney(p.pay)}` : ''}
+                  </p>
+                  {p.address && <p className="text-[12px] text-text-faint mt-0.5 truncate">{p.address}</p>}
+                </button>
+              );
+            }
+            const { app, shift } = entry;
             const company = resolveCompany(shift);
             const done = app.workStage === 'employer_closed' || app.workStage === 'reviewed';
             return (
-              <div key={app.id} className="rounded-card bg-surface border border-border-soft p-3.5">
+              <div key={entryKey(entry)} className="rounded-card bg-surface border border-border-soft p-3.5">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {company.name}</p>
-                  <Badge tone={done ? 'neutral' : 'accent'}>{done ? 'Отработана' : 'Подтверждена'}</Badge>
+                  <Badge tone={done ? 'neutral' : 'accent'}>{done ? 'Отработана' : 'Wolso'}</Badge>
                 </div>
                 <p className="text-[12px] text-text-muted">
                   {timeRangeOf(shift)} · {formatMoney(shift.totalPay)}
@@ -419,7 +601,108 @@ function CalendarOverlay({ entries, onClose }: { entries: Entry[]; onClose: () =
             );
           })}
         </div>
+
+        {selected && (
+          <Button
+            variant="dark"
+            fullWidth
+            className="mt-3"
+            onClick={() => onAddPersonal(localDateStr(selected))}
+          >
+            <Plus size={16} /> Добавить свою смену
+          </Button>
+        )}
+
+        {/* Итог месяца — под днём, а не наверху: сначала «что сегодня»,
+            потом «сколько за месяц». */}
+        <div className="mt-6 rounded-card bg-surface border border-border-soft p-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-3">
+            {MONTHS_NOM[month.getMonth()]} · итого
+          </p>
+          {monthStats.days === 0 ? (
+            <p className="text-[13px] text-text-faint">В этом месяце отработанных смен пока нет.</p>
+          ) : (
+            <div className="space-y-1.5 text-[13px]">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Рабочих дней</span>
+                <span className="font-semibold">{monthStats.days}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Смен через Wolso</span>
+                <span className="font-semibold">{monthStats.wolsoCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Личных смен</span>
+                <span className="font-semibold">{monthStats.personalCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Часов</span>
+                <span className="font-semibold">{monthStats.hours}</span>
+              </div>
+              <div className="h-px bg-border-soft my-2" />
+              <div className="flex justify-between">
+                <span className="text-text-muted">Wolso</span>
+                <span className="font-semibold">{formatMoney(monthStats.wolsoPay)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Личные смены</span>
+                <span className="font-semibold">{formatMoney(monthStats.personalPay)}</span>
+              </div>
+              <div className="flex justify-between text-[15px] pt-1">
+                <span className="font-bold">Всего</span>
+                <span className="font-extrabold">{formatMoney(monthStats.wolsoPay + monthStats.personalPay)}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
+  );
+}
+
+/** Личная смена на сегодня. Намеренно без кнопок «отметиться» и «не смогу
+ *  выйти»: отмечаться не перед кем, отменять — тем более. Всё, что тут
+ *  можно, — поправить или удалить запись. */
+function PersonalShiftCard({ shift, onEdit }: { shift: PersonalShift; onEdit: () => void }) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={onEdit}
+      className="w-full text-left rounded-card bg-surface border border-dashed border-border p-4"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <Badge tone="neutral">Личная</Badge>
+        <span className="text-[13px] text-text-muted">{personalTimeRange(shift)}</span>
+      </div>
+      <p className="font-bold text-[17px]">{shift.positionLabel} · {shift.placeName}</p>
+      {shift.address && <p className="text-[13px] text-text-muted mt-0.5">{shift.address}</p>}
+      {shift.pay > 0 && <p className="text-[13px] text-text-muted mt-0.5">{formatMoney(shift.pay)}</p>}
+      {shift.notes && <p className="text-[13px] text-text-faint mt-2 whitespace-pre-line">{shift.notes}</p>}
+      <p className="text-[12px] text-text-faint mt-3">Нажмите, чтобы изменить</p>
+    </motion.button>
+  );
+}
+
+/** Компактная строка личной смены — и в «Дальше», и в «Отработанных».
+ *  Пунктирная рамка и метка «Личная» отличают её от смены Wolso с одного
+ *  взгляда: выдавать своё за работу через платформу нельзя. */
+function PersonalShiftRow({ shift, done, onEdit }: { shift: PersonalShift; done?: boolean; onEdit: () => void }) {
+  const d = new Date(shift.date);
+  return (
+    <button onClick={onEdit} className="w-full text-left flex items-center gap-3 rounded-card bg-surface border border-dashed border-border p-3.5">
+      <div className="flex flex-col items-center justify-center w-11 shrink-0 rounded-xl bg-surface-2 py-1.5">
+        <span className="text-[10px] text-text-faint uppercase">{weekdayShort(d)}</span>
+        <span className="text-[15px] font-bold">{d.getDate()}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {shift.placeName}</p>
+        <p className="text-[12px] text-text-muted truncate">
+          {personalTimeRange(shift)}
+          {shift.pay > 0 ? ` · ${formatMoney(shift.pay)}` : ''}
+        </p>
+      </div>
+      <Badge tone="neutral" className="shrink-0">{done ? 'Личная' : 'Личная'}</Badge>
+    </button>
   );
 }

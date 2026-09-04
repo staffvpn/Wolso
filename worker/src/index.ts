@@ -16,6 +16,7 @@ import { supportRoutes } from './routes/support';
 import { mediaRoutes } from './routes/media';
 import { botRoutes } from './routes/bot';
 import { complaintRoutes } from './routes/complaints';
+import { personalShiftRoutes } from './routes/personalShifts';
 
 import { adminUserRoutes } from './admin/users';
 import { adminRoleRoutes } from './admin/roles';
@@ -51,7 +52,7 @@ app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
 // '/me'. /auth is excluded on purpose: sign-in has to be able to answer
 // with the reason, and /media serves avatars that other people's screens
 // still legitimately show.
-for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support', '/complaints']) {
+for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support', '/complaints', '/personal-shifts']) {
   app.use(base, attachSession, rejectSuspended);
   app.use(`${base}/*`, attachSession, rejectSuspended);
 }
@@ -68,6 +69,7 @@ app.route('/support', supportRoutes);
 app.route('/media', mediaRoutes);
 app.route('/bot', botRoutes);
 app.route('/complaints', complaintRoutes);
+app.route('/personal-shifts', personalShiftRoutes);
 
 app.route('/admin/users', adminUserRoutes);
 app.route('/admin/roles', adminRoleRoutes);
