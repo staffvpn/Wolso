@@ -19,6 +19,7 @@ import sql0030 from '../../migrations/0030_notification_settings.sql';
 import sql0032 from '../../migrations/0032_personal_shifts.sql';
 import sql0033 from '../../migrations/0033_personal_shift_status.sql';
 import sql0034 from '../../migrations/0034_shift_date_set.sql';
+import sql0035 from '../../migrations/0035_own_photo_reminder.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -61,6 +62,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'personal_shifts', column: 'status', migration: '0033_personal_shift_status', breaks: '«отработал / запланировал» в личных сменах' },
   { table: 'personal_shifts', column: 'found_via', migration: '0033_personal_shift_status', breaks: 'отметка «где нашёл» в личных сменах' },
   { table: 'shifts', column: 'dates', migration: '0034_shift_date_set', breaks: 'смена на несколько разных дней' },
+  { table: 'workers', column: 'photo_reminded_at', migration: '0035_own_photo_reminder', breaks: 'напоминание «поставьте своё фото»' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -97,6 +99,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0032_personal_shifts': sql0032,
   '0033_personal_shift_status': sql0033,
   '0034_shift_date_set': sql0034,
+  '0035_own_photo_reminder': sql0035,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

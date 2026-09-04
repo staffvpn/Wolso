@@ -10,10 +10,12 @@ import { LogoBadge } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SafeImage } from '@/components/ui/SafeImage';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { ShiftCard } from '@/components/deck/ShiftCard';
 import { FilterSheet } from '@/components/FilterSheet';
 import { ProfileHidden } from './ProfileHidden';
+import { NeedOwnPhoto } from './NeedOwnPhoto';
 import { useShiftsStore } from '@/store/useShiftsStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useFiltersStore } from '@/store/useFiltersStore';
@@ -34,8 +36,9 @@ export function Feed() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const { deck, index, loading, lastApplied, loadDeck, swipe, clearLastApplied } = useShiftsStore();
+  const { deck, index, loading, lastApplied, applyError, loadDeck, swipe, clearLastApplied, clearApplyError } = useShiftsStore();
   const profileHidden = useProfileStore((s) => s.hidden);
+  const photoIsFromTelegram = useProfileStore((s) => s.avatarIsFromTelegram);
   const filters = useFiltersStore((s) => s.filters);
   const unread = useNotificationsStore((s) => s.unreadCount());
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -64,6 +67,10 @@ export function Feed() {
   // Only the deck is replaced, not the whole app: hiding an anketa stops
   // new responses, it doesn't cancel the shifts and chats already in play.
   if (profileHidden) return <ProfileHidden />;
+  // То же самое для чужого фото: сервер откажет в отклике (см.
+  // applications.ts), и свайпать в пустоту, не понимая почему, — худшее из
+  // возможных объяснений.
+  if (photoIsFromTelegram) return <NeedOwnPhoto />;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -162,6 +169,8 @@ export function Feed() {
       <AnimatePresence>
         {lastApplied && <ApplySuccessOverlay shift={lastApplied} onClose={clearLastApplied} />}
       </AnimatePresence>
+
+      <ApplyRejectedSheet code={applyError} onClose={clearApplyError} />
     </div>
   );
 }
@@ -170,6 +179,54 @@ export function Feed() {
  *  tapping it. Stays open across "Пропустить" so you can keep paging
  *  through the deck without dropping back to the swipe view each time;
  *  "Откликнуться" closes it in favor of the existing apply-success screen. */
+/** Отклик, который сервер не принял. Свайп вправо отправлял заявку и
+ *  забывал о ней: экран в любом случае показывал «отклик отправлен», и
+ *  человек ждал ответа на то, чего нет. Причина у отказа всегда одна из
+ *  немногих известных — называем её и, где можно, даём кнопку. */
+function ApplyRejectedSheet({ code, onClose }: { code: string | null; onClose: () => void }) {
+  const navigate = useNavigate();
+  if (!code) return null;
+
+  const photo = code === 'photo_required';
+  const title = photo
+    ? 'Нужно своё фото'
+    : code === 'rate_limited'
+      ? 'Слишком много откликов'
+      : code === 'profile_hidden'
+        ? 'Анкета скрыта'
+        : 'Отклик не отправлен';
+  const text = photo
+    ? 'Работодатель выбирает человека на смену по лицу, поэтому откликаться можно только со своим фото, а не с картинкой из Telegram.'
+    : code === 'rate_limited'
+      ? 'За сегодня отправлено слишком много откликов. Попробуйте завтра — и лучше выбирать смены, на которые точно выйдете.'
+      : code === 'profile_hidden'
+        ? 'Пока анкета скрыта, откликаться на новые смены нельзя.'
+        : 'Не получилось отправить отклик — проверьте связь и попробуйте ещё раз.';
+
+  return (
+    <BottomSheet open onClose={onClose}>
+      <h2 className="text-[18px] font-extrabold leading-tight">{title}</h2>
+      <p className="text-[13px] text-text-muted mt-1.5 leading-relaxed">{text}</p>
+      <div className="flex gap-2 mt-4">
+        <Button variant="outline" className="flex-1" onClick={onClose}>
+          Понятно
+        </Button>
+        {photo && (
+          <Button
+            className="flex-1"
+            onClick={() => {
+              onClose();
+              navigate('/w/profile/edit');
+            }}
+          >
+            Поставить фото
+          </Button>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
 function ShiftDetailOverlay({
   shift,
   onClose,

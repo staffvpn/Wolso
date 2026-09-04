@@ -6,6 +6,7 @@ import { recomputeCompanyRating } from '../lib/ratings';
 import { workerIsHidden } from '../lib/hiddenProfiles';
 import { notifyCompany } from '../lib/notifyPrefs';
 import { APPLY_LIMIT, overLimit } from '../lib/rateLimit';
+import { hasOwnPhoto } from '../lib/ownPhoto';
 import { reportCancellation } from '../lib/incidents';
 
 export const applicationRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
@@ -73,6 +74,14 @@ applicationRoutes.post('/', async (c) => {
   // either. The app hides the feed for these accounts (see ProfileHidden),
   // this is the enforcement behind it.
   if (await workerIsHidden(c.env, session.workerId)) return c.json({ error: 'profile_hidden' }, 403);
+
+  // Отклик — это заявка работодателю, который будет выбирать по анкете, и
+  // первое, на что он смотрит, — фото. Картинка, скопированная из Telegram
+  // при регистрации, у половины анкет не имеет к человеку отношения, но
+  // выглядит как заполненное поле, поэтому её и не меняют. Проверка стоит
+  // здесь, а не только в интерфейсе: это единственное место, через которое
+  // отклик может появиться, и просьба, которую можно обойти, — не просьба.
+  if (!(await hasOwnPhoto(c.env, session.workerId))) return c.json({ error: 'photo_required' }, 403);
 
   if (await overLimit(c.env, 'applications', 'worker_id', session.workerId, APPLY_LIMIT)) {
     return c.json({ error: 'rate_limited' }, 429);

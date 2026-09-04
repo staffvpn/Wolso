@@ -68,8 +68,10 @@ export function WorkerProfileScreen() {
 
       {/* Not a scolding banner: it's the single change that most affects
           whether this person gets picked, and signup silently copied a
-          Telegram picture that may be a car or a landscape. Gone the
-          moment they upload anything of their own. */}
+          Telegram picture that may be a car or a landscape. Говорит и о
+          последствии тоже — откликаться с чужой картинкой нельзя (см.
+          applications.ts), и узнать об этом на свайпе было бы хуже. Gone
+          the moment they upload anything of their own. */}
       {profile.avatarIsFromTelegram && !profile.hidden && (
         <button
           onClick={() => navigate('/w/profile/edit')}
@@ -79,7 +81,8 @@ export function WorkerProfileScreen() {
           <span className="min-w-0">
             <span className="block text-[14px] font-bold">Поставьте своё фото</span>
             <span className="block text-[13px] text-text-muted leading-relaxed mt-0.5">
-              Сейчас на анкете фото из Telegram. Работодатель выбирает по лицу — с обычным селфи зовут заметно чаще.
+              Сейчас на анкете фото из Telegram. Работодатель выбирает по лицу, поэтому откликаться на смены можно
+              только со своим — обычное селфи, лицо видно.
             </span>
           </span>
         </button>

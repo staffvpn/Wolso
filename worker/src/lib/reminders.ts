@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { sendTelegramMessage } from './telegramBot';
 import { notifyCompany, notifyWorker } from './notifyPrefs';
+import { photoReminderColumnExists } from './ownPhoto';
 
 /** The two automatic bot reminders, run from the cron trigger (see
  *  wrangler.toml and the `scheduled` export in index.ts).
@@ -138,6 +139,52 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
   return { workers: workers.length, companies: companies.length };
 }
 
+/** Анкеты, на которых до сих пор стоит картинка из Telegram.
+ *
+ *  Само по себе это не мешало ничему — поле выглядит заполненным, поэтому
+ *  его и не трогают, — но откликаться теперь без своего фото нельзя (см.
+ *  routes/applications.ts). Человек, который зайдёт в приложение, узнает об
+ *  этом сразу; человек, который не зайдёт, не узнает никогда. Отсюда одно
+ *  сообщение — и объясняющее, а не требующее.
+ *
+ *  Профиль при этом должен быть заполнен: тому, кто вообще не дошёл до
+ *  конца регистрации, уже ушло письмо про профиль целиком, и второе про
+ *  фото — это ровно тот случай, после которого бота отключают. */
+const OWN_PHOTO_REMINDER_TEXT =
+  'На вашей анкете стоит фото из Telegram.\n\n' +
+  'Работодатель выбирает человека на смену по лицу, поэтому откликаться можно только со своим фото — ' +
+  'обычное селфи при дневном свете, лицо видно, этого достаточно.\n\n' +
+  'Откройте Wolso → Профиль → Редактировать и поставьте фото: это одно нажатие, и смены снова станут доступны.';
+
+async function remindTelegramPhotos(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT w.id, w.telegram_id
+     FROM workers w
+     LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+     WHERE w.photo_reminded_at IS NULL
+       AND w.status != 'suspended'
+       AND w.avatar_data IS NULL
+       AND w.photo_url IS NOT NULL
+       AND (t.active_role = 'worker' OR t.active_role IS NULL)
+       AND w.name != '' AND w.city != '' AND w.bio != '' AND w.skills != '' AND w.birthdate IS NOT NULL
+       AND EXISTS (SELECT 1 FROM worker_positions wp WHERE wp.worker_id = w.id AND wp.months > 0)
+     ORDER BY w.created_at ASC LIMIT ?`,
+  )
+    .bind(BATCH)
+    .all<{ id: number; telegram_id: number }>();
+
+  const support = supportLine(env);
+  const text = support ? `${OWN_PHOTO_REMINDER_TEXT}\n\n${support}` : OWN_PHOTO_REMINDER_TEXT;
+  const now = new Date().toISOString();
+
+  for (const w of results) {
+    await sendTelegramMessage(env, w.telegram_id, text);
+    await env.DB.prepare('UPDATE workers SET photo_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
+  }
+
+  return results.length;
+}
+
 /** Applicants nobody answered. One message per employer, not per
  *  applicant — someone with eight unanswered responses has one problem,
  *  not eight. */
@@ -271,6 +318,16 @@ export async function runReminders(env: Env): Promise<void> {
     console.log('pending-candidate reminders sent', pending);
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
+  }
+
+  try {
+    if (await photoReminderColumnExists(env)) {
+      console.log('own-photo reminders sent', await remindTelegramPhotos(env));
+    } else {
+      console.error('own-photo reminders skipped — migration 0035_own_photo_reminder is not applied');
+    }
+  } catch (err) {
+    console.error('own-photo reminders failed', err);
   }
 
   try {

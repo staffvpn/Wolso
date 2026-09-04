@@ -100,8 +100,12 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
   const underage = !!birthdate && !isAtLeast18(birthdate);
   const nameHasDigits = /\d/.test(name);
   // "фото" alone was ambiguous next to the «Дополнительные фото» block —
-  // name the field the screen actually labels.
-  if (!profile.avatarUrl) missing.push('главное фото');
+  // name the field the screen actually labels. Картинка, скопированная из
+  // Telegram при регистрации, здесь не считается: она у всех есть, поэтому
+  // поле выглядит заполненным и его никто не меняет — а откликнуться с ней
+  // всё равно не выйдет (см. applications.ts). Лучше попросить сразу, чем
+  // после первого свайпа.
+  if (!profile.avatarUrl || profile.avatarIsFromTelegram) missing.push('главное фото');
   if (profile.positions.length === 0) missing.push('опыт работы');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
