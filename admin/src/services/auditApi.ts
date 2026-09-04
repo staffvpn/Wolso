@@ -22,7 +22,26 @@ function fromApi(e: AuditApiRow): AuditLogEntry {
   };
 }
 
-export async function fetchAuditLog(): Promise<AuditLogEntry[]> {
-  const { entries } = await apiFetch<{ entries: AuditApiRow[] }>('/admin/audit-log');
-  return entries.map(fromApi);
+export interface AuditFilters {
+  /** Точное имя сотрудника, 'all' — без фильтра. */
+  actor?: string;
+  /** 'danger' — только разрушительное, 'all' — всё. */
+  tone?: string;
+  /** Подстрока в тексте действия: имя пользователя, название заведения. */
+  q?: string;
+}
+
+/** Фильтруем на сервере, а не в браузере: экран показывает последние 100
+ *  записей, и фильтр по уже загруженной сотне находил бы только то, что и
+ *  так на виду, — а искать в журнале нужно как раз то, что уже уехало
+ *  вниз. Список сотрудников приходит оттуда же, из самого журнала: человек
+ *  мог уйти из команды, а его действия остались. */
+export async function fetchAuditLog(filters: AuditFilters = {}): Promise<{ entries: AuditLogEntry[]; actors: string[] }> {
+  const params = new URLSearchParams({ limit: '200' });
+  if (filters.actor && filters.actor !== 'all') params.set('actor', filters.actor);
+  if (filters.tone && filters.tone !== 'all') params.set('tone', filters.tone);
+  if (filters.q?.trim()) params.set('q', filters.q.trim());
+
+  const data = await apiFetch<{ entries: AuditApiRow[]; actors?: string[] }>(`/admin/audit-log?${params}`);
+  return { entries: data.entries.map(fromApi), actors: data.actors ?? [] };
 }

@@ -388,3 +388,86 @@ export async function setTeamMemberRole(memberId: string, roleId: string): Promi
 export async function revokeTeamAccess(memberId: string): Promise<void> {
   await apiFetch(`/admin/users/team/${memberId}/revoke`, { method: 'POST' });
 }
+
+export interface UserChat {
+  id: string;
+  workerName: string;
+  companyName: string;
+  positionLabel?: string;
+  date?: string;
+  messageCount: number;
+  lastAt?: string;
+}
+
+export interface ChatMessageRow {
+  id: string;
+  sender: 'worker' | 'company' | 'system';
+  text: string;
+  createdAt: string;
+}
+
+/** Переписка работодателя с соискателем — только чтение, для разбора
+ *  спора. До этого у команды были только support-чаты, поэтому «он не
+ *  вышел» против «меня не пустили» решалось наугад. Каждый просмотр
+ *  пишется в аудит-лог: за чтением чужой переписки должен оставаться след. */
+export async function fetchUserChats(kind: 'seeker' | 'employer', id: string): Promise<UserChat[]> {
+  const { chats } = await apiFetch<{
+    chats: {
+      id: number;
+      worker_name: string;
+      company_name: string;
+      position_label: string | null;
+      date: string | null;
+      message_count: number;
+      last_at: string | null;
+    }[];
+  }>(`/admin/users/chats/${kind}/${id}`);
+
+  return chats.map((c) => ({
+    id: String(c.id),
+    workerName: c.worker_name,
+    companyName: c.company_name,
+    positionLabel: c.position_label ?? undefined,
+    date: c.date ?? undefined,
+    messageCount: c.message_count,
+    lastAt: c.last_at ?? undefined,
+  }));
+}
+
+export async function fetchChatMessages(chatId: string): Promise<ChatMessageRow[]> {
+  const { messages } = await apiFetch<{
+    messages: { id: number; sender: string; text: string; created_at: string }[];
+  }>(`/admin/users/chat-messages/${chatId}`);
+
+  return messages.map((m) => ({
+    id: String(m.id),
+    sender: m.sender as ChatMessageRow['sender'],
+    text: m.text,
+    createdAt: m.created_at,
+  }));
+}
+
+export interface UserNote {
+  id: string;
+  text: string;
+  authorName: string;
+  createdAt: string;
+}
+
+/** Заметки команды по человеку: история решений («звонил, обещал заменить
+ *  фото») до этого жила в голове того, кто решал, — а решают по очереди
+ *  разные люди. */
+export async function fetchUserNotes(kind: 'seeker' | 'employer', id: string): Promise<UserNote[]> {
+  const { notes } = await apiFetch<{ notes: { id: number; text: string; author_name: string; created_at: string }[] }>(
+    `/admin/users/notes/${kind}/${id}`,
+  );
+  return notes.map((n) => ({ id: String(n.id), text: n.text, authorName: n.author_name, createdAt: n.created_at }));
+}
+
+export async function addUserNote(kind: 'seeker' | 'employer', id: string, text: string): Promise<void> {
+  await apiFetch(`/admin/users/notes/${kind}/${id}`, { method: 'POST', body: { text } });
+}
+
+export async function deleteUserNote(noteId: string): Promise<void> {
+  await apiFetch(`/admin/users/notes/${noteId}`, { method: 'DELETE' });
+}

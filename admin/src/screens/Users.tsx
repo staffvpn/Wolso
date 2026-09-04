@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
+import { UserChatsAndNotes } from '@/components/UserChatsAndNotes';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useUserDetailStore } from '@/store/useUserDetailStore';
 import { deleteReview } from '@/services/usersApi';
@@ -866,6 +867,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
               await refreshUsers();
             }}
           />
+          <UserChatsAndNotes kind="seeker" id={user.id} />
           <div>
             <SectionLabel>Завершённые смены{completedApplications.length > 0 ? ` (${completedApplications.length})` : ''}</SectionLabel>
             {completedApplications.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}
@@ -1134,6 +1136,7 @@ function EmployerDetail({ user }: { user: PlatformUser }) {
               await refreshUsers();
             }}
           />
+          <UserChatsAndNotes kind="employer" id={user.id} />
           <div>
             <SectionLabel>Завершённые вакансии{closedVacancies.length > 0 ? ` (${closedVacancies.length})` : ''}</SectionLabel>
             {closedVacancies.length === 0 && <p className="text-[13px] text-text-faint">Пока нет</p>}

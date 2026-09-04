@@ -54,3 +54,32 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
+
+/** Скачивает файл, который отдаёт API. Через fetch, а не через ссылку:
+ *  выгрузка требует токен в заголовке, а обычный <a href> его не пошлёт —
+ *  сервер ответит 401, и браузер молча скачает файл с ошибкой внутри. */
+export async function apiDownload(path: string, fallbackName: string): Promise<void> {
+  if (!API_URL) throw new Error('VITE_API_URL is not set');
+
+  const token = useSessionStore.getState().token;
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+  if (res.status === 401) useSessionStore.getState().logout();
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (payload as { error?: string }).error);
+  }
+
+  // Имя берём из Content-Disposition — сервер уже проставил туда дату.
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const named = /filename="([^"]+)"/.exec(disposition)?.[1];
+
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = named ?? fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

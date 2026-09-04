@@ -1,62 +1,68 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { useAuditStore } from '@/store/useAuditStore';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
-const ROLE_FILTERS = ['Все', 'Owner', 'Админ', 'Модератор', 'Поддержка'];
+const TONE_FILTERS = [
+  { id: 'all', label: 'Все' },
+  { id: 'danger', label: 'Опасные' },
+  { id: 'neutral', label: 'Обычные' },
+];
 const TONE_DOT: Record<string, string> = { accent: 'bg-accent', danger: 'bg-danger', neutral: 'bg-text-faint' };
 
 export function AuditLog() {
   const entries = useAuditStore((s) => s.entries);
+  const actors = useAuditStore((s) => s.actors);
   const load = useAuditStore((s) => s.load);
   const [query, setQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('Все');
+  const [actor, setActor] = useState('all');
+  const [tone, setTone] = useState('all');
 
+  // Фильтруем запросом к серверу, а не по загруженному куску: журнал
+  // длинный, и искать в нём нужно как раз то, что уже ушло вниз. Поиск
+  // отложен, чтобы не дёргать API на каждую букву.
   useEffect(() => {
-    load();
+    const t = setTimeout(() => load({ actor, tone, q: query }), query ? 350 : 0);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const filtered = useMemo(() => {
-    return entries.filter((e) => {
-      const matchesRole = roleFilter === 'Все' || e.actorRoleLabel === roleFilter;
-      const matchesQuery = !query.trim() || `${e.actorName} ${e.action}`.toLowerCase().includes(query.trim().toLowerCase());
-      return matchesRole && matchesQuery;
-    });
-  }, [entries, query, roleFilter]);
+  }, [actor, tone, query]);
 
   return (
     <div className="pb-10">
       <PageHeader
         title="Аудит-лог"
         subtitle="Все действия команды, без удаления"
-        right={
-          <Button variant="outline">
-            <Download size={15} /> Экспорт CSV
-          </Button>
-        }
       />
 
       <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap">
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по действию или человеку" className="w-full sm:w-[280px]" />
-        <Tabs value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTERS.map((r) => ({ id: r, label: r }))} />
+        {/* Сотрудники берутся из самого журнала, а не из состава команды:
+            человек мог уйти, а его действия остались и их надо уметь найти. */}
+        <Select value={actor} onChange={(e) => setActor(e.target.value)} className="w-full sm:w-[200px]">
+          <option value="all">Все сотрудники</option>
+          {actors.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </Select>
+        <Tabs value={tone} onChange={setTone} options={TONE_FILTERS} />
       </div>
 
       <div className="px-4 sm:px-8">
         <Card className="p-6">
-          {filtered.length === 0 ? (
+          {entries.length === 0 ? (
             <p className="text-center text-[13px] text-text-faint py-8">Ничего не найдено</p>
           ) : (
             <div className="relative">
               <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border-soft" />
               <div className="space-y-5">
-                {filtered.map((e) => (
+                {entries.map((e) => (
                   <div key={e.id} className="relative flex gap-3.5 pl-0">
                     <span className={cn('h-[11px] w-[11px] rounded-full mt-1 shrink-0 ring-4 ring-surface', TONE_DOT[e.tone])} />
                     <div className="min-w-0 -mt-0.5">
