@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/apiClient';
-import type { PersonalShift } from '@/types';
+import type { PersonalShift, PersonalShiftStatus } from '@/types';
 
 interface ApiRow {
   id: number;
@@ -13,10 +13,14 @@ interface ApiRow {
   endMin: number;
   pay: number;
   notes: string;
+  /** Отсутствуют, пока на сервере не применена миграция 0033 — тогда
+   *  считаем всё запланированным, как и до появления статуса. */
+  status?: PersonalShiftStatus;
+  foundVia?: string;
 }
 
 function fromApi(r: ApiRow): PersonalShift {
-  return { ...r, id: String(r.id) };
+  return { ...r, id: String(r.id), status: r.status ?? 'planned', foundVia: r.foundVia ?? '' };
 }
 
 export type PersonalShiftInput = Omit<PersonalShift, 'id'>;

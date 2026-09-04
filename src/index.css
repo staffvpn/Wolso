@@ -27,6 +27,14 @@
   --color-warning: #e8b23f;
   --color-warning-soft: rgba(232, 178, 63, 0.14);
 
+  /* Личные смены — работа, которую человек нашёл сам. Отдельный цвет, а не
+   * оттенок зелёного: в календаре синий против фирменного зелёного читается
+   * с одного взгляда, и своя смена никогда не выглядит как работа через
+   * Wolso. Тёмный -fg, потому что текст ложится на заливку. */
+  --color-info: #4a9dff;
+  --color-info-soft: rgba(74, 157, 255, 0.16);
+  --color-info-fg: #04121f;
+
   --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   --radius-card: 1.25rem;

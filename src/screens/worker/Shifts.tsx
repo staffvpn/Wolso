@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Mail, Plus, Star, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Mail, Plus, Star, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Card } from '@/components/ui/Card';
@@ -12,6 +12,7 @@ import { PersonalShiftSheet } from '@/components/PersonalShiftSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { usePersonalShiftsStore } from '@/store/usePersonalShiftsStore';
 import { resolveCompany } from '@/data/companies';
+import { foundViaLabel } from '@/data/foundVia';
 import { formatDateRange, formatDayMonth, formatMoney, isSameDay, localDateStr, weekdayShort } from '@/lib/format';
 import { hapticNotify, hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
@@ -68,11 +69,12 @@ function entryDate(e: Entry) {
 }
 
 /** Отработана ли запись. У смены Wolso это решает работодатель, закрывая
- *  её; у личной — календарь: её никто не подтверждает, поэтому «прошла
- *  дата» и есть весь статус. */
-function entryDone(e: Entry, today: Date) {
+ *  её; у личной — сам человек кнопкой «Отработал». По дате это больше не
+ *  выводится: смену переносят, срывают и просто не выходят, а календарь
+ *  всё равно записывал её в отработанные и в заработок за месяц. */
+function entryDone(e: Entry) {
   if (e.source === 'wolso') return e.app.workStage === 'employer_closed' || e.app.workStage === 'reviewed';
-  return stripTime(new Date(e.personal.date)) < stripTime(today);
+  return e.personal.status === 'worked';
 }
 
 function entryCoversDay(e: Entry, day: Date) {
@@ -94,6 +96,26 @@ function personalTimeRange(p: PersonalShift) {
   return `${pad(p.startHour)}:${pad(p.startMin)}–${pad(p.endHour)}:${pad(p.endMin)}`;
 }
 
+/** Чем красить день в календаре. Цвет говорит про источник: зелёный —
+ *  работа через Wolso, синий — своя. Заливка говорит про статус:
+ *  отработанный день закрашен целиком, запланированный только подсвечен —
+ *  так «что уже было» и «что ещё предстоит» различимы, не отнимая у цвета
+ *  его единственное значение. День, где есть и то и другое, красится
+ *  пополам, а не выбирает победителя. */
+function dayClasses(dayEntries: Entry[]): string {
+  const hasWolso = dayEntries.some((e) => e.source === 'wolso');
+  const hasPersonal = dayEntries.some((e) => e.source === 'personal');
+  const worked = dayEntries.some(entryDone);
+
+  if (hasWolso && hasPersonal) {
+    return worked
+      ? 'bg-[linear-gradient(135deg,var(--color-accent)_0_50%,var(--color-info)_50%_100%)] text-accent-fg'
+      : 'bg-[linear-gradient(135deg,var(--color-accent-soft)_0_50%,var(--color-info-soft)_50%_100%)] text-text';
+  }
+  if (hasPersonal) return worked ? 'bg-info text-info-fg' : 'bg-info-soft text-info ring-1 ring-info/40';
+  return worked ? 'bg-accent text-accent-fg' : 'bg-accent-soft text-accent ring-1 ring-accent/40';
+}
+
 export function Shifts() {
   const applications = useApplicationsStore((s) => s.applications);
   const load = useApplicationsStore((s) => s.load);
@@ -101,6 +123,7 @@ export function Shifts() {
   const cancelApplication = useApplicationsStore((s) => s.cancelApplication);
   const personal = usePersonalShiftsStore((s) => s.shifts);
   const loadPersonal = usePersonalShiftsStore((s) => s.load);
+  const updatePersonal = usePersonalShiftsStore((s) => s.update);
   const [cancelling, setCancelling] = useState<Application | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [personalSheet, setPersonalSheet] = useState<{ editing: PersonalShift | null; date?: string } | null>(null);
@@ -110,6 +133,14 @@ export function Shifts() {
     loadPersonal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Отметить личную смену отработанной — из карточки или строки, без
+   *  открытия формы. Ошибку глушим: список останется как был, и человек
+   *  увидит, что переключение не сработало. */
+  function markWorked(shift: PersonalShift) {
+    hapticNotify('success');
+    void updatePersonal(shift.id, { status: 'worked' }).catch(() => {});
+  }
 
   const withShift = (list: Application[]): Entry[] =>
     list
@@ -134,17 +165,15 @@ export function Shifts() {
   const today = new Date();
 
   // Личные смены — те же записи календаря, просто другого происхождения.
-  // Разделение на «впереди» и «отработана» у них по дате: подтверждать их
-  // некому.
+  // Разделение на «впереди» и «отработана» у них по статусу, который
+  // человек ставит сам: подтверждать их некому.
   const personalEntries = useMemo<Entry[]>(() => personal.map((p) => ({ source: 'personal', personal: p })), [personal]);
   const personalUpcoming = useMemo(
-    () => personalEntries.filter((e) => !entryDone(e, today)).sort((a, b) => entryDate(a).localeCompare(entryDate(b))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => personalEntries.filter((e) => !entryDone(e)).sort((a, b) => entryDate(a).localeCompare(entryDate(b))),
     [personalEntries],
   );
   const personalDone = useMemo(
-    () => personalEntries.filter((e) => entryDone(e, today)).sort((a, b) => entryDate(b).localeCompare(entryDate(a))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => personalEntries.filter((e) => entryDone(e)).sort((a, b) => entryDate(b).localeCompare(entryDate(a))),
     [personalEntries],
   );
 
@@ -210,6 +239,7 @@ export function Shifts() {
                       key={entryKey(entry)}
                       shift={entry.personal}
                       onEdit={() => setPersonalSheet({ editing: entry.personal })}
+                      onMarkWorked={() => markWorked(entry.personal)}
                     />
                   );
                 }
@@ -268,6 +298,7 @@ export function Shifts() {
                       key={entryKey(entry)}
                       shift={entry.personal}
                       onEdit={() => setPersonalSheet({ editing: entry.personal })}
+                      onMarkWorked={() => markWorked(entry.personal)}
                     />
                   );
                 }
@@ -317,7 +348,6 @@ export function Shifts() {
                   <PersonalShiftRow
                     key={entryKey(entry)}
                     shift={entry.personal}
-                    done
                     onEdit={() => setPersonalSheet({ editing: entry.personal })}
                   />
                 ) : (
@@ -465,7 +495,7 @@ function CalendarOverlay({
   const monthStats = useMemo(() => {
     const inMonth = entries.filter((e) => {
       const d = new Date(entryDate(e));
-      return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth() && entryDone(e, today);
+      return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth() && entryDone(e);
     });
     const wolso = inMonth.filter((e) => e.source === 'wolso');
     const own = inMonth.filter((e) => e.source === 'personal');
@@ -521,7 +551,8 @@ function CalendarOverlay({
         <div className="grid grid-cols-7 gap-1">
           {cells.map((day, i) => {
             if (!day) return <span key={`blank-${i}`} />;
-            const count = shiftsOn(day).length;
+            const dayEntries = shiftsOn(day);
+            const count = dayEntries.length;
             const isToday = isSameDay(day, today);
             const isSelected = selected != null && isSameDay(day, selected);
             return (
@@ -533,21 +564,26 @@ function CalendarOverlay({
                 }}
                 className={cn(
                   'aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-[14px] font-semibold transition-colors',
-                  count > 0 && !isSelected && 'bg-accent text-accent-fg',
+                  count > 0 && !isSelected && dayClasses(dayEntries),
                   count === 0 && !isSelected && 'bg-surface text-text-muted',
                   isSelected && 'bg-text text-bg',
                   isToday && !isSelected && count === 0 && 'ring-1 ring-accent',
                 )}
               >
                 {day.getDate()}
-                {count > 1 && (
-                  <span className={cn('text-[9px] font-bold leading-none', isSelected ? 'text-bg/70' : 'text-accent-fg/80')}>
-                    {count}
-                  </span>
-                )}
+                {count > 1 && <span className="text-[9px] font-bold leading-none opacity-70">{count}</span>}
               </button>
             );
           })}
+        </div>
+
+        {/* Легенда: цвет в календаре ничего не значит, пока не сказано, что
+            он значит. Четыре состояния — ровно те, что рисует dayClasses. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5">
+          <LegendDot className="bg-accent" label="Wolso — отработана" />
+          <LegendDot className="bg-accent-soft ring-1 ring-accent/40" label="Wolso — впереди" />
+          <LegendDot className="bg-info" label="Своя — отработана" />
+          <LegendDot className="bg-info-soft ring-1 ring-info/40" label="Своя — впереди" />
         </div>
       </div>
 
@@ -568,17 +604,18 @@ function CalendarOverlay({
                 <button
                   key={entryKey(entry)}
                   onClick={() => onEditPersonal(p)}
-                  className="w-full text-left rounded-card bg-surface border border-dashed border-border p-3.5"
+                  className="w-full text-left rounded-card bg-surface border border-dashed border-info/40 p-3.5"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="font-semibold text-[14px] truncate">{p.positionLabel} · {p.placeName}</p>
                     {/* Источник виден на каждой карточке: личная смена не
                         должна выглядеть как работа через Wolso. */}
-                    <Badge tone="neutral">Личная</Badge>
+                    <Badge tone="info">{p.status === 'worked' ? 'Своя · отработана' : 'Своя'}</Badge>
                   </div>
                   <p className="text-[12px] text-text-muted">
                     {personalTimeRange(p)}
                     {p.pay > 0 ? ` · ${formatMoney(p.pay)}` : ''}
+                    {p.foundVia ? ` · ${foundViaLabel(p.foundVia)}` : ''}
                   </p>
                   {p.address && <p className="text-[12px] text-text-faint mt-0.5 truncate">{p.address}</p>}
                 </button>
@@ -660,49 +697,82 @@ function CalendarOverlay({
   );
 }
 
-/** Личная смена на сегодня. Намеренно без кнопок «отметиться» и «не смогу
- *  выйти»: отмечаться не перед кем, отменять — тем более. Всё, что тут
- *  можно, — поправить или удалить запись. */
-function PersonalShiftCard({ shift, onEdit }: { shift: PersonalShift; onEdit: () => void }) {
+function LegendDot({ className, label }: { className: string; label: string }) {
   return (
-    <motion.button
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-text-faint">
+      <span className={cn('h-2.5 w-2.5 rounded-[4px]', className)} />
+      {label}
+    </span>
+  );
+}
+
+/** Личная смена на сегодня. Намеренно без кнопок «отметиться» и «не смогу
+ *  выйти»: отмечаться не перед кем, отменять — тем более. Отметить
+ *  отработанной можно прямо отсюда — ради одного переключателя открывать
+ *  форму незачем. */
+function PersonalShiftCard({ shift, onEdit, onMarkWorked }: { shift: PersonalShift; onEdit: () => void; onMarkWorked: () => void }) {
+  return (
+    <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={onEdit}
-      className="w-full text-left rounded-card bg-surface border border-dashed border-border p-4"
+      className="rounded-card bg-surface border border-dashed border-info/40 p-4"
     >
-      <div className="flex items-center justify-between mb-3">
-        <Badge tone="neutral">Личная</Badge>
-        <span className="text-[13px] text-text-muted">{personalTimeRange(shift)}</span>
-      </div>
-      <p className="font-bold text-[17px]">{shift.positionLabel} · {shift.placeName}</p>
-      {shift.address && <p className="text-[13px] text-text-muted mt-0.5">{shift.address}</p>}
-      {shift.pay > 0 && <p className="text-[13px] text-text-muted mt-0.5">{formatMoney(shift.pay)}</p>}
-      {shift.notes && <p className="text-[13px] text-text-faint mt-2 whitespace-pre-line">{shift.notes}</p>}
-      <p className="text-[12px] text-text-faint mt-3">Нажмите, чтобы изменить</p>
-    </motion.button>
+      <button onClick={onEdit} className="w-full text-left">
+        <div className="flex items-center justify-between mb-3">
+          <Badge tone="info">Своя смена</Badge>
+          <span className="text-[13px] text-text-muted">{personalTimeRange(shift)}</span>
+        </div>
+        <p className="font-bold text-[17px]">{shift.positionLabel} · {shift.placeName}</p>
+        {shift.address && <p className="text-[13px] text-text-muted mt-0.5">{shift.address}</p>}
+        {shift.pay > 0 && <p className="text-[13px] text-text-muted mt-0.5">{formatMoney(shift.pay)}</p>}
+        {shift.foundVia && <p className="text-[13px] text-text-faint mt-0.5">Нашли: {foundViaLabel(shift.foundVia)}</p>}
+        {shift.notes && <p className="text-[13px] text-text-faint mt-2 whitespace-pre-line">{shift.notes}</p>}
+      </button>
+
+      {shift.status === 'planned' ? (
+        <Button variant="dark" fullWidth className="mt-3" onClick={onMarkWorked}>
+          <Check size={17} /> Отработал
+        </Button>
+      ) : (
+        <p className="text-[12px] text-text-faint mt-3">Отмечена как отработанная · нажмите, чтобы изменить</p>
+      )}
+    </motion.div>
   );
 }
 
 /** Компактная строка личной смены — и в «Дальше», и в «Отработанных».
- *  Пунктирная рамка и метка «Личная» отличают её от смены Wolso с одного
- *  взгляда: выдавать своё за работу через платформу нельзя. */
-function PersonalShiftRow({ shift, done, onEdit }: { shift: PersonalShift; done?: boolean; onEdit: () => void }) {
+ *  Пунктирная синяя рамка и метка «Своя» отличают её от смены Wolso с
+ *  одного взгляда: выдавать своё за работу через платформу нельзя. */
+function PersonalShiftRow({ shift, onEdit, onMarkWorked }: { shift: PersonalShift; onEdit: () => void; onMarkWorked?: () => void }) {
   const d = new Date(shift.date);
   return (
-    <button onClick={onEdit} className="w-full text-left flex items-center gap-3 rounded-card bg-surface border border-dashed border-border p-3.5">
-      <div className="flex flex-col items-center justify-center w-11 shrink-0 rounded-xl bg-surface-2 py-1.5">
-        <span className="text-[10px] text-text-faint uppercase">{weekdayShort(d)}</span>
-        <span className="text-[15px] font-bold">{d.getDate()}</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {shift.placeName}</p>
-        <p className="text-[12px] text-text-muted truncate">
-          {personalTimeRange(shift)}
-          {shift.pay > 0 ? ` · ${formatMoney(shift.pay)}` : ''}
-        </p>
-      </div>
-      <Badge tone="neutral" className="shrink-0">{done ? 'Личная' : 'Личная'}</Badge>
-    </button>
+    <div className="flex items-center gap-3 rounded-card bg-surface border border-dashed border-info/40 p-3.5">
+      <button onClick={onEdit} className="min-w-0 flex-1 text-left flex items-center gap-3">
+        <div className="flex flex-col items-center justify-center w-11 shrink-0 rounded-xl bg-surface-2 py-1.5">
+          <span className="text-[10px] text-text-faint uppercase">{weekdayShort(d)}</span>
+          <span className="text-[15px] font-bold">{d.getDate()}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[14px] truncate">{shift.positionLabel} · {shift.placeName}</p>
+          <p className="text-[12px] text-text-muted truncate">
+            {personalTimeRange(shift)}
+            {shift.pay > 0 ? ` · ${formatMoney(shift.pay)}` : ''}
+            {shift.foundVia ? ` · ${foundViaLabel(shift.foundVia)}` : ''}
+          </p>
+        </div>
+      </button>
+      {/* «Отработал» одной кнопкой — там, где смена ещё запланирована.
+          У отработанной остаётся только метка. */}
+      {shift.status === 'planned' && onMarkWorked ? (
+        <button
+          onClick={onMarkWorked}
+          className="shrink-0 h-9 px-3 rounded-xl bg-info-soft text-info text-[12px] font-semibold flex items-center gap-1"
+        >
+          <Check size={14} /> Отработал
+        </button>
+      ) : (
+        <Badge tone="info" className="shrink-0">Своя</Badge>
+      )}
+    </div>
   );
 }

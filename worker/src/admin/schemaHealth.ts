@@ -17,6 +17,7 @@ import sql0028 from '../../migrations/0028_reminders.sql';
 import sql0029 from '../../migrations/0029_worker_employment_type.sql';
 import sql0030 from '../../migrations/0030_notification_settings.sql';
 import sql0032 from '../../migrations/0032_personal_shifts.sql';
+import sql0033 from '../../migrations/0033_personal_shift_status.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -56,6 +57,8 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'workers', column: 'notify_employer_replies', migration: '0030_notification_settings', breaks: 'переключатели уведомлений в настройках' },
   { table: 'applications', column: 'shift_reminded_at', migration: '0030_notification_settings', breaks: 'напоминание перед сменой' },
   { table: 'companies', column: 'notify_new_responses', migration: '0031_complaints_and_employer_settings', breaks: 'настройки уведомлений у работодателя' },
+  { table: 'personal_shifts', column: 'status', migration: '0033_personal_shift_status', breaks: '«отработал / запланировал» в личных сменах' },
+  { table: 'personal_shifts', column: 'found_via', migration: '0033_personal_shift_status', breaks: 'отметка «где нашёл» в личных сменах' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -90,6 +93,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0030_notification_settings': sql0030,
   '0031_complaints_and_employer_settings': sql0031,
   '0032_personal_shifts': sql0032,
+  '0033_personal_shift_status': sql0033,
 };
 
 /** Strips the explanatory comments and splits into individual statements,
@@ -126,7 +130,11 @@ adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
   // would otherwise show up as "every column missing" rather than as the
   // one missing table it actually is.
   const missingTables = REQUIRED_TABLES.filter((t) => !present.get(t.table)?.size);
-  const missingColumns = REQUIRED_COLUMNS.filter((r) => !present.get(r.table)?.has(r.column));
+  // Столбцы отсутствующей таблицы не перечисляем: она уже названа выше, а
+  // «нет столбца status» рядом с «нет таблицы personal_shifts» только сбивает
+  // с толку — чинится это одной миграцией, создающей таблицу.
+  const absentTables = new Set(missingTables.map((t) => t.table));
+  const missingColumns = REQUIRED_COLUMNS.filter((r) => !absentTables.has(r.table) && !present.get(r.table)?.has(r.column));
 
   const missingMigrations = [...new Set([...missingColumns, ...missingTables].map((m) => m.migration))].sort();
 

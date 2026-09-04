@@ -24,6 +24,15 @@ interface Row {
   pay: number;
   notes: string;
   created_at: string;
+  /** Появились в миграции 0033 — до неё в строке их просто нет. */
+  status?: string;
+  found_via?: string;
+}
+
+/** Сегодня по UTC. Запасной вариант статуса для базы без миграции 0033:
+ *  ровно то правило, по которому экран раньше и определял отработанность. */
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function toJson(r: Row) {
@@ -39,6 +48,8 @@ function toJson(r: Row) {
     endMin: r.end_min,
     pay: r.pay,
     notes: r.notes,
+    status: r.status === 'worked' || r.status === 'planned' ? r.status : r.date < todayStr() ? 'worked' : 'planned',
+    foundVia: r.found_via ?? '',
     createdAt: r.created_at,
   };
 }
@@ -59,6 +70,23 @@ async function tableExists(env: Env): Promise<boolean> {
   }
 }
 
+/** И то же самое для миграции 0033 отдельно: таблица может существовать со
+ *  старым набором столбцов. Пока её не применили, статус и «где нашёл»
+ *  просто не пишутся — вместо 500 на каждое сохранение смены. */
+let statusConfirmed = false;
+
+async function statusColumnsExist(env: Env): Promise<boolean> {
+  if (statusConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(personal_shifts)').all<{ name: string }>();
+    const names = new Set(results.map((r) => r.name));
+    statusConfirmed = names.has('status') && names.has('found_via');
+    return statusConfirmed;
+  } catch {
+    return false;
+  }
+}
+
 interface Body {
   placeName?: string;
   address?: string;
@@ -70,6 +98,8 @@ interface Body {
   endMin?: number;
   pay?: number;
   notes?: string;
+  status?: string;
+  foundVia?: string;
 }
 
 /** Что обязательно, а что нет. Название, должность, дата и время — без них
@@ -88,6 +118,7 @@ function validate(b: Body): string | null {
     if (!Number.isInteger(m) || m! < 0 || m! > 59) return 'time_required';
   }
   if (b.pay !== undefined && (!Number.isFinite(b.pay) || b.pay < 0)) return 'pay_invalid';
+  if (b.status !== undefined && b.status !== 'planned' && b.status !== 'worked') return 'status_invalid';
   return null;
 }
 
@@ -113,24 +144,31 @@ personalShiftRoutes.post('/', async (c) => {
   const problem = validate(body);
   if (problem) return c.json({ error: problem }, 400);
 
+  const withStatus = await statusColumnsExist(c.env);
+  const columns = ['worker_id', 'place_name', 'address', 'position_label', 'date', 'start_hour', 'start_min', 'end_hour', 'end_min', 'pay', 'notes'];
+  const values: unknown[] = [
+    session.workerId,
+    body.placeName!.trim().slice(0, 200),
+    (body.address ?? '').trim().slice(0, 300),
+    body.positionLabel!.trim().slice(0, 100),
+    body.date,
+    body.startHour,
+    body.startMin ?? 0,
+    body.endHour,
+    body.endMin ?? 0,
+    Math.round(body.pay ?? 0),
+    (body.notes ?? '').trim().slice(0, 1000),
+  ];
+  if (withStatus) {
+    columns.push('status', 'found_via');
+    values.push(body.status ?? 'planned', (body.foundVia ?? '').trim().slice(0, 60));
+  }
+
   const row = await c.env.DB.prepare(
-    `INSERT INTO personal_shifts (worker_id, place_name, address, position_label, date,
-                                  start_hour, start_min, end_hour, end_min, pay, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+    `INSERT INTO personal_shifts (${columns.join(', ')})
+     VALUES (${columns.map(() => '?').join(', ')}) RETURNING *`,
   )
-    .bind(
-      session.workerId,
-      body.placeName!.trim().slice(0, 200),
-      (body.address ?? '').trim().slice(0, 300),
-      body.positionLabel!.trim().slice(0, 100),
-      body.date,
-      body.startHour,
-      body.startMin ?? 0,
-      body.endHour,
-      body.endMin ?? 0,
-      Math.round(body.pay ?? 0),
-      (body.notes ?? '').trim().slice(0, 1000),
-    )
+    .bind(...values)
     .first<Row>();
 
   return c.json({ shift: toJson(row!) });
@@ -150,7 +188,7 @@ personalShiftRoutes.patch('/:id', async (c) => {
   if (!existing) return c.json({ error: 'not_found' }, 404);
 
   const body = await c.req.json<Body>().catch((): Body => ({}));
-  // Правки частичные: экран может прислать одну изменённую оплату. Сливаем
+  // Правки частичные: экран может прислать один изменённый статус. Сливаем
   // с тем, что уже лежит, и проверяем результат целиком — иначе половинчатая
   // правка могла бы оставить запись без времени.
   const merged: Body = {
@@ -164,31 +202,47 @@ personalShiftRoutes.patch('/:id', async (c) => {
     endMin: body.endMin ?? existing.end_min,
     pay: body.pay ?? existing.pay,
     notes: body.notes ?? existing.notes,
+    status: body.status ?? existing.status ?? 'planned',
+    foundVia: body.foundVia ?? existing.found_via ?? '',
   };
   const problem = validate(merged);
   if (problem) return c.json({ error: problem }, 400);
 
+  const withStatus = await statusColumnsExist(c.env);
+  const sets = [
+    'place_name = ?',
+    'address = ?',
+    'position_label = ?',
+    'date = ?',
+    'start_hour = ?',
+    'start_min = ?',
+    'end_hour = ?',
+    'end_min = ?',
+    'pay = ?',
+    'notes = ?',
+  ];
+  const values: unknown[] = [
+    merged.placeName!.trim().slice(0, 200),
+    (merged.address ?? '').trim().slice(0, 300),
+    merged.positionLabel!.trim().slice(0, 100),
+    merged.date,
+    merged.startHour,
+    merged.startMin,
+    merged.endHour,
+    merged.endMin,
+    Math.round(merged.pay ?? 0),
+    (merged.notes ?? '').trim().slice(0, 1000),
+  ];
+  if (withStatus) {
+    sets.push('status = ?', 'found_via = ?');
+    values.push(merged.status, (merged.foundVia ?? '').trim().slice(0, 60));
+  }
+
   const row = await c.env.DB.prepare(
-    `UPDATE personal_shifts
-     SET place_name = ?, address = ?, position_label = ?, date = ?,
-         start_hour = ?, start_min = ?, end_hour = ?, end_min = ?, pay = ?, notes = ?,
-         updated_at = datetime('now')
+    `UPDATE personal_shifts SET ${sets.join(', ')}, updated_at = datetime('now')
      WHERE id = ? AND worker_id = ? RETURNING *`,
   )
-    .bind(
-      merged.placeName!.trim().slice(0, 200),
-      (merged.address ?? '').trim().slice(0, 300),
-      merged.positionLabel!.trim().slice(0, 100),
-      merged.date,
-      merged.startHour,
-      merged.startMin,
-      merged.endHour,
-      merged.endMin,
-      Math.round(merged.pay ?? 0),
-      (merged.notes ?? '').trim().slice(0, 1000),
-      id,
-      session.workerId,
-    )
+    .bind(...values, id, session.workerId)
     .first<Row>();
 
   return c.json({ shift: toJson(row!) });
