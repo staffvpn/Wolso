@@ -80,7 +80,7 @@ export function Settings() {
             <Toggle checked={profile.notifyNewShifts} onChange={(v) => save({ notifyNewShifts: v })} />
           </div>
           <div className="flex items-center justify-between py-3 gap-3">
-            <span className="text-[15px] font-medium">Ответы работодателей</span>
+            <span className="text-[15px] font-medium">Приглашения и отмены</span>
             <Toggle checked={profile.notifyEmployerReplies} onChange={(v) => save({ notifyEmployerReplies: v })} />
           </div>
           <div className="flex items-center justify-between py-3 gap-3">

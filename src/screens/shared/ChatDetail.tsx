@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePoll } from '@/lib/usePoll';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Send, ChevronLeft, RotateCw, Flag } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -31,12 +32,14 @@ export function ChatDetail() {
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const messages = useChatStore((s) => (chatId ? s.messagesByChat[chatId] : undefined) ?? EMPTY_MESSAGES);
   const loadMessages = useChatStore((s) => s.loadMessages);
+  const syncMessages = useChatStore((s) => s.syncMessages);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
 
   const [text, setText] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
   const [messagesError, setMessagesError] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   function reloadMessages() {
@@ -63,6 +66,12 @@ export function ChatDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
+
+  // Переписка обновлялась только при входе в чат: ответ собеседника
+  // появлялся на экране, лишь когда человек выходил и заходил снова.
+  // Теперь открытый чат сам догружает новое — при свёрнутом приложении
+  // опрос останавливается, см. usePoll.
+  usePoll(() => (chatId ? syncMessages(chatId, actor) : undefined), 2000, !!chatId);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -101,9 +110,16 @@ export function ChatDetail() {
   const reportTargetId = actor === 'company' ? chat.workerId : chat.companyId;
 
   function handleSend(value: string) {
-    if (!value.trim() || !chatId) return;
-    sendMessage(chatId, value.trim(), actor);
+    const body = value.trim();
+    if (!body || !chatId) return;
+    setSendError(false);
     setText('');
+    // Не отправившееся сообщение возвращается в поле ввода, а не пропадает
+    // вместе с набранным текстом: переписываешь его тогда заново.
+    sendMessage(chatId, body, actor).catch(() => {
+      setSendError(true);
+      setText((current) => (current ? current : body));
+    });
   }
 
   return (
@@ -143,6 +159,11 @@ export function ChatDetail() {
               <RotateCw size={13} /> Повторить
             </button>
           </div>
+        )}
+        {/* Сообщение, которое не ушло. Текст уже вернулся в поле ввода —
+            остаётся сказать, почему он там снова оказался. */}
+        {sendError && (
+          <p className="text-[12px] text-danger text-center">Сообщение не отправилось — проверьте связь и попробуйте ещё раз.</p>
         )}
         {messages.map((m) => {
           if (m.kind === 'system') {

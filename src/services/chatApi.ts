@@ -56,8 +56,14 @@ export async function fetchChats(as: ChatActor): Promise<Chat[]> {
   return chats.map(chatFromApi);
 }
 
-export async function fetchMessages(chatId: string, as: ChatActor): Promise<ChatMessage[]> {
-  const { messages } = await apiFetch<{ messages: ApiMessage[] }>(`/chats/${chatId}/messages`, { as });
+/** Вся переписка, либо только то, что появилось после сообщения `after`.
+ *  Второе — для опроса открытого чата: возить всю историю раз в пару
+ *  секунд ради нуля новых строк ни к чему. */
+export async function fetchMessages(chatId: string, as: ChatActor, after?: string): Promise<ChatMessage[]> {
+  // Оптимистичные сообщения (id вида `local-…`) серверу не отдаём: он ждёт
+  // число, а такого id у него всё равно нет.
+  const cursor = after && /^\d+$/.test(after) ? `?after=${after}` : '';
+  const { messages } = await apiFetch<{ messages: ApiMessage[] }>(`/chats/${chatId}/messages${cursor}`, { as });
   return messages.map((m) => messageFromApi(m, as));
 }
 

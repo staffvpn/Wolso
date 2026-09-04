@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
-import { notifyCompany, notifyWorker } from '../lib/notifyPrefs';
 import { MESSAGE_LIMIT, overLimit } from '../lib/rateLimit';
 
 export const chatRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -85,46 +84,47 @@ chatRoutes.get('/', async (c) => {
 
 async function assertParticipant(env: Env, chatId: string, actor: { role: 'worker' | 'company'; id: number }) {
   const col = actor.role === 'worker' ? 'worker_id' : 'company_id';
-  return env.DB.prepare(`SELECT id, company_id, worker_id, worker_notified_at, company_notified_at FROM chats WHERE id = ? AND ${col} = ?`)
+  return env.DB.prepare(`SELECT id, company_id, worker_id FROM chats WHERE id = ? AND ${col} = ?`)
     .bind(chatId, actor.id)
-    .first<{ id: number; company_id: number; worker_id: number; worker_notified_at: string | null; company_notified_at: string | null }>();
+    .first<{ id: number; company_id: number; worker_id: number }>();
 }
 
+/** История чата — целиком, либо только то, что появилось после
+ *  сообщения `after`.
+ *
+ *  Второе нужно открытому чату: он опрашивает эту ручку раз в пару секунд,
+ *  чтобы ответ собеседника появлялся сам, а не после выхода и повторного
+ *  входа в переписку. Возить всю историю каждые две секунды ради нуля
+ *  новых строк незачем — при `after` запрос упирается в первичный ключ и
+ *  почти всегда возвращает пустой список. */
 chatRoutes.get('/:id/messages', async (c) => {
   const actor = actorFromSession(c.get('session'));
   if (!actor) return c.json({ error: 'auth_required' }, 401);
   const chatId = c.req.param('id');
   if (!(await assertParticipant(c.env, chatId, actor))) return c.json({ error: 'not_found' }, 404);
 
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM messages WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?) ORDER BY created_at ASC',
-  )
-    .bind(chatId, actor.role)
-    .all();
-  await c.env.DB.prepare('UPDATE messages SET read = 1 WHERE chat_id = ? AND sender != ?').bind(chatId, actor.role).run();
+  const afterParam = c.req.query('after');
+  const after = afterParam && /^\d+$/.test(afterParam) ? Number(afterParam) : null;
 
-  // They've now actually seen everything — clear our own "last notified"
-  // mark for this chat so the *next* message that arrives pings again
-  // right away instead of still being inside the old cooldown window.
-  const notifiedCol = actor.role === 'worker' ? 'worker_notified_at' : 'company_notified_at';
-  await c.env.DB.prepare(`UPDATE chats SET ${notifiedCol} = NULL WHERE id = ?`).bind(chatId).run();
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM messages
+     WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?)${after === null ? '' : ' AND id > ?'}
+     ORDER BY id ASC`,
+  )
+    .bind(...(after === null ? [chatId, actor.role] : [chatId, actor.role, after]))
+    .all();
+
+  // Отметка о прочтении — только когда есть что отмечать. Иначе опрос
+  // открытого чата превращался бы в запись в базу каждые две секунды,
+  // ничего при этом не меняющую.
+  if (after === null || results.length > 0) {
+    await c.env.DB.prepare('UPDATE messages SET read = 1 WHERE chat_id = ? AND sender != ? AND read = 0')
+      .bind(chatId, actor.role)
+      .run();
+  }
 
   return c.json({ messages: results });
 });
-
-/** One bot ping per unread streak, not one per message — otherwise a
- *  quick back-and-forth turns into a wall of Telegram notifications.
- *  After a ping, the same side stays quiet for this long even if more
- *  messages come in; reading the chat (see GET /:id/messages above)
- *  clears the cooldown early, since there's nothing left to batch once
- *  they've actually seen the conversation. */
-const CHAT_NOTIFY_COOLDOWN_MINUTES = 5;
-
-function withinCooldown(notifiedAt: string | null): boolean {
-  if (!notifiedAt) return false;
-  const iso = notifiedAt.includes('T') ? notifiedAt : `${notifiedAt.replace(' ', 'T')}Z`;
-  return Date.now() - new Date(iso).getTime() < CHAT_NOTIFY_COOLDOWN_MINUTES * 60 * 1000;
-}
 
 chatRoutes.post('/:id/messages', async (c) => {
   const actor = actorFromSession(c.get('session'));
@@ -146,44 +146,14 @@ chatRoutes.post('/:id/messages', async (c) => {
     .bind(chatId, actor.role, text.trim())
     .first();
 
-  // Notify whoever didn't just send it — but only once per unread streak
-  // (see CHAT_NOTIFY_COOLDOWN_MINUTES above), not on every single message.
-  const preview = text.trim().length > 200 ? `${text.trim().slice(0, 200)}…` : text.trim();
-  if (actor.role === 'worker') {
-    if (!withinCooldown(chat.company_notified_at)) {
-      const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(actor.id).first<{ name: string }>();
-      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
-        .bind(chat.company_id)
-        .first<{ owner_telegram_id: number }>();
-      if (company) {
-        c.executionCtx.waitUntil(
-          notifyCompany(
-            c.env,
-            { id: chat.company_id, telegramId: company.owner_telegram_id },
-            'worker_replies',
-            `💬 ${worker?.name ?? 'Соискатель'}:\n${preview}`,
-          ),
-        );
-        await c.env.DB.prepare("UPDATE chats SET company_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
-      }
-    }
-  } else {
-    if (!withinCooldown(chat.worker_notified_at)) {
-      const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(actor.id).first<{ name: string }>();
-      const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
-        .bind(chat.worker_id)
-        .first<{ telegram_id: number }>();
-      if (worker) {
-        c.executionCtx.waitUntil(
-          notifyWorker(c.env, { id: chat.worker_id, telegramId: worker.telegram_id }, 'employer_replies', `💬 ${company?.name ?? 'Работодатель'}:\n${preview}`),
-        );
-        // Stamped either way: the cooldown is about not pinging on every
-        // message, and a worker who switched these off shouldn't have the
-        // cooldown re-armed for them on every send instead.
-        await c.env.DB.prepare("UPDATE chats SET worker_notified_at = datetime('now') WHERE id = ?").bind(chatId).run();
-      }
-    }
-  }
+  // Уведомления в бот о новом сообщении здесь больше нет — сознательно.
+  // Переписка идёт внутри приложения и обновляется сама (открытый чат
+  // опрашивает GET выше), а дублирующий пуш на каждую реплику превращал
+  // обычный разговор в поток сообщений от бота. Бот остаётся для того,
+  // что действительно требует внимания вне приложения: приглашения,
+  // отмены, изменения смены, напоминание перед выходом.
+  // Столбцы chats.worker_notified_at / company_notified_at (миграция 0015)
+  // с этого момента никем не читаются и остаются только как след.
 
   return c.json({ message: inserted });
 });

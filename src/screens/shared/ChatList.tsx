@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { usePoll } from '@/lib/usePoll';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
@@ -13,11 +14,17 @@ export function ChatList() {
   const chats = useChatStore((s) => s.chats);
   const loading = useChatStore((s) => s.loading);
   const load = useChatStore((s) => s.load);
+  const refresh = useChatStore((s) => s.refresh);
 
   useEffect(() => {
     load(role === 'worker' ? 'worker' : 'company');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  // Реже, чем сама переписка: здесь важны только счётчик непрочитанных и
+  // последняя строка, а не каждое сообщение. Обновление тихое — список
+  // уже на экране и мигать спиннером из-за фонового запроса не должен.
+  usePoll(() => refresh(role === 'worker' ? 'worker' : 'company'), 5000);
 
   return (
     <div className="flex flex-col h-full min-h-0">
