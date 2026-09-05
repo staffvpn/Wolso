@@ -43,6 +43,28 @@ interface UsersState {
   checkBots: () => Promise<void>;
 }
 
+/** Почему не получилось проверить бота. Раньше на любую ошибку выводилось
+ *  «проверьте, что воркер задеплоен» — совет, бесполезный ровно во всех
+ *  случаях, кроме одного: сессия истекла, прав не хватает, не задан токен
+ *  бота, воркер упёрся в лимит. Человек шёл перепроверять деплой, с
+ *  которым всё было в порядке. */
+function botCheckMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return 'Не удалось связаться с сервером. Проверьте соединение и адрес API в настройках дашборда.';
+  }
+  switch (err.code) {
+    case 'migration_required':
+      return 'Не применена миграция 0025_bot_status. Откройте Настройки → Состояние базы данных → «Проверить миграции», там будет готовый SQL.';
+    case 'no_bot_token':
+      return 'У воркера не задан BOT_TOKEN — без него проверять нечего. Задайте секрет: Cloudflare → Workers → wolso-api → Settings → Variables and Secrets.';
+    case 'internal_error':
+      return 'Воркер ответил ошибкой. Откройте Cloudflare → Workers → wolso-api → Logs и посмотрите последнюю запись — там будет причина.';
+  }
+  if (err.status === 401) return 'Сессия истекла. Обновите страницу и войдите заново.';
+  if (err.status === 403) return 'Недостаточно прав: проверка бота доступна ролям с правом на управление пользователями.';
+  return `Не получилось проверить (ошибка ${err.status}${err.code ? `, ${err.code}` : ''}).`;
+}
+
 export const useUsersStore = create<UsersState>((set, get) => ({
   seekers: [],
   employers: [],
@@ -145,16 +167,12 @@ export const useUsersStore = create<UsersState>((set, get) => ({
               '.',
       });
     } catch (err) {
-      // A generic "попробуйте ещё раз" here is what made an unapplied
-      // migration look like a dead button. Say which one is missing and
-      // where to fix it.
-      set({
-        botCheckResult:
-          err instanceof ApiError && err.code === 'migration_required'
-            ? 'Не применена миграция 0025_bot_status. Откройте Настройки → Состояние базы данных → «Проверить миграции», там будет готовый SQL.'
-            : 'Не получилось проверить. Проверьте, что воркер задеплоен с последними изменениями.',
-        botCheckFailed: true,
-      });
+      // Сообщение должно называть причину, а не гадать. «Проверьте, что
+      // воркер задеплоен» отправляло перепроверять деплой человека, у
+      // которого на самом деле истекла сессия или не задан токен бота, —
+      // и найти он там ничего не мог, потому что с деплоем всё было в
+      // порядке.
+      set({ botCheckResult: botCheckMessage(err), botCheckFailed: true });
     } finally {
       set({ checkingBot: false });
     }

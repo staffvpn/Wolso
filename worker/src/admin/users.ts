@@ -126,15 +126,33 @@ adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
     return c.json({ error: 'migration_required', migration: '0025_bot_status' }, 400);
   }
 
-  const BATCH = 25;
-  const [{ results: workers }, { results: companies }] = await Promise.all([
-    c.env.DB.prepare('SELECT id, telegram_id FROM workers WHERE bot_status_at IS NULL ORDER BY id LIMIT ?')
-      .bind(BATCH)
-      .all<{ id: number; telegram_id: number }>(),
-    c.env.DB.prepare('SELECT id, owner_telegram_id FROM companies WHERE bot_status_at IS NULL ORDER BY id LIMIT ?')
-      .bind(BATCH)
-      .all<{ id: number; owner_telegram_id: number }>(),
-  ]);
+  // Без токена бота проверять нечем: каждый запрос ушёл бы в Telegram с
+  // пустым токеном и вернулся с 404, а кнопка отчиталась бы «проверено N,
+  // все без ответа» — то есть соврала бы, ничего не проверив.
+  if (!c.env.BOT_TOKEN) return c.json({ error: 'no_bot_token' }, 400);
+
+  // Сколько аккаунтов трогает один запрос. Не «побольше, чтобы быстрее»:
+  // у запроса воркера есть предел на число исходящих обращений (на
+  // бесплатном тарифе — 50), и в этот предел считаются не только вызовы
+  // Telegram, но и каждый запрос к D1. Прежние 25 + 25 аккаунтов давали
+  // около сотни обращений — на бесплатном тарифе такой запрос падал
+  // целиком, и кнопка показывала «не получилось проверить» ровно тогда,
+  // когда база подросла. Здесь: 1 PRAGMA + 2 SELECT + 15 вызовов Telegram
+  // + 1 batch + 1 SELECT — двадцать с небольшим. Дашборд жмёт эту ручку в
+  // цикле, так что за одно нажатие всё равно проходит несколько сотен.
+  const BATCH = 15;
+  const { results: workers } = await c.env.DB.prepare(
+    'SELECT id, telegram_id FROM workers WHERE bot_status_at IS NULL ORDER BY id LIMIT ?',
+  )
+    .bind(BATCH)
+    .all<{ id: number; telegram_id: number }>();
+  // Работодателей добираем на остаток лимита, а не ещё столько же: считается
+  // общее число обращений за запрос, а не по таблице.
+  const { results: companies } = await c.env.DB.prepare(
+    'SELECT id, owner_telegram_id FROM companies WHERE bot_status_at IS NULL ORDER BY id LIMIT ?',
+  )
+    .bind(Math.max(0, BATCH - workers.length))
+    .all<{ id: number; owner_telegram_id: number }>();
 
   const now = new Date().toISOString();
   let active = 0;
@@ -144,22 +162,28 @@ adminUserRoutes.post('/check-bot-status', requireStaffMiddleware, async (c) => {
   /** A probe that came back 'unknown' means Telegram never gave us a
    *  usable answer — a network blip, a rate limit. Stamp the row so the
    *  batch moves on, but leave bot_status alone rather than overwriting
-   *  something we do know with something we don't. */
-  const apply = async (table: 'workers' | 'companies', id: number, status: string) => {
+   *  something we do know with something we don't.
+   *
+   *  Раньше каждая такая запись уходила в базу отдельно; теперь они
+   *  собираются и отправляются одним batch — это одно обращение вместо
+   *  полусотни, из-за которых запрос и упирался в предел. */
+  const writes: D1PreparedStatement[] = [];
+  const apply = (table: 'workers' | 'companies', id: number, status: string) => {
     if (status === 'unknown') {
       inconclusive++;
-      await c.env.DB.prepare(`UPDATE ${table} SET bot_status_at = ? WHERE id = ?`).bind(now, id).run();
+      writes.push(c.env.DB.prepare(`UPDATE ${table} SET bot_status_at = ? WHERE id = ?`).bind(now, id));
       return;
     }
     if (status === 'active') active++;
     else unreachable++;
-    await c.env.DB.prepare(`UPDATE ${table} SET bot_status = ?, bot_status_at = ? WHERE id = ?`).bind(status, now, id).run();
+    writes.push(c.env.DB.prepare(`UPDATE ${table} SET bot_status = ?, bot_status_at = ? WHERE id = ?`).bind(status, now, id));
   };
 
   await Promise.all([
     ...workers.map(async (w) => apply('workers', w.id, await probeBotStatus(c.env, w.telegram_id))),
     ...companies.map(async (co) => apply('companies', co.id, await probeBotStatus(c.env, co.owner_telegram_id))),
   ]);
+  if (writes.length > 0) await c.env.DB.batch(writes);
 
   const left = await c.env.DB.prepare(
     `SELECT (SELECT COUNT(*) FROM workers WHERE bot_status_at IS NULL)
