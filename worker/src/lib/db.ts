@@ -22,6 +22,10 @@ export interface ShiftRow {
   end_min: number;
   hourly_rate: number;
   total_pay: number;
+  /** 'hourly' | 'fixed' — что работодатель ввёл сам, а что посчиталось
+   *  (миграция 0036). Отсутствует на базе до неё: тогда это 'hourly',
+   *  как оно и было. */
+  pay_mode?: string | null;
   description: string;
   meal: number;
   urgency: string;
@@ -68,6 +72,7 @@ export function shiftToJson(r: ShiftRow) {
     endMin: r.end_min,
     hourlyRate: r.hourly_rate,
     totalPay: r.total_pay,
+    payMode: r.pay_mode === 'fixed' ? 'fixed' : 'hourly',
     description: r.description,
     meal: !!r.meal,
     urgency: r.urgency,

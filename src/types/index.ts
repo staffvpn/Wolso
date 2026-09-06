@@ -48,6 +48,13 @@ export interface Company {
 
 export type ShiftUrgency = 'normal' | 'urgent';
 
+/** Чем работодатель назвал оплату при публикации: ставкой в час или суммой
+ *  за смену. В данных всегда есть и то и другое — недостающее считается из
+ *  часов, — так что фильтр по ставке и статистика работают в обоих случаях.
+ *  Режим нужен, чтобы показать главным то число, о котором договаривались,
+ *  и подставить его же обратно в форму. */
+export type PayMode = 'hourly' | 'fixed';
+
 /** What a worker is after. 'any' — both, which is what every anketa
  *  written before the question existed means (see migration 0029). */
 export type LookingFor = 'any' | 'shift' | 'permanent';
@@ -80,6 +87,8 @@ export interface Shift {
   endMin: number;
   hourlyRate: number;
   totalPay: number;
+  /** Отсутствует у API до миграции 0036 — тогда это 'hourly'. */
+  payMode?: PayMode;
   /** No location source wired up yet (needs Telegram's location API or
    *  geocoding) — undefined until that lands; UI hides the chip when absent. */
   distanceKm?: number;
@@ -275,6 +284,10 @@ export interface Vacancy {
   endHour: number;
   endMin: number;
   hourlyRate: number;
+  /** См. Shift.payMode — та же оплата со стороны работодателя. */
+  payMode?: PayMode;
+  /** Оплата за смену целиком. Считается из ставки, когда режим 'hourly'. */
+  totalPay?: number;
   requirements: string[];
   /** What the employer wrote in «Описание» — carried so the edit form can
    *  prefill it instead of silently blanking it on save. */

@@ -13,7 +13,7 @@ import { CancelSheet } from '@/components/CancelSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
 import { resolveCompany } from '@/data/companies';
-import { formatShiftDays, formatMoney, relativeShiftDays, timeRange } from '@/lib/format';
+import { formatShiftDays, formatMoney, hourlyRateLabel, relativeShiftDays, timeRange } from '@/lib/format';
 import { hapticNotify } from '@/lib/telegram';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { cn } from '@/lib/cn';
@@ -196,7 +196,7 @@ function ResponseCard({
               <DetailRow label="Дата" value={formatShiftDays(shift)} />
             )}
             <DetailRow label="Время" value={`${times} · ${hours} ч`} />
-            <DetailRow label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />
+            <DetailRow label="Ставка" value={hourlyRateLabel(shift)} />
             <DetailRow label="Итого" value={formatMoney(shift.totalPay)} />
           </div>
 

@@ -14,6 +14,8 @@ interface VacancyApiResponse {
   endHour: number;
   endMin: number;
   hourlyRate: number;
+  payMode?: 'hourly' | 'fixed';
+  totalPay?: number;
   requirements: string[];
   /** shiftToJson has always sent this; the type just never declared it. */
   description?: string;
@@ -37,6 +39,8 @@ function fromApiVacancy(v: VacancyApiResponse): Vacancy {
     endHour: v.endHour,
     endMin: v.endMin,
     hourlyRate: v.hourlyRate,
+    payMode: v.payMode ?? 'hourly',
+    totalPay: v.totalPay,
     requirements: v.requirements,
     description: v.description ?? '',
     employmentType: (v.employmentType as Vacancy['employmentType']) ?? 'shift',
@@ -251,6 +255,10 @@ export async function createVacancy(input: {
   endHour: number;
   endMin: number;
   hourlyRate: number;
+  /** 'fixed' — работодатель назвал сумму за смену (totalPay), ставка
+   *  считается сервером; 'hourly' — наоборот. */
+  payMode?: 'hourly' | 'fixed';
+  totalPay?: number;
   requirements: string[];
   employmentType: Vacancy['employmentType'];
   description?: string;
@@ -274,6 +282,8 @@ export async function createVacancy(input: {
       endHour: input.endHour,
       endMin: input.endMin,
       hourlyRate: input.hourlyRate,
+      payMode: input.payMode,
+      totalPay: input.totalPay,
       requirements: input.requirements,
       employmentType: input.employmentType,
       description: input.description,
@@ -300,6 +310,8 @@ export async function updateVacancy(
     startHour: number;
     endHour: number;
     hourlyRate: number;
+    payMode?: 'hourly' | 'fixed';
+    totalPay?: number;
     requirements: string[];
     employmentType: Vacancy['employmentType'];
     description?: string;

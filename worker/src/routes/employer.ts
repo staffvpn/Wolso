@@ -12,6 +12,7 @@ import { asLookingFor, lookingForColumnExists, matchesLookingForSql } from '../l
 import { companyNotifyPrefColumnsExist, notifyWorker } from '../lib/notifyPrefs';
 import { VACANCY_LIMIT, remainingAllowance } from '../lib/rateLimit';
 import { datesColumnExists, datesColumnValue, expandDates, isConsecutive, normalizeDates } from '../lib/shiftDates';
+import { asPayMode, derivePay, payModeColumnExists } from '../lib/payMode';
 import { reportCancellation } from '../lib/incidents';
 
 export const employerRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
@@ -296,6 +297,10 @@ employerRoutes.post('/vacancies', async (c) => {
     endHour: number;
     endMin: number;
     hourlyRate: number;
+    /** Что назвал работодатель. 'fixed' — сумма за смену лежит в totalPay,
+     *  ставка считается; 'hourly' (умолчание) — наоборот. */
+    payMode?: string;
+    totalPay?: number;
     description?: string;
     meal?: boolean;
     urgency?: 'normal' | 'urgent';
@@ -331,8 +336,12 @@ employerRoutes.post('/vacancies', async (c) => {
   if (allowance < groups.length) return c.json({ error: 'rate_limited' }, 429);
 
   const durationHours = body.endHour - body.startHour;
-  const totalPay = Math.max(0, Math.round(durationHours * body.hourlyRate));
+  // Работодатель называет либо ставку в час, либо сумму за смену — второе
+  // недостающее считается здесь, и в базу всегда уходят обе величины.
+  const payMode = asPayMode(body.payMode);
+  const { hourlyRate, totalPay } = derivePay(payMode, payMode === 'fixed' ? (body.totalPay ?? 0) : body.hourlyRate, durationHours);
   const withDates = await datesColumnExists(c.env);
+  const withPayMode = await payModeColumnExists(c.env);
 
   // Пропуски между днями хранить пока негде (миграция 0034 не применена).
   // Молча превратить «13-е и 27-е» в пятнадцать дней подряд нельзя: это
@@ -358,7 +367,7 @@ employerRoutes.post('/vacancies', async (c) => {
       body.startMin ?? 0,
       body.endHour,
       body.endMin ?? 0,
-      body.hourlyRate,
+      hourlyRate,
       totalPay,
       body.description ?? '',
       body.meal ? 1 : 0,
@@ -371,6 +380,10 @@ employerRoutes.post('/vacancies', async (c) => {
     if (withDates) {
       columns.push('dates');
       values.push(datesColumnValue(group));
+    }
+    if (withPayMode) {
+      columns.push('pay_mode');
+      values.push(payMode);
     }
 
     const inserted = await c.env.DB.prepare(
@@ -428,6 +441,8 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
     startHour?: number;
     endHour?: number;
     hourlyRate?: number;
+    payMode?: string;
+    totalPay?: number;
     description?: string;
     employmentType?: string;
     requirements?: string[];
@@ -464,7 +479,17 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
               ? body.endDate
               : null;
 
-  const totalPay = Math.max(0, Math.round((next.endHour - next.startHour) * next.hourlyRate));
+  // Режим оплаты меняется только когда форма его прислала; иначе берём тот,
+  // с которым смена опубликована, — правка одного описания не должна
+  // молча пересчитывать сумму по другому правилу.
+  const existingMode = asPayMode((existing as ShiftRow & { pay_mode?: string }).pay_mode);
+  const payMode = body.payMode === undefined ? existingMode : asPayMode(body.payMode);
+  const entered =
+    payMode === 'fixed'
+      ? (body.totalPay ?? (existingMode === 'fixed' ? existing.total_pay : next.hourlyRate * (next.endHour - next.startHour)))
+      : next.hourlyRate;
+  const { hourlyRate, totalPay } = derivePay(payMode, entered, next.endHour - next.startHour);
+  next.hourlyRate = hourlyRate;
 
   const sets = [
     'position = ?', 'position_label = ?', 'date = ?', 'end_date = ?', 'start_hour = ?', 'end_hour = ?',
@@ -483,6 +508,10 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
     next.employmentType,
     JSON.stringify(next.requirements),
   ];
+  if (await payModeColumnExists(c.env)) {
+    sets.push('pay_mode = ?');
+    values.push(payMode);
+  }
   // Набор дней переписываем только когда форма его прислала — правка одной
   // ставки не должна молча схлопывать вакансию с пропусками в отрезок.
   if (body.dates !== undefined) {

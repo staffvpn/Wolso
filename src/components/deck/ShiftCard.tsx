@@ -4,7 +4,7 @@ import { resolveCompany } from '@/data/companies';
 import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
-import { formatDistance, formatMoney, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, hourlyRateLabel, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { ChevronRight, Heart } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
@@ -103,7 +103,7 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
         <div className="mt-4">
           <span className="text-[30px] font-extrabold leading-none">{formatMoney(shift.totalPay)}</span>
           <span className="text-[14px] text-text-muted ml-2">
-            за смену · {shift.hourlyRate} ₽/ч
+            за смену · {hourlyRateLabel(shift)}
           </span>
         </div>
 

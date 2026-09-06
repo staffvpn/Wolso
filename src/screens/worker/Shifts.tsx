@@ -13,7 +13,7 @@ import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { usePersonalShiftsStore } from '@/store/usePersonalShiftsStore';
 import { resolveCompany } from '@/data/companies';
 import { foundViaLabel } from '@/data/foundVia';
-import { formatShiftDays, formatDayMonth, formatMoney, isSameDay, localDateStr, shiftDays, weekdayShort } from '@/lib/format';
+import { formatShiftDays, formatDayMonth, formatMoney, hourlyRateLabel, isSameDay, localDateStr, shiftDays, weekdayShort } from '@/lib/format';
 import { hapticNotify, hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
 import type { Application, PersonalShift, Shift } from '@/types';
@@ -437,7 +437,7 @@ function CompletedShiftRow({ app, shift }: { app: Application; shift: Shift }) {
             <DetailRow label="Должность" value={shift.positionLabel} />
             <DetailRow label="Дата" value={formatShiftDays(shift)} />
             <DetailRow label="Время" value={`${timeRangeOf(shift)} · ${hours} ч`} />
-            <DetailRow label="Ставка" value={`${formatMoney(shift.hourlyRate)}/ч`} />
+            <DetailRow label="Ставка" value={hourlyRateLabel(shift)} />
             <DetailRow label="Итого" value={formatMoney(shift.totalPay)} />
           </div>
 

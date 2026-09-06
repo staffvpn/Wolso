@@ -27,6 +27,7 @@ export interface ShiftApiResponse {
   endMin: number;
   hourlyRate: number;
   totalPay: number;
+  payMode?: 'hourly' | 'fixed';
   description: string;
   meal: boolean;
   urgency: string;
@@ -70,6 +71,7 @@ export function fromApi(s: ShiftApiResponse): Shift {
     endMin: s.endMin,
     hourlyRate: s.hourlyRate,
     totalPay: s.totalPay,
+    payMode: s.payMode ?? 'hourly',
     // Real distance needs a location source (Telegram's location API or
     // manual city/address geocoding) — not wired up yet, so we simply
     // don't claim a number. UI hides the distance chip when it's absent.

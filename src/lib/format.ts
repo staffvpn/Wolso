@@ -140,6 +140,23 @@ export function relativeShiftDays(shift: { date: string; endDate?: string; dates
   return formatDays(days);
 }
 
+/** Ставка в час строкой. Когда работодатель назвал сумму за смену, ставка
+ *  из неё посчитана и почти никогда не делится нацело — 3000 за 9 часов
+ *  это 333.33, — поэтому она показывается с «≈». Писать «333 ₽/ч» без
+ *  оговорки значит обещать 2997 за смену вместо трёх тысяч, о которых
+ *  договорились. Когда делится ровно (или ставку и назвали), «≈» не нужно. */
+export function hourlyRateLabel(shift: {
+  hourlyRate: number;
+  totalPay: number;
+  startHour: number;
+  endHour: number;
+  payMode?: 'hourly' | 'fixed';
+}): string {
+  const hours = shift.endHour - shift.startHour;
+  const exact = shift.payMode !== 'fixed' || hours <= 0 || shift.hourlyRate * hours === shift.totalPay;
+  return `${exact ? '' : '≈'}${formatMoney(shift.hourlyRate)}/ч`;
+}
+
 export function timeRange(startHour: number, startMin: number, endHour: number, endMin: number) {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(startHour)}:${pad(startMin)}–${pad(endHour)}:${pad(endMin)}`;

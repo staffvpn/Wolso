@@ -40,6 +40,8 @@ interface EmployerState {
     endHour: number;
     endMin: number;
     hourlyRate: number;
+    payMode?: 'hourly' | 'fixed';
+    totalPay?: number;
     requirements: string[];
     employmentType: Vacancy['employmentType'];
     description?: string;

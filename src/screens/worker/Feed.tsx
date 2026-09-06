@@ -23,7 +23,7 @@ import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { resolveCompany } from '@/data/companies';
-import { formatDistance, formatMoney, localDateStr, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
+import { formatDistance, formatMoney, hourlyRateLabel, localDateStr, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { FEATURES } from '@/lib/features';
 import { hapticSelect } from '@/lib/telegram';
@@ -336,7 +336,7 @@ function ShiftDetailOverlay({
 
           <div className="mt-5">
             <span className="text-[32px] font-extrabold leading-none">{formatMoney(shift.totalPay)}</span>
-            <span className="text-[14px] text-text-muted ml-2">за смену · {shift.hourlyRate} ₽/ч</span>
+            <span className="text-[14px] text-text-muted ml-2">за смену · {hourlyRateLabel(shift)}</span>
           </div>
 
           <p className="text-[14px] leading-relaxed text-text-muted mt-4 whitespace-pre-line">{shift.description}</p>

@@ -31,6 +31,7 @@ interface ApiApplication {
     endMin: number;
     hourlyRate: number;
     totalPay: number;
+    payMode?: 'hourly' | 'fixed';
     description: string;
     /** What the employer ticked when publishing ("Медкнижка", …). The API
      *  has always sent these; this type just never declared them. */
@@ -73,6 +74,7 @@ function fromApi(a: ApiApplication): Application {
           endMin: a.shift.endMin,
           hourlyRate: a.shift.hourlyRate,
           totalPay: a.shift.totalPay,
+          payMode: a.shift.payMode ?? 'hourly',
           description: a.shift.description,
           // Same drop as in shiftsApi: the employer's requirements were
           // being thrown away here, so the expanded response card had

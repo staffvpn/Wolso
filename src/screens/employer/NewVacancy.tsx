@@ -11,11 +11,11 @@ import { SectionLabel } from '@/components/ui/Card';
 import { ShiftDaysPicker } from '@/components/ShiftDaysPicker';
 import { POSITIONS, MARKET_AVG_RATE } from '@/data/positions';
 import { useEmployerStore } from '@/store/useEmployerStore';
-import { formatDays, localDateStr, pluralizeShifts, shiftDays } from '@/lib/format';
+import { formatDays, formatMoney, localDateStr, pluralizeShifts, shiftDays } from '@/lib/format';
 import { ApiError } from '@/lib/apiClient';
 import { EMPLOYMENT_TYPES } from '@/data/employmentTypes';
 import { cn } from '@/lib/cn';
-import type { EmploymentType, Position } from '@/types';
+import type { EmploymentType, PayMode, Position } from '@/types';
 
 const KEY_POSITIONS = POSITIONS.slice(0, 8);
 const REQUIREMENT_POOL = ['Опыт от 1 года', 'Медкнижка', 'Без опыта', 'Своя форма'];
@@ -52,6 +52,11 @@ export function NewVacancy() {
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(19);
   const [rate, setRate] = useState(450);
+  /** Чем работодатель называет оплату. Второе число всегда считается из
+   *  первого и часов, поэтому в базе есть и то и другое — режим лишь
+   *  говорит, что из них он ввёл сам. */
+  const [payMode, setPayMode] = useState<PayMode>('hourly');
+  const [total, setTotal] = useState(4050);
   const [requirements, setRequirements] = useState<string[]>(['Опыт от 1 года', 'Медкнижка']);
   const [description, setDescription] = useState('');
   const [publishing, setPublishing] = useState(false);
@@ -77,6 +82,8 @@ export function NewVacancy() {
     setStartHour(editing.startHour);
     setEndHour(editing.endHour);
     setRate(editing.hourlyRate);
+    setPayMode(editing.payMode ?? 'hourly');
+    setTotal(editing.totalPay ?? editing.hourlyRate * Math.max(1, editing.endHour - editing.startHour));
     setRequirements(editing.requirements ?? []);
     setDescription(editing.description);
     setFilledFrom(editing.id);
@@ -84,6 +91,11 @@ export function NewVacancy() {
 
   const marketAvg = MARKET_AVG_RATE[position];
   const positionLabel = POSITIONS.find((p) => p.id === position)!.label;
+  const hours = endHour - startHour;
+  // Сумма за смену и ставка — две проекции одного и того же; какая из них
+  // введена, решает payMode, вторая живёт здесь.
+  const derivedTotal = hours > 0 ? Math.round(rate * hours) : rate;
+  const derivedRate = hours > 0 ? Math.round(total / hours) : total;
   const days = selectedDays.length;
   const startDate = selectedDays[0] ?? TODAY;
   const endDate = days > 1 ? selectedDays[days - 1]! : startDate;
@@ -96,6 +108,8 @@ export function NewVacancy() {
    *  range can't be published from a section that's no longer visible. */
   const isShift = employmentType === 'shift';
   const isPermanent = employmentType === 'permanent';
+  // У постоянной работы платят за рабочий день, у разовой — за смену.
+  const perLabel = isPermanent ? 'за день' : 'за смену';
 
   function chooseEmploymentType(id: EmploymentType) {
     setEmploymentType(id);
@@ -133,6 +147,8 @@ export function NewVacancy() {
           startHour,
           endHour,
           hourlyRate: rate,
+          payMode,
+          totalPay: total,
           requirements,
           employmentType,
           description: description.trim(),
@@ -153,6 +169,8 @@ export function NewVacancy() {
         endHour,
         endMin: 0,
         hourlyRate: rate,
+        payMode,
+        totalPay: total,
         requirements,
         employmentType,
         description: description.trim(),
@@ -288,20 +306,67 @@ export function NewVacancy() {
 
         <div>
           <SectionLabel>Оплата</SectionLabel>
+          {/* Договариваются чаще суммой за выход — «три тысячи за смену», —
+              а форма спрашивала только ставку, и работодателю приходилось
+              делить в уме. Причём нацело это обычно не делится: 3000 за 9
+              часов — 333.33, а вписать можно было только целое, и сумма
+              выходила не та, о которой он думал. Теперь он называет то, чем
+              оперирует сам, а второе число считается и показывается рядом. */}
+          <div className="flex gap-2 mb-3">
+            <PayModeOption
+              active={payMode === 'hourly'}
+              title="Ставка в час"
+              hint={isPermanent ? 'за день выйдет по часам' : 'сумма за смену посчитается'}
+              onClick={() => setPayMode('hourly')}
+            />
+            <PayModeOption
+              active={payMode === 'fixed'}
+              title={isPermanent ? 'Сумма за день' : 'Сумма за смену'}
+              hint="ставка в час посчитается"
+              onClick={() => setPayMode('fixed')}
+            />
+          </div>
+
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-[28px] font-extrabold">{rate} ₽</span>
-            {/* The hours are now asked for whichever type is picked, so the
-                derived total is always real — only its wording changes:
-                an ongoing job is paid per working day, not per shift. */}
+            <span className="text-[28px] font-extrabold">{payMode === 'hourly' ? rate : total} ₽</span>
+            {/* Второе число всегда на виду: работодатель видит и то, о чём
+                договаривается, и то, как это выглядит с другой стороны. */}
             <span className="text-[13px] text-text-muted">
-              в час
-              {employmentType && ` · ${rate * (endHour - startHour)} ₽ ${isPermanent ? 'за день' : 'за смену'}`}
+              {payMode === 'hourly' ? 'в час' : perLabel}
+              {employmentType &&
+                (payMode === 'hourly'
+                  ? ` · ${formatMoney(derivedTotal)} ${perLabel}`
+                  : hours > 0
+                    ? ` · ${formatMoney(derivedRate)}/ч`
+                    : '')}
             </span>
           </div>
-          <Slider min={200} max={1000} step={10} value={rate} onChange={setRate} className="mt-3" />
+
+          {payMode === 'hourly' ? (
+            <Slider min={200} max={1000} step={10} value={rate} onChange={setRate} className="mt-3" />
+          ) : (
+            // Ползунком сумму за смену не наберёшь: разброс от полутора
+            // тысяч до десяти, и шаг, удобный на одном конце, бесполезен на
+            // другом.
+            <input
+              type="number"
+              min={0}
+              step={100}
+              inputMode="numeric"
+              value={total}
+              onChange={(e) => setTotal(Math.max(0, Number(e.target.value)))}
+              className="w-full rounded-2xl bg-surface border border-border px-3.5 py-3 text-[16px] font-bold outline-none focus:border-accent mt-1"
+            />
+          )}
+
           <p className="text-accent text-[13px] font-medium mt-2">
-            Средняя ставка по позиции «{positionLabel}» рядом — {marketAvg} ₽
+            Средняя ставка по позиции «{positionLabel}» рядом — {marketAvg} ₽/ч
           </p>
+          {payMode === 'fixed' && hours <= 0 && (
+            <p className="text-[12px] text-text-faint mt-1 leading-relaxed">
+              Часы начала и конца совпадают, поэтому ставку в час посчитать не из чего — соискатель увидит только сумму.
+            </p>
+          )}
         </div>
 
         <div>
@@ -361,6 +426,36 @@ export function NewVacancy() {
         </Button>
       </div>
     </div>
+  );
+}
+
+/** «Ставка в час» против «сумма за смену» — две одинаковые по весу
+ *  кнопки, а не переключатель: ни один из вариантов не «обычный», и
+ *  подсказка под каждой сразу говорит, что посчитается вторым. */
+function PayModeOption({
+  active,
+  title,
+  hint,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex-1 min-w-0 text-left rounded-2xl border px-3.5 py-2.5 transition-colors',
+        active ? 'bg-accent-soft border-accent' : 'bg-surface border-border',
+      )}
+    >
+      <span className={cn('block font-semibold text-[14px]', active && 'text-accent')}>{title}</span>
+      <span className="block text-[11px] text-text-faint leading-snug mt-0.5">{hint}</span>
+    </button>
   );
 }
 
