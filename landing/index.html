@@ -542,38 +542,24 @@
   }
 
   /* ---------------- Процесс: карусель ---------------- */
-  .rail-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 34px; flex-wrap: wrap; }
-  .rail-nav { display: flex; gap: 10px; }
-  .rail-btn {
-    width: 52px; height: 52px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--text);
-    background: linear-gradient(180deg, #232725, #141716);
-    border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 30px -18px #000;
-    transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
-  }
-  .rail-btn:hover { border-color: rgba(52,209,124,0.35); transform: translateY(-2px); }
-  .rail-btn:active { transform: scale(0.94); }
-  .rail-btn svg { width: 18px; height: 18px; }
+  .rail-head { margin-bottom: 36px; }
+  /* Три шага — три колонки, которые видно целиком. Раньше здесь была
+     горизонтальная карусель: суммарная ширина карточек не помещалась в
+     контейнер, третий шаг уезжал за край, и «как это работает» требовало
+     листать, чтобы дочитать. Шагов ровно три и больше не станет, так что
+     прокрутка тут не нужна — нужна сетка. */
   .rail {
-    display: flex; gap: 20px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    padding-bottom: 8px;
-    /* Карточки должны иметь возможность «выехать» тенью за край. */
-    margin: 0 -8px; padding-left: 8px; padding-right: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    align-items: stretch;
   }
-  .rail::-webkit-scrollbar { display: none; }
   .rail > .step {
-    flex: 0 0 min(392px, 84vw);
-    scroll-snap-align: start;
     position: relative;
-    padding: 34px 30px 30px;
-    min-height: 300px;
+    padding: 32px 28px 28px;
     display: flex; flex-direction: column;
   }
+  @media (max-width: 980px) { .rail { grid-template-columns: 1fr; gap: 18px; } }
   .step-icon-tile {
     width: 58px; height: 58px; border-radius: 17px;
     display: flex; align-items: center; justify-content: center;
@@ -869,10 +855,6 @@
           <span class="eyebrow">Как это работает</span>
           <h2 class="h-duo">От открытого бота<br><span class="dim">до первой смены</span></h2>
         </div>
-        <div class="rail-nav">
-          <button class="rail-btn" id="railPrev" aria-label="Предыдущий шаг"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-          <button class="rail-btn" id="railNext" aria-label="Следующий шаг"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
-        </div>
       </div>
 
       <div class="rail" id="rail">
@@ -1144,31 +1126,6 @@
       }
     });
   });
-
-  // ---- Карусель шагов ----
-  var rail = document.getElementById('rail');
-  var railPrev = document.getElementById('railPrev');
-  var railNext = document.getElementById('railNext');
-  if (rail && railPrev && railNext) {
-    function railStep() {
-      var card = rail.querySelector('.step');
-      // Ширина карточки плюс зазор — прокрутка ровно на одну позицию.
-      return card ? card.getBoundingClientRect().width + 20 : 380;
-    }
-    railPrev.addEventListener('click', function () { rail.scrollBy({ left: -railStep(), behavior: reducedMotion ? 'auto' : 'smooth' }); });
-    railNext.addEventListener('click', function () { rail.scrollBy({ left: railStep(), behavior: reducedMotion ? 'auto' : 'smooth' }); });
-
-    // Стрелка гаснет, когда упёрлись в край — иначе кнопка выглядит
-    // сломанной, хотя просто некуда ехать.
-    function syncArrows() {
-      var max = rail.scrollWidth - rail.clientWidth - 2;
-      railPrev.style.opacity = rail.scrollLeft <= 2 ? '0.35' : '1';
-      railNext.style.opacity = rail.scrollLeft >= max ? '0.35' : '1';
-    }
-    rail.addEventListener('scroll', syncArrows, { passive: true });
-    window.addEventListener('resize', syncArrows);
-    syncArrows();
-  }
 
   // ---- Интерактивная колода в мокапе ----
   // Photos are Picsum placeholder shots (seeded, so each card is stable) run
