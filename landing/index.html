@@ -285,9 +285,11 @@
   }
   @media (max-width: 720px) { .hero-panel { margin: 8px; padding-top: 44px; border-radius: 26px; } }
 
-  .hero-grid { display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 48px; align-items: center; position: relative; z-index: 2; }
-  .hero-grid > div { min-width: 0; }
-  @media (max-width: 940px) { .hero-grid { grid-template-columns: 1fr; gap: 40px; } }
+  /* Герой в одну колонку: текст по центру, под ним баннер во всю ширину. */
+  .hero-top { position: relative; z-index: 2; max-width: 880px; margin: 0 auto; text-align: center; }
+  .hero-top .hero-sub { margin-left: auto; margin-right: auto; }
+  .hero-top .hero-ctas,
+  .hero-top .hero-fine { justify-content: center; }
 
   .hero-panel h1 {
     font-family: var(--font-display);
@@ -337,150 +339,46 @@
     background: var(--accent);
     opacity: 0.5;
   }
-  /* ---------------- Phone / demo card ---------------- */
-  .phone-stage { display: flex; justify-content: center; perspective: 1400px; min-width: 0; }
-  .phone {
-    width: min(300px, 78vw);
-    aspect-ratio: 300 / 610;
-    border-radius: 42px;
-    background: linear-gradient(160deg, #17191700, #050605);
-    border: 10px solid #050605;
-    box-shadow: 0 50px 90px -35px rgba(0,0,0,0.75), 0 0 0 1px #1d201f;
+  /* ---------------- Баннер героя ----------------
+     Герой в одну колонку: текст сверху, под ним картинка во всю ширину
+     контента. Тень считаем через drop-shadow, а не box-shadow: так она
+     повторяет альфу картинки, если у баннера прозрачный фон. */
+  .hero-banner {
     position: relative;
-    overflow: hidden;
-    transform: rotate(3deg);
+    z-index: 2;
+    margin: 52px auto 0;
+    max-width: 1112px;
   }
-  .phone-notch {
-    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-    width: 120px; height: 26px; background: #050605; border-radius: 0 0 16px 16px; z-index: 5;
+  .hero-banner img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 28px;
+    filter: drop-shadow(0 46px 80px rgba(0, 0, 0, 0.62));
+    animation: heroFloat 9s ease-in-out infinite;
   }
-  .phone-screen {
-    position: absolute; inset: 0;
-    background: var(--bg);
-    padding-top: 32px;
-    display: flex; flex-direction: column;
+  @keyframes heroFloat {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(0, -10px, 0); }
   }
-  .phone-topbar {
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 16px 11px;
-    border-bottom: 1px solid var(--border-soft);
+  /* Зелёное свечение под баннером — тот же приём, что и у панели, чтобы
+     картинка «сидела» в фоне, а не лежала поверх него. */
+  .hero-banner::before {
+    content: "";
+    position: absolute;
+    inset: 12% 6% -6%;
+    background: radial-gradient(ellipse at center, rgba(52, 209, 124, 0.28), transparent 70%);
+    filter: blur(46px);
+    z-index: -1;
+    pointer-events: none;
   }
-  .phone-topbar .tg-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
-  .phone-topbar .tg-title img { height: 14px; width: auto; }
-  .phone-topbar .tg-dots { display: flex; gap: 3px; }
-  .phone-topbar .tg-dots span { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); }
-
-  .deck-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 0; position: relative; }
-  .deck { position: relative; flex: 1; min-height: 0; }
-  .demo-card {
-    position: absolute; inset: 0;
-    border-radius: 22px;
-    background: var(--surface);
-    border: 1px solid var(--border-soft);
-    overflow: hidden;
-    display: flex; flex-direction: column;
-    touch-action: none;
-    cursor: grab;
-    user-select: none;
-    box-shadow: 0 20px 40px -22px rgba(0,0,0,0.6);
+  @media (prefers-reduced-motion: reduce) {
+    .hero-banner img { animation: none; }
   }
-  .demo-card:active { cursor: grabbing; }
-  .demo-card.behind { z-index: 1; filter: brightness(0.82); transform: scale(0.95) translateY(10px); }
-  .demo-card.front { z-index: 2; }
-
-  .demo-photo {
-    height: 46%;
-    position: relative;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+  @media (max-width: 720px) {
+    .hero-banner { margin-top: 34px; }
+    .hero-banner img { border-radius: 18px; }
   }
-  .demo-photo .badge-init {
-    width: 44px; height: 44px; border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 18px; color: #06170e;
-    position: absolute; right: 10px; bottom: 10px;
-    box-shadow: 0 6px 16px -6px rgba(0,0,0,0.5);
-  }
-  .demo-photo img.photo-img {
-    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-    filter: saturate(0.55) contrast(1.08) brightness(0.9);
-  }
-  .demo-photo .tint { position: absolute; inset: 0; mix-blend-mode: color; opacity: 0.85; }
-  .demo-chip-row { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; }
-  .demo-chip {
-    font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
-    background: rgba(10,11,10,0.55); color: #fff; backdrop-filter: blur(4px);
-  }
-  .demo-photo .name-overlay {
-    position: absolute; left: 12px; right: 64px; bottom: 10px; color: #fff;
-  }
-  .demo-photo .name-overlay p:first-child { font-weight: 800; font-size: 15px; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
-  .demo-photo .name-overlay p:last-child { font-size: 11px; margin: 2px 0 0; opacity: 0.85; }
-  .demo-photo::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.55));
-  }
-
-  .demo-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-  .demo-price { font-size: 22px; font-weight: 800; }
-  .demo-price span { font-size: 12px; font-weight: 500; color: var(--text-muted); }
-  .demo-meta { font-size: 11.5px; color: var(--text-faint); }
-
-  .swipe-flag {
-    position: absolute; top: 20px;
-    font-family: var(--font-body);
-    font-weight: 800; font-size: 15px;
-    padding: 6px 12px; border-radius: 8px;
-    border: 2.5px solid; opacity: 0;
-    transform: rotate(-14deg);
-    letter-spacing: 0.05em;
-    z-index: 3;
-  }
-  .swipe-flag.like { right: 16px; color: var(--accent); border-color: var(--accent); transform: rotate(10deg); }
-  .swipe-flag.pass { left: 16px; color: var(--text-faint); border-color: var(--text-faint); transform: rotate(-10deg); }
-
-  .demo-hint {
-    text-align: center; font-size: 11px; color: var(--text-faint); margin: 10px 0;
-    display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;
-  }
-  .demo-hint svg { width: 13px; height: 13px; animation: nudge 1.8s ease-in-out infinite; }
-  @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
-
-  .phone-tabbar {
-    flex-shrink: 0;
-    display: flex;
-    border-top: 1px solid var(--border-soft);
-    background: var(--bg-soft);
-    padding: 8px 2px 12px;
-  }
-  .ptab {
-    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-    background: none; border: none; color: var(--text-faint); font-family: var(--font-body);
-    font-size: 9px; font-weight: 600; padding: 2px 0; cursor: default;
-  }
-  .ptab svg { width: 17px; height: 17px; }
-  .ptab.active { color: var(--accent); }
-
-  .phone-toast {
-    position: absolute; top: 44px; right: 10px; max-width: 172px;
-    background: var(--surface); border: 1px solid var(--border-soft);
-    border-radius: 14px; padding: 9px 13px;
-    font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.35;
-    box-shadow: 0 16px 34px -14px rgba(0,0,0,0.7);
-    display: flex; align-items: center; gap: 8px;
-    transform: translateX(28px) scale(0.9); opacity: 0;
-    transition: transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.45s ease;
-    z-index: 12; pointer-events: none;
-  }
-  .phone-toast.show { transform: translateX(0) scale(1); opacity: 1; }
-  .phone-toast .dot {
-    width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-
-  .phone { transition: transform 0.25s ease-out; will-change: transform; }
-  @media (prefers-reduced-motion: reduce) { .phone { transition: none; } }
 
   /* ---------------- Reveal ---------------- */
   [data-reveal] {
@@ -810,48 +708,26 @@
   <section class="hero-panel">
     <span class="ghost-word" style="bottom:-6%;">WOLSO</span>
     <div class="wrap">
-      <div class="hero-grid">
-        <div>
-          <span class="eyebrow">Telegram mini app · 18+</span>
-          <h1>Смена на завтра —<br>за пару свайпов<span class="accent">.</span></h1>
-          <p class="hero-sub">Wolso — подработка в кафе, барах и магазинах прямо в Telegram. Смены публикуют только проверенные заведения: с ИНН и модерацией, а не анонимное объявление из чата.</p>
-          <div class="hero-ctas">
-            <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary" data-cta>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21.5 3 2.5 10.6c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.5.8 1.1.8s.8-.2 1.1-.6l2.6-2.5 5.1 3.8c.9.5 1.6.3 1.9-.9l3.4-16c.4-1.4-.5-2-1.9-1.4Z" fill="currentColor"/></svg>
-              Открыть Wolso
-            </a>
-            <a href="#how" class="btn btn-dark">Как это работает</a>
-          </div>
-          <div class="hero-fine">
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Бесплатно для соискателей</span>
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Без установки приложений</span>
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Заведения проверены</span>
-          </div>
+      <div class="hero-top">
+        <span class="eyebrow">Telegram mini app · 18+</span>
+        <h1>Смена на завтра —<br>за пару свайпов<span class="accent">.</span></h1>
+        <p class="hero-sub">Wolso — подработка в кафе, барах и магазинах прямо в Telegram. Смены публикуют только проверенные заведения: с ИНН и модерацией, а не анонимное объявление из чата.</p>
+        <div class="hero-ctas">
+          <a href="https://t.me/wolsoappbot" target="_blank" rel="noreferrer" class="btn btn-primary" data-cta>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21.5 3 2.5 10.6c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.5.8 1.1.8s.8-.2 1.1-.6l2.6-2.5 5.1 3.8c.9.5 1.6.3 1.9-.9l3.4-16c.4-1.4-.5-2-1.9-1.4Z" fill="currentColor"/></svg>
+            Открыть Wolso
+          </a>
+          <a href="#how" class="btn btn-dark">Как это работает</a>
         </div>
+        <div class="hero-fine">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Бесплатно для соискателей</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Без установки приложений</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Заведения проверены</span>
+        </div>
+      </div>
 
-        <div class="phone-stage" id="phoneStage">
-          <div class="phone" id="phone">
-            <div class="phone-notch"></div>
-            <div class="phone-toast" id="toast"><span class="dot"></span><span id="toastText"></span></div>
-            <div class="phone-screen">
-              <div class="phone-topbar">
-                <span class="tg-title"><img src="logo.png" alt="" />Wolso</span>
-                <span class="tg-dots"><span></span><span></span><span></span></span>
-              </div>
-              <div class="deck-wrap">
-                <div class="deck" id="deck"></div>
-                <p class="demo-hint">Потяни карточку в сторону<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></p>
-              </div>
-              <div class="phone-tabbar">
-                <button class="ptab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Лента</button>
-                <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Отклики</button>
-                <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="16" cy="15" r="3"/><path d="M16 14v1.3l.9.7"/></svg>Смены</button>
-                <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>Чаты</button>
-                <button class="ptab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.2-2.2 3.1-3.3 5.5-3.3s4.3 1.1 5.5 3.3"/></svg>Профиль</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="hero-banner">
+        <img src="art/hero-banner.webp" alt="Лента смен Wolso в Telegram: телефон с карточками подработки" />
       </div>
     </div>
 
@@ -1139,135 +1015,6 @@
       }
     });
   });
-
-  // ---- Интерактивная колода в мокапе ----
-  // Photos are Picsum placeholder shots (seeded, so each card is stable) run
-  // through a per-card duotone tint — not actual Wolso venues, since none
-  // exist to pull from yet. Swap `photo` for a real venue photo URL any
-  // time and the tint still applies automatically.
-  var DEMOS = [
-    { init: 'П', color1: '#34d17c', color2: '#0d3a22', photo: 'https://picsum.photos/seed/wolso-cafe-1/480/420', title: 'Просвет Кофе', sub: 'Бариста · 1.2 км', chips: ['Сегодня 14:00', '6 часов'], price: '2 100 ₽', unit: '350 ₽/ч' },
-    { init: 'М', color1: '#e8b23f', color2: '#4a3305', photo: 'https://picsum.photos/seed/wolso-kitchen-2/480/420', title: 'Мама Раша', sub: 'Повар · 900 м', chips: ['Завтра 10:00', '8 часов'], price: '3 200 ₽', unit: '400 ₽/ч' },
-    { init: 'Л', color1: '#4d9bef', color2: '#0e2c4d', photo: 'https://picsum.photos/seed/wolso-bar-3/480/420', title: 'Лаунж Бар №9', sub: 'Официант · 2.4 км', chips: ['Сегодня 18:00', '5 часов'], price: '2 750 ₽', unit: '550 ₽/ч' },
-    { init: 'Р', color1: '#ef7d5e', color2: '#4a1c0d', photo: 'https://picsum.photos/seed/wolso-retail-4/480/420', title: 'Рынок Central', sub: 'Продавец · 600 м', chips: ['Сегодня 11:00', '4 часа'], price: '1 600 ₽', unit: '400 ₽/ч' }
-  ];
-  var deck = document.getElementById('deck');
-  var order = [0, 1, 2, 3];
-
-  function cardHTML(d) {
-    return (
-      '<div class="demo-photo">' +
-        '<img class="photo-img" src="' + d.photo + '" alt="" loading="lazy" />' +
-        '<div class="tint" style="background:linear-gradient(150deg,' + d.color1 + ',' + d.color2 + ')"></div>' +
-        '<div class="demo-chip-row"><span class="demo-chip">' + d.chips[0] + '</span><span class="demo-chip">' + d.chips[1] + '</span></div>' +
-        '<div class="badge-init" style="background:rgba(255,255,255,0.92)">' + d.init + '</div>' +
-        '<div class="name-overlay"><p>' + d.title + '</p><p>' + d.sub + '</p></div>' +
-      '</div>' +
-      '<div class="demo-body">' +
-        '<div class="demo-price">' + d.price + ' <span>за смену · ' + d.unit + '</span></div>' +
-        '<div class="demo-meta">Оплата в день смены · питание включено</div>' +
-      '</div>' +
-      '<span class="swipe-flag like">ОТКЛИК</span>' +
-      '<span class="swipe-flag pass">СКИП</span>'
-    );
-  }
-
-  function renderDeck() {
-    deck.innerHTML = '';
-    order.slice(0, 2).forEach(function (idx, i) {
-      var d = DEMOS[idx];
-      var card = document.createElement('div');
-      card.className = 'demo-card ' + (i === 0 ? 'front' : 'behind');
-      card.innerHTML = cardHTML(d);
-      deck.appendChild(card);
-      if (i === 0) wireDrag(card);
-    });
-  }
-
-  function cycle() {
-    order.push(order.shift());
-    renderDeck();
-  }
-
-  function wireDrag(card) {
-    var startX = 0, dx = 0, dragging = false;
-    var likeFlag = card.querySelector('.swipe-flag.like');
-    var passFlag = card.querySelector('.swipe-flag.pass');
-
-    function down(clientX) { dragging = true; startX = clientX; card.style.transition = 'none'; }
-    function move(clientX) {
-      if (!dragging) return;
-      dx = clientX - startX;
-      var rot = dx / 14;
-      card.style.transform = 'translateX(' + dx + 'px) rotate(' + rot + 'deg)';
-      var pct = Math.min(Math.abs(dx) / 90, 1);
-      if (dx > 0) { likeFlag.style.opacity = pct; passFlag.style.opacity = 0; }
-      else { passFlag.style.opacity = pct; likeFlag.style.opacity = 0; }
-    }
-    function up() {
-      if (!dragging) return;
-      dragging = false;
-      card.style.transition = 'transform 0.4s cubic-bezier(.2,.8,.2,1)';
-      if (Math.abs(dx) > 90) {
-        var flyX = dx > 0 ? 520 : -520;
-        card.style.transform = 'translateX(' + flyX + 'px) rotate(' + (dx > 0 ? 26 : -26) + 'deg)';
-        card.style.opacity = '0';
-        setTimeout(cycle, 320);
-      } else {
-        card.style.transform = 'translateX(0) rotate(0)';
-        likeFlag.style.opacity = 0;
-        passFlag.style.opacity = 0;
-      }
-      dx = 0;
-    }
-
-    card.addEventListener('pointerdown', function (e) { card.setPointerCapture(e.pointerId); down(e.clientX); });
-    card.addEventListener('pointermove', function (e) { move(e.clientX); });
-    card.addEventListener('pointerup', up);
-    card.addEventListener('pointercancel', up);
-  }
-
-  renderDeck();
-
-  // Idle nudge so a visitor who never touches the phone still sees the mechanic once.
-  setTimeout(function () {
-    var front = deck.querySelector('.demo-card.front');
-    if (!front) return;
-    front.style.transition = 'transform 0.5s ease';
-    front.style.transform = 'translateX(26px) rotate(4deg)';
-    setTimeout(function () { front.style.transform = 'translateX(0) rotate(0)'; }, 380);
-  }, 1600);
-
-  // ---- Floating activity toast — a little proof of life on an otherwise static mock. ----
-  if (!reducedMotion) {
-    var TOASTS = ['🔔 Новый отклик на смену', '💬 Работодатель написал в чат', '✅ Смена подтверждена', '⭐ Новый отзыв — 5.0'];
-    var toast = document.getElementById('toast');
-    var toastText = document.getElementById('toastText');
-    var toastIdx = 0;
-    function showToast() {
-      toastText.textContent = TOASTS[toastIdx % TOASTS.length];
-      toastIdx++;
-      toast.classList.add('show');
-      setTimeout(function () { toast.classList.remove('show'); }, 2600);
-    }
-    setTimeout(function () {
-      showToast();
-      setInterval(showToast, 5200);
-    }, 2200);
-  }
-
-  // ---- Subtle cursor-follow tilt on the phone (desktop only, no touch fuss). ----
-  var stage = document.getElementById('phoneStage');
-  var phone = document.getElementById('phone');
-  if (!reducedMotion && window.matchMedia('(pointer: fine)').matches) {
-    stage.addEventListener('mousemove', function (e) {
-      var r = stage.getBoundingClientRect();
-      var px = (e.clientX - r.left) / r.width - 0.5;
-      var py = (e.clientY - r.top) / r.height - 0.5;
-      phone.style.transform = 'rotate(' + (3 + px * 6) + 'deg) rotateX(' + (py * -8) + 'deg)';
-    });
-    stage.addEventListener('mouseleave', function () { phone.style.transform = 'rotate(3deg)'; });
-  }
 
   // ---- Параллакс на призрачных надписях ----
   // Дёшево и заметно: вотермарк едет медленнее страницы, отчего блок
