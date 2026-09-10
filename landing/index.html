@@ -259,41 +259,81 @@
     position: relative;
     margin: 14px;
     border-radius: var(--r-panel);
-    padding: 64px 0 0;
     overflow: hidden;
+    /* Фолбэк на случай, если баннер не загрузился. */
     background:
       radial-gradient(120% 120% at 12% -10%, #14402a 0%, #0c1a14 42%, #080b0a 100%);
     border: 1px solid rgba(52, 209, 124, 0.16);
     box-shadow: 0 50px 110px -60px #000;
     isolation: isolate;
   }
-  .hero-panel::after {
-    /* Медленно дышащее пятно света — единственная «живая» деталь фона. */
+  /* Баннер лежит во всю панель. object-position смещён вправо: слева
+     у картинки спокойный интерьер, туда и встаёт текст, а телефон с
+     карточками остаётся в кадре при любой ширине. */
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    z-index: 0;
+  }
+  /* Затемнение слева — иначе заголовок теряется на светлых лампах. */
+  .hero-panel::before {
     content: "";
     position: absolute;
-    top: -30%; left: 8%;
-    width: 60%; height: 90%;
-    background: radial-gradient(ellipse at center, rgba(52, 209, 124, 0.22), transparent 68%);
-    filter: blur(30px);
+    inset: 0;
+    z-index: 1;
     pointer-events: none;
-    z-index: -1;
-    animation: breathe 11s ease-in-out infinite;
+    background:
+      linear-gradient(90deg, rgba(7,9,8,0.95) 0%, rgba(7,9,8,0.88) 26%, rgba(7,9,8,0.5) 46%, rgba(7,9,8,0) 64%),
+      linear-gradient(180deg, rgba(7,9,8,0.5) 0%, rgba(7,9,8,0) 24%);
   }
-  @keyframes breathe {
-    0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
-    50% { transform: translate3d(4%, 5%, 0) scale(1.14); opacity: 1; }
-  }
-  @media (max-width: 720px) { .hero-panel { margin: 8px; padding-top: 44px; border-radius: 26px; } }
+  @media (max-width: 720px) { .hero-panel { margin: 8px; border-radius: 26px; } }
 
-  /* Герой в одну колонку: текст по центру, под ним баннер во всю ширину. */
-  .hero-top { position: relative; z-index: 2; max-width: 880px; margin: 0 auto; text-align: center; }
-  .hero-top .hero-sub { margin-left: auto; margin-right: auto; }
-  .hero-top .hero-ctas,
-  .hero-top .hero-fine { justify-content: center; }
+  /* Текст занимает левую половину и по вертикали стоит по центру кадра. */
+  .hero-panel .wrap {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    min-height: clamp(540px, 53vw, 800px);
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+  /* Ширина колонки подобрана так, чтобы строки заголовка обрывались
+     до парящей карточки на баннере и не наезжали на неё. */
+  .hero-top { max-width: 520px; }
+
+  /* Бегущая строка лежит поверх нижнего края картинки — притемняем
+     её полосу, иначе должности теряются на бликах стойки. */
+  .hero-panel .marquee {
+    margin-top: 0;
+    background: rgba(7, 9, 8, 0.74);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+  }
+
+  /* Узко — картинка перестаёт быть фоном и встаёт отдельным блоком под
+     текстом: поверх телефона читать заголовок невозможно. */
+  @media (max-width: 940px) {
+    .hero-panel { display: flex; flex-direction: column; }
+    .hero-panel .wrap { order: 1; min-height: 0; padding-top: 44px; padding-bottom: 0; }
+    /* На узком экране баннер во всю ширину превращается в тонкую полоску,
+       где ничего не разобрать. Поэтому кадрируем его на телефон. */
+    .hero-bg { order: 2; position: static; width: 100%; height: auto; margin-top: 28px; aspect-ratio: 16 / 11; object-fit: cover; object-position: 66% center; }
+    .hero-panel .marquee { order: 3; }
+    .hero-panel::before { background: linear-gradient(180deg, rgba(7,9,8,0.5) 0%, rgba(7,9,8,0) 24%); }
+    .hero-top { max-width: none; }
+  }
+  @media (max-width: 560px) {
+    .hero-bg { aspect-ratio: 4 / 5; object-position: 71% center; }
+  }
 
   .hero-panel h1 {
     font-family: var(--font-display);
-    font-size: clamp(38px, 6vw, 68px);
+    font-size: clamp(36px, 4.4vw, 57px);
     font-weight: 700;
     line-height: 1.0;
     letter-spacing: -0.04em;
@@ -339,47 +379,6 @@
     background: var(--accent);
     opacity: 0.5;
   }
-  /* ---------------- Баннер героя ----------------
-     Герой в одну колонку: текст сверху, под ним картинка во всю ширину
-     контента. Тень считаем через drop-shadow, а не box-shadow: так она
-     повторяет альфу картинки, если у баннера прозрачный фон. */
-  .hero-banner {
-    position: relative;
-    z-index: 2;
-    margin: 52px auto 0;
-    max-width: 1112px;
-  }
-  .hero-banner img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 28px;
-    filter: drop-shadow(0 46px 80px rgba(0, 0, 0, 0.62));
-    animation: heroFloat 9s ease-in-out infinite;
-  }
-  @keyframes heroFloat {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50% { transform: translate3d(0, -10px, 0); }
-  }
-  /* Зелёное свечение под баннером — тот же приём, что и у панели, чтобы
-     картинка «сидела» в фоне, а не лежала поверх него. */
-  .hero-banner::before {
-    content: "";
-    position: absolute;
-    inset: 12% 6% -6%;
-    background: radial-gradient(ellipse at center, rgba(52, 209, 124, 0.28), transparent 70%);
-    filter: blur(46px);
-    z-index: -1;
-    pointer-events: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hero-banner img { animation: none; }
-  }
-  @media (max-width: 720px) {
-    .hero-banner { margin-top: 34px; }
-    .hero-banner img { border-radius: 18px; }
-  }
-
   /* ---------------- Reveal ---------------- */
   [data-reveal] {
     opacity: 0;
@@ -706,7 +705,7 @@
 <main id="top">
   <!-- ============ Герой ============ -->
   <section class="hero-panel">
-    <span class="ghost-word" style="bottom:-6%;">WOLSO</span>
+    <img class="hero-bg" src="art/hero-banner.webp" width="1678" height="937" fetchpriority="high" decoding="async" alt="Лента смен Wolso в Telegram на фоне кофейни" />
     <div class="wrap">
       <div class="hero-top">
         <span class="eyebrow">Telegram mini app · 18+</span>
@@ -724,10 +723,6 @@
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Без установки приложений</span>
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Заведения проверены</span>
         </div>
-      </div>
-
-      <div class="hero-banner">
-        <img src="art/hero-banner.webp" alt="Лента смен Wolso в Telegram: телефон с карточками подработки" />
       </div>
     </div>
 
