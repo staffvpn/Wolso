@@ -734,6 +734,13 @@
      прямоугольнику: у фигур неровный контур, и box-shadow выдал бы рамку
      вокруг пустоты. */
   .step-art {
+    /* align-self обязателен: карточка шага — flex-колонка, а в ней элемент
+       по умолчанию растягивается на всю ширину (align-items: stretch).
+       Вместе с жёстко заданной высотой это плющило иллюстрацию — картинка
+       249×224 показывалась как 298×112. width:auto от этого не спасает:
+       растягивает не он, а флексбокс. */
+    align-self: flex-start;
+    flex-shrink: 0;
     height: 112px; width: auto;
     margin: -6px 0 22px -6px;
     filter: drop-shadow(0 20px 26px rgba(0, 0, 0, 0.55));
@@ -742,6 +749,8 @@
   .step.soft-hover:hover .step-art { transform: translateY(-6px) scale(1.05); }
 
   .feat-art {
+    align-self: flex-start;
+    flex-shrink: 0;
     height: 68px; width: auto;
     margin: -4px 0 16px -4px;
     filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.5));
@@ -750,12 +759,16 @@
   .feat.soft-hover:hover .feat-art { transform: translateY(-5px) scale(1.06) rotate(-2deg); }
 
   .acc-art {
+    align-self: flex-start;
+    flex-shrink: 0;
     height: 138px; width: auto;
     margin: 0 0 20px;
     filter: drop-shadow(0 22px 30px rgba(0, 0, 0, 0.55));
   }
 
   .cta-art {
+    align-self: center;
+    flex-shrink: 0;
     height: 210px; width: auto;
     margin: 0 auto 26px;
     position: relative; z-index: 2;
