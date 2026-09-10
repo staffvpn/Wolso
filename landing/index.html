@@ -257,7 +257,13 @@
      зелёный с подсветкой. */
   .hero-panel {
     position: relative;
-    margin: 14px;
+    /* Ширина ограничена, а не растянута на весь экран: иначе на 2K и
+       шире панель разъезжается, высота упирается в потолок, панель
+       становится «квадратнее» баннера — и cover срезает кадр сверху
+       и снизу вместе с телефоном. */
+    width: calc(100% - 28px);
+    max-width: 1800px;
+    margin: 14px auto;
     border-radius: var(--r-panel);
     overflow: hidden;
     /* Фолбэк на случай, если баннер не загрузился. */
@@ -293,7 +299,7 @@
       linear-gradient(90deg, rgba(7,9,8,0.95) 0%, rgba(7,9,8,0.88) 26%, rgba(7,9,8,0.5) 46%, rgba(7,9,8,0) 64%),
       linear-gradient(180deg, rgba(7,9,8,0.5) 0%, rgba(7,9,8,0) 24%);
   }
-  @media (max-width: 720px) { .hero-panel { margin: 8px; border-radius: 26px; } }
+  @media (max-width: 720px) { .hero-panel { width: calc(100% - 16px); margin: 8px auto; border-radius: 26px; } }
 
   /* Текст занимает левую половину и по вертикали стоит по центру кадра. */
   .hero-panel .wrap {
@@ -303,7 +309,7 @@
     align-items: center;
     /* Высота считается из пропорций баннера (21:9): так кадр встаёт
        целиком, без обрезки по бокам, где лежат парящие карточки. */
-    min-height: clamp(460px, 42vw, 720px);
+    min-height: clamp(460px, 42vw, 772px);
     padding-top: 40px;
     padding-bottom: 40px;
   }
