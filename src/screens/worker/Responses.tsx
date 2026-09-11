@@ -10,6 +10,7 @@ import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DetailRow } from '@/components/ui/DetailRow';
 import { CancelSheet } from '@/components/CancelSheet';
+import { WithdrawSheet } from '@/components/WithdrawSheet';
 import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
 import { resolveCompany } from '@/data/companies';
@@ -35,10 +36,12 @@ export function Responses() {
   const loadApplications = useApplicationsStore((s) => s.load);
   const respondToInvite = useApplicationsStore((s) => s.respondToInvite);
   const cancelApplication = useApplicationsStore((s) => s.cancelApplication);
+  const withdrawApplication = useApplicationsStore((s) => s.withdrawApplication);
   const chats = useChatStore((s) => s.chats);
   const loadChats = useChatStore((s) => s.load);
   const [tab, setTab] = useState<Tab>('all');
   const [cancelling, setCancelling] = useState<Application | null>(null);
+  const [withdrawing, setWithdrawing] = useState<Application | null>(null);
 
   useEffect(() => {
     loadApplications();
@@ -105,6 +108,7 @@ export function Responses() {
                   chatId={chats.find((c) => c.shiftId === app.shift?.id)?.id}
                   onRespond={respondToInvite}
                   onCancel={setCancelling}
+                  onWithdraw={setWithdrawing}
                   onOpenChat={(id) => navigate(`/w/chats/${id}`)}
                 />
               </motion.div>
@@ -112,6 +116,19 @@ export function Responses() {
           </div>
         )}
       </div>
+
+      {withdrawing && (
+        <WithdrawSheet
+          open
+          onClose={() => setWithdrawing(null)}
+          shiftTitle={
+            withdrawing.shift
+              ? `${withdrawing.shift.positionLabel} · ${resolveCompany(withdrawing.shift).name}`
+              : 'Смена'
+          }
+          onSubmit={() => withdrawApplication(withdrawing.id)}
+        />
+      )}
 
       {cancelling && (
         <CancelSheet
@@ -140,12 +157,14 @@ function ResponseCard({
   chatId,
   onRespond,
   onCancel,
+  onWithdraw,
   onOpenChat,
 }: {
   app: Application;
   chatId?: string;
   onRespond: (id: string, accept: boolean) => void;
   onCancel: (app: Application) => void;
+  onWithdraw: (app: Application) => void;
   onOpenChat: (chatId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -232,6 +251,27 @@ function ResponseCard({
           )}
           <Button variant="dark" size="md" className="w-11 px-0 shrink-0" onClick={() => onRespond(app.id, false)} aria-label="Отклонить">
             <X size={17} />
+          </Button>
+        </div>
+      )}
+
+      {/* У неотвеченного отклика не было ни одной кнопки: откликнуться —
+          один свайп, а передумать нечем. Человек, нашедший смену в другом
+          месте, продолжал висеть в очереди кандидатов. */}
+      {app.status === 'pending' && (
+        <div className="flex items-center gap-2 px-4 pb-4">
+          {chatId && (
+            <Button size="md" className="flex-1" onClick={() => onOpenChat(chatId)}>
+              <MessageCircle size={16} /> Открыть чат
+            </Button>
+          )}
+          <Button
+            variant="dark"
+            size="md"
+            className={cn('shrink-0', !chatId && 'flex-1')}
+            onClick={() => onWithdraw(app)}
+          >
+            Отозвать отклик
           </Button>
         </div>
       )}

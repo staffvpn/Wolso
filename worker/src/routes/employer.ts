@@ -865,8 +865,15 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
 
   const app = await c.env.DB.prepare('SELECT * FROM applications WHERE id = ? AND shift_id = ?').bind(appId, shiftId).first<{
     worker_id: number;
+    status: string;
   }>();
   if (!app) return c.json({ error: 'not_found' }, 404);
+  // Решать можно только то, что ещё не решено. Проверки здесь не было, а
+  // значит открытый со вчера экран кандидатов мог переписать любой статус:
+  // соискатель отзывает отклик (см. /applications/:id/withdraw),
+  // работодатель жмёт «Принять» по старой карточке — и человек получает
+  // приглашение на смену, из которой сам же ушёл.
+  if (app.status !== 'pending') return c.json({ error: 'already_decided' }, 409);
 
   const dbStatus = status === 'accepted' ? 'invited' : 'declined';
   await c.env.DB.prepare('UPDATE applications SET status = ? WHERE id = ?').bind(dbStatus, appId).run();

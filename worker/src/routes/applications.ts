@@ -195,6 +195,52 @@ applicationRoutes.post('/:id/respond', async (c) => {
   return c.json({ ok: true });
 });
 
+/** Отзыв ещё не рассмотренного отклика.
+ *
+ *  Откликнуться было одним свайпом, а передумать — нечем: у отклика в
+ *  статусе `pending` на экране «Мои отклики» не было ни одной кнопки.
+ *  Человек, нашедший смену в другом месте, оставался висеть в очереди
+ *  кандидатов, и работодатель звал того, кто уже не придёт.
+ *
+ *  Причину здесь не спрашиваем, в отличие от /cancel ниже: там человек
+ *  выходит из смены, на которую работодатель уже рассчитывает, и молчание
+ *  оставило бы его гадать. Здесь же работодатель ещё ничего не решил —
+ *  требовать объяснение не за что.
+ *
+ *  Статус тот же `cancelled`, что и у отмены: повторный отклик на эту же
+ *  смену он не блокирует (см. проверку в POST / выше), так что передумать
+ *  можно и обратно. */
+applicationRoutes.post('/:id/withdraw', async (c) => {
+  const session = requireWorker(c as never);
+  if (!session) return c.json({ error: 'auth_required' }, 401);
+  const app = await ownedApplication(c.env, c.req.param('id'), session.workerId);
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  // Только неотвеченный отклик. У приглашения есть свой «Отклонить»
+  // (/respond), у подтверждённой смены — свой «Не смогу выйти» (/cancel),
+  // и оба сообщают работодателю то, о чём здесь сообщать нечего.
+  if (app.status !== 'pending') return c.json({ error: 'not_pending' }, 400);
+
+  await c.env.DB.prepare(
+    "UPDATE applications SET status = 'cancelled', cancelled_by = 'worker', cancel_reason = NULL, cancelled_at = datetime('now') WHERE id = ?",
+  )
+    .bind(app.id)
+    .run();
+
+  // Чата на неотвеченный отклик обычно нет — он заводится при
+  // приглашении. Но если работодатель успел написать первым, висящая
+  // переписка по отозванному отклику никому не нужна.
+  const shift = await c.env.DB.prepare('SELECT company_id FROM shifts WHERE id = ?')
+    .bind(app.shift_id)
+    .first<{ company_id: number }>();
+  if (shift) await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
+
+  // Работодателю не пишем — ни в бот, ни в список уведомлений. Он на этого
+  // человека ещё ничего не потратил, карточка просто уйдёт из «Кандидатов»;
+  // пуш на каждый отозванный отклик — это ровно тот шум, после которого
+  // бота отключают.
+  return c.json({ ok: true });
+});
+
 /** A worker who already confirmed a shift can still back out — a reason
  *  is mandatory, matching the employer's own /vacancies/:id/candidates/:id/cancel,
  *  so the employer isn't left guessing why someone they were counting on

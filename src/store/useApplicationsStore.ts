@@ -101,6 +101,9 @@ interface ApplicationsState {
   respondToInvite: (applicationId: string, accept: boolean) => Promise<void>;
   /** Backing out of an already-confirmed shift — reason is mandatory. */
   cancelApplication: (applicationId: string, reason: string) => Promise<void>;
+  /** Отзыв ещё не рассмотренного отклика. Причина не нужна: работодатель
+   *  по этому отклику пока ничего не решил. */
+  withdrawApplication: (applicationId: string) => Promise<void>;
   submitReview: (applicationId: string, rating: number, tags: string[], comment: string) => Promise<void>;
 }
 
@@ -150,6 +153,15 @@ export const useApplicationsStore = create<ApplicationsState>((set) => ({
     set((s) => ({
       applications: s.applications.map((a) =>
         a.id === applicationId ? { ...a, status: 'cancelled', cancelledBy: 'worker', cancelReason: reason } : a,
+      ),
+    }));
+  },
+
+  withdrawApplication: async (applicationId) => {
+    await apiFetch(`/applications/${applicationId}/withdraw`, { method: 'POST' });
+    set((s) => ({
+      applications: s.applications.map((a) =>
+        a.id === applicationId ? { ...a, status: 'cancelled', cancelledBy: 'worker', cancelReason: undefined } : a,
       ),
     }));
   },
