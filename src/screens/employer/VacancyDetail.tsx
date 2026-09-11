@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Check, Mail, Pencil, X, XCircle } from 'lucide-react';
+import { Check, ChevronRight, Mail, Pencil, X, XCircle } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
@@ -137,7 +137,10 @@ export function VacancyDetail() {
               const canCancel = !isClosed && (c.status === 'invited' || !shiftIsPast);
               return (
                 <Card key={c.id} className="p-4">
-                  <div className="flex items-center gap-3">
+                  {/* Шапка карточки открывает анкету. Раньше у приглашённых
+                      и вышедших её было не посмотреть вообще: человека уже
+                      позвали на смену, а перечитать, кого именно, негде. */}
+                  <button onClick={() => setSelected(c)} className="flex items-center gap-3 w-full text-left">
                     <Avatar src={c.photos[0]} name={c.name} size={44} />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[14px] truncate">{c.name}</p>
@@ -145,7 +148,8 @@ export function VacancyDetail() {
                     </div>
                     {c.status === 'invited' && <Badge tone="neutral">Ждём подтверждения</Badge>}
                     {isClosed && <Badge tone="accent">Смена закрыта</Badge>}
-                  </div>
+                    <ChevronRight size={16} className="text-text-faint shrink-0" />
+                  </button>
                   <div className="flex items-center gap-2 mt-4">
                     {!isClosed && c.status !== 'invited' && shiftIsPast && (
                       <Button size="md" className="flex-1" onClick={() => setClosing(c)}>
@@ -194,10 +198,11 @@ export function VacancyDetail() {
               <div className="rounded-card bg-surface border border-accent/40 p-4 mb-4">
                 <button onClick={() => setSelected(top)} className="flex items-center gap-3 w-full text-left">
                   <Avatar src={top.photos[0]} name={top.name} size={52} />
-                  <div className="min-w-0">
-                    <p className="font-bold text-[17px]">{top.name}</p>
-                    <p className="text-[13px] text-text-muted">{formatRating(top.rating)} · {top.shiftsCompleted} смен</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[17px] truncate">{top.name}</p>
+                    <p className="text-[13px] text-text-muted truncate">{formatRating(top.rating)} · {top.shiftsCompleted} смен</p>
                   </div>
+                  <ChevronRight size={17} className="text-text-faint shrink-0" />
                 </button>
                 <div className="flex items-center gap-2 mt-4">
                   <Button className="flex-1" onClick={() => decideCandidate(vacancy.id, top.id, 'accepted')}>
@@ -234,6 +239,10 @@ export function VacancyDetail() {
                   >
                     Пригласить
                   </button>
+                  {/* Строка открывала анкету и раньше, но выглядела мёртвой:
+                      ни стрелки, ни любого другого знака, что по ней можно
+                      нажать. */}
+                  <ChevronRight size={16} className="text-text-faint shrink-0" />
                 </div>
               ))}
             </div>
@@ -247,14 +256,35 @@ export function VacancyDetail() {
             candidate={selected}
             onClose={() => setSelected(null)}
             acceptLabel="Пригласить"
-            onAccept={() => {
-              decideCandidate(vacancy.id, selected.id, 'accepted');
-              setSelected(null);
-            }}
-            onDecline={() => {
-              decideCandidate(vacancy.id, selected.id, 'declined');
-              setSelected(null);
-            }}
+            // «Пригласить» и «Отклонить» — только для нерешённого отклика.
+            // Этой же анкетой теперь открывают уже приглашённых и вышедших
+            // на смену, а звать второй раз человека, который уже согласился,
+            // нечего: там остаётся только написать.
+            onAccept={
+              selected.status === 'pending'
+                ? () => {
+                    decideCandidate(vacancy.id, selected.id, 'accepted');
+                    setSelected(null);
+                  }
+                : undefined
+            }
+            onDecline={
+              selected.status === 'pending'
+                ? () => {
+                    decideCandidate(vacancy.id, selected.id, 'declined');
+                    setSelected(null);
+                  }
+                : undefined
+            }
+            onMessage={
+              selected.status === 'pending'
+                ? undefined
+                : () => {
+                    const candidate = selected;
+                    setSelected(null);
+                    void openChatFor(candidate);
+                  }
+            }
           />
         )}
       </AnimatePresence>
