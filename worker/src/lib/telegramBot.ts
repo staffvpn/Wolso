@@ -28,6 +28,30 @@ export async function getTelegramUsername(env: Env, chatId: number): Promise<str
  *  any other single failure is logged and swallowed rather than thrown,
  *  so one bad chat_id in a batch never takes down the rest. */
 export async function sendTelegramMessage(env: Env, chatId: number, text: string): Promise<boolean> {
+  return (await sendTelegramMessageResult(env, chatId, text)) === 'sent';
+}
+
+/** Исход отправки для тех, кто на него смотрит.
+ *
+ *  - `sent`      — доставлено;
+ *  - `permanent` — не доставится и при повторе: бот заблокирован, аккаунт
+ *                  удалён, чат не найден, запрос отвергнут;
+ *  - `transient` — Telegram прилёг или лимитит (429, 5xx, обрыв сети).
+ *                  О самом человеке это не говорит ничего.
+ *
+ *  Разница важна ровно там, где попытка одна на всю жизнь: напоминание о
+ *  незаконченном профиле помечается отправленным и больше не повторяется,
+ *  так что списать его на 429 — значит молча лишить человека письма
+ *  навсегда. Граница проведена по коду ответа, а не по описанию: всё,
+ *  кроме 429 и 5xx, считаем окончательным, иначе нераспознанная ошибка
+ *  заставила бы крон долбиться в один и тот же чат каждый час. */
+export type TelegramSendResult = 'sent' | 'permanent' | 'transient';
+
+export async function sendTelegramMessageResult(
+  env: Env,
+  chatId: number,
+  text: string,
+): Promise<TelegramSendResult> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -55,12 +79,13 @@ export async function sendTelegramMessage(env: Env, chatId: number, text: string
       }
       const status = classifyTelegramFailure(res.status, description);
       if (status) await recordBotStatus(env, chatId, status);
-      return false;
+      return res.status === 429 || res.status >= 500 ? 'transient' : 'permanent';
     }
     await recordBotStatus(env, chatId, 'active');
-    return true;
+    return 'sent';
   } catch (err) {
+    // Сеть оборвалась — про человека это не говорит ничего.
     console.error('telegram sendMessage threw', chatId, err);
-    return false;
+    return 'transient';
   }
 }

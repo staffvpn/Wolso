@@ -55,7 +55,12 @@ html, body {
    * ignored it since iOS 10, so the app could still be pinched/panned out
    * of its frame without this. */
   touch-action: pan-y;
-  overflow-x: hidden;
+  /* Прокрутки на уровне документа быть не должно вообще: каждый экран
+   * живёт внутри #root и листает собственный контейнер. Пока здесь стоял
+   * только overflow-x, вертикальный жест мимо прокручиваемого блока
+   * доставался странице, а внутри Telegram — его обёртке, и приложение
+   * ехало вверх-вниз без всякого содержимого под ним. */
+  overflow: hidden;
 }
 
 body {

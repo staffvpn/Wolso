@@ -22,8 +22,12 @@ export function WorkerProfileScreen() {
 
   if (!loaded) return null;
 
+  // overflow-x-hidden обязателен: по спецификации overflow-y: auto
+  // вычисляет overflow-x как auto, даже если он visible. Полоса фото ниже
+  // выходит за края через -mx-5, и без этого весь экран тянулся вбок на
+  // 20 px в пустоту.
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-y-auto px-5 pt-5 safe-top pb-4">
+    <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
       <div className="flex items-center gap-4">
         <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
         <div className="min-w-0 flex-1">

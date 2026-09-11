@@ -1,5 +1,5 @@
 import type { Env } from '../types';
-import { sendTelegramMessage } from './telegramBot';
+import { sendTelegramMessageResult } from './telegramBot';
 import { notifyCompany, notifyWorker } from './notifyPrefs';
 import { photoReminderColumnExists } from './ownPhoto';
 
@@ -123,20 +123,30 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
   const text = support ? `${SIGNUP_REMINDER_TEXT}\n\n${support}` : SIGNUP_REMINDER_TEXT;
   const now = new Date().toISOString();
 
+  // Помечаем отправленным всё, кроме временных отказов. Человек,
+  // заблокировавший бота, письма не получит сколько ни повторяй, и вот
+  // из-за таких повторов цикл бы никогда не закончился. А 429 или 500 от
+  // Telegram про человека не говорят ничего: раньше такой ответ тоже
+  // ставил отметку — и единственная за всю жизнь попытка сгорала впустую,
+  // причём молча. Теперь её просто повторит следующий час.
+  let sentWorkers = 0;
+  let sentCompanies = 0;
+
   for (const w of workers) {
-    await sendTelegramMessage(env, w.telegram_id, text);
-    // Stamped whatever the send returned. A person who blocked the bot
-    // won't get this message no matter how many times we retry, and
-    // retrying is what would make this loop never terminate.
+    const result = await sendTelegramMessageResult(env, w.telegram_id, text);
+    if (result === 'transient') continue;
+    if (result === 'sent') sentWorkers++;
     await env.DB.prepare('UPDATE workers SET signup_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
   }
 
   for (const co of companies) {
-    await sendTelegramMessage(env, co.owner_telegram_id, text);
+    const result = await sendTelegramMessageResult(env, co.owner_telegram_id, text);
+    if (result === 'transient') continue;
+    if (result === 'sent') sentCompanies++;
     await env.DB.prepare('UPDATE companies SET signup_reminded_at = ? WHERE id = ?').bind(now, co.id).run();
   }
 
-  return { workers: workers.length, companies: companies.length };
+  return { workers: sentWorkers, companies: sentCompanies };
 }
 
 /** Анкеты, на которых до сих пор стоит картинка из Telegram.
@@ -177,12 +187,17 @@ async function remindTelegramPhotos(env: Env): Promise<number> {
   const text = support ? `${OWN_PHOTO_REMINDER_TEXT}\n\n${support}` : OWN_PHOTO_REMINDER_TEXT;
   const now = new Date().toISOString();
 
+  // Та же попытка «раз в жизни», что и у напоминания о профиле, — и та же
+  // оговорка про временные отказы.
+  let sent = 0;
   for (const w of results) {
-    await sendTelegramMessage(env, w.telegram_id, text);
+    const result = await sendTelegramMessageResult(env, w.telegram_id, text);
+    if (result === 'transient') continue;
+    if (result === 'sent') sent++;
     await env.DB.prepare('UPDATE workers SET photo_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
   }
 
-  return results.length;
+  return sent;
 }
 
 /** Applicants nobody answered. One message per employer, not per

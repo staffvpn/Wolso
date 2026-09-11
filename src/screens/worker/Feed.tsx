@@ -72,8 +72,13 @@ export function Feed() {
   // возможных объяснений.
   if (photoIsFromTelegram) return <NeedOwnPhoto />;
 
+  // touch-none на всей ленте: вертикальный жест мимо карточки уходил
+  // браузеру, а тот отдавал его обёртке Telegram — экран ехал вверх-вниз,
+  // хотя прокручивать здесь нечего. У самой карточки touch-none стоял и
+  // раньше (DeckCard), поэтому тянулось всё вокруг неё: шапка, счётчик,
+  // поля вокруг колоды, кнопки и подпись.
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 touch-none">
       <div className="flex items-center justify-between px-5 pt-4 pb-2 safe-top shrink-0">
         <div className="flex items-center gap-2">
           <Logo size={22} className="text-accent" />
@@ -274,7 +279,9 @@ function ShiftDetailOverlay({
         </IconButton>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+      {/* touch-pan-y возвращает прокрутку: оверлей лежит внутри ленты,
+          а та целиком touch-none. */}
+      <div className="flex-1 min-h-0 overflow-y-auto touch-pan-y pb-4">
         <div className="relative h-80 shrink-0 bg-surface-2 overflow-hidden">
           {hasPhotos ? (
             <SafeImage key={photos[photoIndex]} src={photos[photoIndex]} alt={company.name} className="h-full w-full object-cover" />
