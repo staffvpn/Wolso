@@ -62,7 +62,7 @@ export function WorkerProfileScreen() {
           </div>
           <p className="text-[13px] text-text-muted leading-relaxed">
             Работодатели не видят её в поиске, а откликаться на новые смены нельзя.
-            {profile.hiddenReason ? '' : ' Поправьте анкету и напишите в поддержку.'}
+            {profile.hiddenReason ? '' : ' Исправьте анкету и сохраните — мы посмотрим её заново.'}
           </p>
           {profile.hiddenReason && (
             <p className="text-[13px] text-text leading-relaxed mt-2 whitespace-pre-line">{profile.hiddenReason}</p>

@@ -36,12 +36,16 @@ export function ProfileHidden() {
         </div>
       )}
 
-      <Button variant="dark" onClick={() => navigate('/w/profile')}>
-        Открыть анкету
+      <Button variant="dark" onClick={() => navigate('/w/profile/edit')}>
+        Исправить анкету
       </Button>
 
+      {/* Писать в поддержку больше не нужно: сохранение правок само шлёт
+          оператору сигнал посмотреть анкету заново (см.
+          reportHiddenProfileEdit в воркере). */}
       <p className="text-[13px] text-text-faint max-w-[300px] leading-relaxed">
-        Поправьте анкету и напишите в поддержку — её вернут в поиск.
+        Исправьте то, о чём речь, и сохраните — мы получим уведомление и посмотрим анкету заново. Писать в поддержку не
+        нужно.
       </p>
     </div>
   );

@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff, requireStaffMiddleware, staffHasPermission } from '../middleware/auth';
 import { provisionWorker, provisionCompany } from '../routes/auth';
-import { getTelegramUsername } from '../lib/telegramBot';
+import { getTelegramUsername, sendTelegramMessage } from '../lib/telegramBot';
 import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
-import { hiddenColumnExists } from '../lib/hiddenProfiles';
+import { hiddenColumnExists, hiddenEditColumnExists } from '../lib/hiddenProfiles';
 import { userNotesTableExists } from '../lib/complaints';
 import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
 import { datesColumnExists, expandDates } from '../lib/shiftDates';
@@ -598,7 +598,9 @@ adminUserRoutes.post('/seekers/:id/hide', requirePermission('blockUsers'), async
     return c.json({ error: 'migration_required', migration: '0027_hidden_profiles' }, 400);
   }
 
-  const worker = await c.env.DB.prepare('SELECT name, hidden FROM workers WHERE id = ?').bind(id).first<{ name: string; hidden: number }>();
+  const worker = await c.env.DB.prepare('SELECT name, telegram_id, hidden FROM workers WHERE id = ?')
+    .bind(id)
+    .first<{ name: string; telegram_id: number; hidden: number }>();
   if (!worker) return c.json({ error: 'not_found' }, 404);
 
   const next = worker.hidden ? 0 : 1;
@@ -607,6 +609,29 @@ adminUserRoutes.post('/seekers/:id/hide', requirePermission('blockUsers'), async
   await c.env.DB.prepare('UPDATE workers SET hidden = ?, hidden_reason = ?, hidden_at = ? WHERE id = ?')
     .bind(next, next ? reason || null : null, next ? new Date().toISOString() : null, id)
     .run();
+
+  // Отметка о «посмотрите ещё раз» сбрасывается при каждой смене
+  // видимости: после возврата в поиск и повторного скрытия человек должен
+  // снова иметь возможность позвать оператора, а не упереться в окно,
+  // закрытое прошлым разом.
+  if (await hiddenEditColumnExists(c.env)) {
+    await c.env.DB.prepare('UPDATE workers SET hidden_edit_notified_at = NULL WHERE id = ?').bind(id).run();
+  }
+
+  // Причина лежала только в базе и показывалась внутри приложения — то
+  // есть тому, кто сам зайдёт и заметит. Человек, которого перестали
+  // звать на смены, обычно просто решает, что смен нет. Поэтому пишем в
+  // бот, и без оглядки на переключатели уведомлений: это не рассылка про
+  // смены, а то, что случилось с его аккаунтом.
+  const notice = next
+    ? 'Ваша анкета скрыта из поиска.\n\n' +
+      (reason ? `Причина: ${reason}\n\n` : '') +
+      'Чаты и уже согласованные смены работают как прежде, но работодатели не видят анкету в поиске, ' +
+      'и откликаться на новые смены нельзя.\n\n' +
+      'Это поправимо: откройте Wolso → Профиль → Редактировать и исправьте то, о чём речь. ' +
+      'Как сохраните — мы получим уведомление и посмотрим анкету заново.'
+    : 'Ваша анкета снова в поиске.\n\nРаботодатели опять видят её, и можно откликаться на смены.';
+  c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, notice));
 
   const actor = await actorLabel(c.env, session);
   await logAction(

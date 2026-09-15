@@ -21,6 +21,7 @@ import sql0033 from '../../migrations/0033_personal_shift_status.sql';
 import sql0034 from '../../migrations/0034_shift_date_set.sql';
 import sql0035 from '../../migrations/0035_own_photo_reminder.sql';
 import sql0036 from '../../migrations/0036_pay_mode.sql';
+import sql0037 from '../../migrations/0037_hidden_review_request.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -54,6 +55,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'workers', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
   { table: 'companies', column: 'suspended_reason', migration: '0026_suspension_reason', breaks: 'блокировка пользователей' },
   { table: 'workers', column: 'hidden', migration: '0027_hidden_profiles', breaks: 'скрытие анкет' },
+  { table: 'workers', column: 'hidden_edit_notified_at', migration: '0037_hidden_review_request', breaks: 'сигнал оператору, что скрытую анкету исправили' },
   { table: 'workers', column: 'signup_reminded_at', migration: '0028_reminders', breaks: 'авто-напоминания в боте' },
   { table: 'companies', column: 'pending_reminded_at', migration: '0028_reminders', breaks: 'авто-напоминания в боте' },
   { table: 'workers', column: 'looking_for', migration: '0029_worker_employment_type', breaks: 'смена или постоянная работа в анкете' },
@@ -94,6 +96,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0025_bot_status': sql0025,
   '0026_suspension_reason': sql0026,
   '0027_hidden_profiles': sql0027,
+  '0037_hidden_review_request': sql0037,
   '0028_reminders': sql0028,
   '0029_worker_employment_type': sql0029,
   '0030_notification_settings': sql0030,

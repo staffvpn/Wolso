@@ -4,6 +4,7 @@ import { attachSession, requireWorker } from '../middleware/auth';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { asLookingFor, lookingForColumnExists, nameHasDigits } from '../lib/workerPrefs';
 import { notifyPrefColumnsExist } from '../lib/notifyPrefs';
+import { reportHiddenProfileEdit } from '../lib/hiddenProfiles';
 
 export const profileRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 profileRoutes.use('*', attachSession);
@@ -222,10 +223,17 @@ profileRoutes.patch('/', async (c) => {
       }
     }
   }
+  // Считаем, изменилось ли в анкете что-то по существу. Переключатели
+  // уведомлений сюда не входят: выключить «напоминать о сменах» — не
+  // исправление скрытой анкеты, и дёргать из-за этого оператора незачем.
+  const profileFieldsTouched = fields.some((f) => !f.startsWith('notify_'));
+
   if (fields.length) {
     binds.push(session.workerId);
     await c.env.DB.prepare(`UPDATE workers SET ${fields.join(', ')} WHERE id = ?`).bind(...binds).run();
   }
+
+  if (profileFieldsTouched) c.executionCtx.waitUntil(reportHiddenProfileEdit(c.env, session.workerId));
 
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
@@ -245,6 +253,8 @@ profileRoutes.post('/positions', async (c) => {
   await c.env.DB.prepare('INSERT INTO worker_positions (worker_id, position, position_label, months) VALUES (?, ?, ?, ?)')
     .bind(session.workerId, position, positionLabel, Math.round(months))
     .run();
+
+  c.executionCtx.waitUntil(reportHiddenProfileEdit(c.env, session.workerId));
 
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
@@ -273,6 +283,7 @@ profileRoutes.post('/avatar', async (c) => {
   if (!check.ok) return c.json({ error: check.error }, check.status);
 
   await setAvatar(c.env, 'workers', session.workerId, bytes, contentType);
+  c.executionCtx.waitUntil(reportHiddenProfileEdit(c.env, session.workerId));
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
 });
@@ -292,6 +303,7 @@ profileRoutes.post('/photos', async (c) => {
   const result = await addGalleryPhoto(c.env, 'worker_photos', 'worker_id', session.workerId, bytes, contentType);
   if (!result.ok) return c.json({ error: result.error }, 400);
 
+  c.executionCtx.waitUntil(reportHiddenProfileEdit(c.env, session.workerId));
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
 });
@@ -301,6 +313,9 @@ profileRoutes.delete('/photos/:id', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
   await deleteGalleryPhoto(c.env, 'worker_photos', 'worker_id', session.workerId, c.req.param('id'));
+  // Убранное фото — тоже исправление: анкеты скрывают в том числе за
+  // чужие снимки, и удаление такого снимка и есть ответ на замечание.
+  c.executionCtx.waitUntil(reportHiddenProfileEdit(c.env, session.workerId));
   const profile = await loadProfile(c.env, session.workerId);
   return c.json({ ok: true, ...profile });
 });
