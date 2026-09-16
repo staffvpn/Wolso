@@ -52,7 +52,7 @@ adminComplaintRoutes.get('/', requireStaffMiddleware, async (c) => {
  *  are already in the audit log); 'rejected' means they looked and there
  *  was nothing to it. Both take a note, because "почему по этой жалобе
  *  ничего не сделали" is a question that gets asked later. */
-adminComplaintRoutes.post('/:id', requirePermission('blockUsers'), async (c) => {
+adminComplaintRoutes.post('/:id', requirePermission('handleComplaints'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
   type Body = { status?: string; resolution?: string };

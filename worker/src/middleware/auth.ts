@@ -82,16 +82,46 @@ export async function requireStaffMiddleware(c: Context<{ Bindings: Env; Variabl
 }
 
 /** Loads the role row for the current staff session and checks a permission. */
+/** Чем подменить право, которого в роли ещё нет.
+ *
+ *  Миграции здесь применяются руками, поэтому выкаченный воркер бывает на
+ *  миграцию впереди базы. Для колонок это решается проверкой через PRAGMA,
+ *  а для прав — вот этим: без запасного варианта новый ключ читался бы как
+ *  'no', и до применения 0038 у всех сотрудников разом пропали бы проверка
+ *  работодателей, жалобы, скрытие анкет и рассылки.
+ *
+ *  Соответствия те же, что в самой миграции: новое право наследует тому
+ *  старому, внутри которого оно раньше жило. viewTechHealth наследует
+ *  'yes' — технический раздел раньше был открыт любому сотруднику. */
+const LEGACY_FALLBACK: Partial<Record<PermissionKey, PermissionKey | 'yes'>> = {
+  verifyEmployers: 'approveVacancies',
+  hideProfiles: 'blockUsers',
+  handleComplaints: 'blockUsers',
+  sendBroadcasts: 'manageData',
+  managePromos: 'manageData',
+  viewTechHealth: 'yes',
+};
+
 export async function staffHasPermission(env: Env, roleId: string, key: PermissionKey): Promise<PermissionValue | null> {
   const row = await env.DB.prepare('SELECT permissions FROM roles WHERE id = ?').bind(roleId).first<{ permissions: string }>();
   if (!row) return null;
-  const perms = JSON.parse(row.permissions) as Record<PermissionKey, PermissionValue>;
-  return perms[key] ?? 'no';
+  const perms = JSON.parse(row.permissions) as Record<string, string | undefined>;
+
+  const raw = perms[key] ?? resolveLegacy(perms, key);
+  // Строки 'confirm' ещё лежат в базе, пока не применена 0038. Читаем их
+  // как 'yes' — ровно так они и работали.
+  return raw === 'no' ? 'no' : raw === undefined ? 'no' : 'yes';
 }
 
-/** Hono middleware: 401s with no/invalid session, 403s if the role lacks `key`
- *  entirely (value 'no'). A 'confirm' value is let through — the client is
- *  expected to have shown its own confirmation step; the server just logs it. */
+function resolveLegacy(perms: Record<string, string | undefined>, key: PermissionKey): string | undefined {
+  const fallback = LEGACY_FALLBACK[key];
+  if (!fallback) return undefined;
+  return fallback === 'yes' ? 'yes' : perms[fallback];
+}
+
+/** Hono middleware: 401s with no/invalid session, 403s if the role lacks
+ *  `key`. staffHasPermission выше уже свело значение к 'yes'/'no', включая
+ *  наследование от старого права, пока не применена миграция 0038. */
 export function requirePermission(key: PermissionKey) {
   return async (c: Context<{ Bindings: Env; Variables: Vars }>, next: Next) => {
     const session = requireStaff(c);

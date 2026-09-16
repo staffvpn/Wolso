@@ -47,7 +47,7 @@ function toJson(row: EmployerVerificationRow) {
 
 /** Reuses approveVacancies — same "content moderation" bucket as approving
  *  a vacancy, rather than a brand-new permission just for this. */
-adminVerificationRoutes.get('/employers', requirePermission('approveVacancies'), async (c) => {
+adminVerificationRoutes.get('/employers', requirePermission('verifyEmployers'), async (c) => {
   const status = c.req.query('status') ?? 'pending';
   const { results } = await c.env.DB.prepare(
     `SELECT id, name, inn, city, address, description, founded_year, avatar_data, owner_telegram_id, telegram_username,
@@ -63,7 +63,7 @@ adminVerificationRoutes.get('/employers', requirePermission('approveVacancies'),
  *  completion) didn't turn up anything useful, or an admin wants a fresh
  *  look before deciding. Runs synchronously so the result is ready by the
  *  time this returns. */
-adminVerificationRoutes.post('/employers/:id/recheck', requirePermission('approveVacancies'), async (c) => {
+adminVerificationRoutes.post('/employers/:id/recheck', requirePermission('verifyEmployers'), async (c) => {
   const id = c.req.param('id');
   const company = await c.env.DB.prepare('SELECT id, name, inn FROM companies WHERE id = ?').bind(id).first<{
     id: number;
@@ -81,7 +81,7 @@ adminVerificationRoutes.post('/employers/:id/recheck', requirePermission('approv
   return c.json({ aiSummary: summary });
 });
 
-adminVerificationRoutes.post('/employers/:id/approve', requirePermission('approveVacancies'), async (c) => {
+adminVerificationRoutes.post('/employers/:id/approve', requirePermission('verifyEmployers'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
   const company = await c.env.DB.prepare('SELECT name, owner_telegram_id FROM companies WHERE id = ?').bind(id).first<{
@@ -109,7 +109,7 @@ adminVerificationRoutes.post('/employers/:id/approve', requirePermission('approv
   return c.json({ ok: true });
 });
 
-adminVerificationRoutes.post('/employers/:id/reject', requirePermission('approveVacancies'), async (c) => {
+adminVerificationRoutes.post('/employers/:id/reject', requirePermission('verifyEmployers'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
   const { reason } = await c.req.json<{ reason: string }>();

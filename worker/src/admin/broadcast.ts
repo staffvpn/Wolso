@@ -114,13 +114,13 @@ async function pickableRecipients(env: Env): Promise<(PickableRow & { role: 'see
 /** The list behind the "выбрать вручную" checkboxes. Deliberately the same
  *  query as the audience resolver rather than the Пользователи list: a
  *  suspended account shows up there but must never be pickable here. */
-adminBroadcastRoutes.get('/recipients', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.get('/recipients', requirePermission('sendBroadcasts'), async (c) => {
   return c.json({ recipients: await pickableRecipients(c.env) });
 });
 
 /** How many people a given audience currently covers — shown next to the
  *  compose box so it's never a surprise how wide a message is going. */
-adminBroadcastRoutes.get('/audience', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.get('/audience', requirePermission('sendBroadcasts'), async (c) => {
   const audience = parseAudience(c.req.query('audience'));
   const city = c.req.query('city')?.trim() || null;
   // 'custom' is counted client-side from the checkboxes — it has no query
@@ -134,7 +134,7 @@ adminBroadcastRoutes.get('/audience', requirePermission('manageData'), async (c)
 /** Cities that actually have accounts in them, for the city picker —
  *  free-typing a city that matches nobody is the easiest way to send a
  *  broadcast into the void. */
-adminBroadcastRoutes.get('/cities', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.get('/cities', requirePermission('sendBroadcasts'), async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT city FROM workers WHERE city IS NOT NULL AND TRIM(city) != ''
      UNION ALL
@@ -162,7 +162,7 @@ adminBroadcastRoutes.get('/cities', requirePermission('manageData'), async (c) =
  *  driven by /:id/send-batch below so a long run can't blow a Worker's
  *  request budget, and so an interrupted broadcast can be resumed instead
  *  of restarted from the top. */
-adminBroadcastRoutes.post('/', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.post('/', requirePermission('sendBroadcasts'), async (c) => {
   const session = requireStaff(c as never)!;
   const body = await c.req.json<{ text: string; audience?: string; city?: string; telegramIds?: number[] }>();
   const text = body.text?.trim();
@@ -191,7 +191,7 @@ adminBroadcastRoutes.post('/', requirePermission('manageData'), async (c) => {
 /** Sends the next batch and moves the cursor. Safe to call again after a
  *  failure: the cursor only advances past recipients this call actually
  *  attempted, so a retry resumes rather than re-sending to everyone. */
-adminBroadcastRoutes.post('/:id/send-batch', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.post('/:id/send-batch', requirePermission('sendBroadcasts'), async (c) => {
   const id = c.req.param('id');
   const row = await c.env.DB.prepare('SELECT * FROM broadcasts WHERE id = ?').bind(id).first<{
     id: number;
@@ -236,7 +236,7 @@ adminBroadcastRoutes.post('/:id/send-batch', requirePermission('manageData'), as
 
 /** Past broadcasts, newest first — what was sent, to whom, and how it
  *  landed. */
-adminBroadcastRoutes.get('/', requirePermission('manageData'), async (c) => {
+adminBroadcastRoutes.get('/', requirePermission('sendBroadcasts'), async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT id, text, audience, city, total, cursor, sent_count, failed_count, created_by, created_at
      FROM broadcasts ORDER BY id DESC LIMIT 50`,

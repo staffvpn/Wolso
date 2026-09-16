@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, History, Plus, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -29,11 +29,18 @@ export function Roles() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function cyclePermission(role: RoleDef, key: PermissionKey) {
-    if (!canManageTeam || role.id === 'owner') return;
-    const order: PermissionValue[] = key === 'blockUsers' ? ['no', 'confirm', 'yes'] : ['no', 'yes'];
-    const idx = order.indexOf(role.permissions[key]);
-    updatePermission(role.id, key, order[(idx + 1) % order.length]);
+  // Роль владельца не редактируется намеренно: иначе с неё можно снять
+  // «команду и роли» и запереть себя снаружи собственной админки.
+  // Передача владения по той же причине никому не выдаётся — сервер
+  // отказывает (admin/roles.ts).
+  function togglePermission(role: RoleDef, key: PermissionKey) {
+    if (!canEdit(role, key)) return;
+    const next: PermissionValue = role.permissions[key] === 'yes' ? 'no' : 'yes';
+    updatePermission(role.id, key, next);
+  }
+
+  function canEdit(role: RoleDef, key: PermissionKey) {
+    return canManageTeam && role.id !== 'owner' && key !== 'transferOwnership';
   }
 
   return (
@@ -90,21 +97,39 @@ export function Roles() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
-                {PERMISSIONS.map((p) => (
-                  <tr key={p.key}>
-                    <td className="px-5 py-3.5 text-[14px] font-medium text-text">{p.label}</td>
-                    {roles.map((role) => (
-                      <td key={role.id} className="px-4 py-3.5 text-center">
-                        <button
-                          onClick={() => cyclePermission(role, p.key)}
-                          disabled={!canManageTeam || role.id === 'owner'}
-                          className={cn('inline-flex', role.id !== 'owner' && canManageTeam && 'cursor-pointer')}
+                {PERMISSIONS.map((p, i) => (
+                  <Fragment key={p.key}>
+                    {/* Заголовок секции — когда группа сменилась. Прав стало
+                        пятнадцать, сплошным списком в них не разобраться. */}
+                    {p.group && p.group !== PERMISSIONS[i - 1]?.group && (
+                      <tr className="bg-surface-2/50">
+                        <td
+                          colSpan={roles.length + 1}
+                          className="px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-text-faint"
                         >
-                          <PermissionCell value={role.permissions[p.key]} />
-                        </button>
+                          {p.group}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="px-5 py-3.5">
+                        <p className="text-[14px] font-medium text-text">{p.label}</p>
+                        {p.hint && <p className="text-[12px] text-text-muted mt-0.5 leading-snug">{p.hint}</p>}
                       </td>
-                    ))}
-                  </tr>
+                      {roles.map((role) => (
+                        <td key={role.id} className="px-4 py-3.5 text-center">
+                          <button
+                            onClick={() => togglePermission(role, p.key)}
+                            disabled={!canEdit(role, p.key)}
+                            aria-label={`${p.label} — ${role.name}`}
+                            className={cn('inline-flex', canEdit(role, p.key) && 'cursor-pointer')}
+                          >
+                            <PermissionCell value={role.permissions[p.key]} />
+                          </button>
+                        </td>
+                      ))}
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -132,7 +157,6 @@ export function Roles() {
 
 function PermissionCell({ value }: { value: PermissionValue }) {
   if (value === 'yes') return <Check size={17} className="text-accent mx-auto" strokeWidth={3} />;
-  if (value === 'confirm') return <Badge tone="warning">с подтверждением</Badge>;
   return <span className="text-text-faint">–</span>;
 }
 

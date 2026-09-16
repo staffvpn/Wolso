@@ -588,7 +588,7 @@ adminUserRoutes.post('/seekers/:id/block', requirePermission('blockUsers'), asyn
  *  The reason is optional here, unlike blocking, because hiding doesn't
  *  lock anyone out — but it is shown to the person if given, so they don't
  *  spend a week wondering why the invitations stopped. */
-adminUserRoutes.post('/seekers/:id/hide', requirePermission('blockUsers'), async (c) => {
+adminUserRoutes.post('/seekers/:id/hide', requirePermission('hideProfiles'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
 

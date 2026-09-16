@@ -15,17 +15,31 @@ export interface Env {
 }
 
 export type PermissionKey =
+  // Очереди на разбор
   | 'approveVacancies'
+  | 'verifyEmployers'
+  | 'handleComplaints'
+  // Действия над пользователями
   | 'blockUsers'
+  | 'hideProfiles'
+  | 'switchUserRole'
   | 'viewSupportChats'
+  // Площадка
+  | 'managePromos'
+  | 'sendBroadcasts'
+  // Служебное
+  | 'manageTeam'
+  | 'viewTechHealth'
+  | 'manageData'
   | 'refundsPayouts'
   | 'changeCommission'
-  | 'manageTeam'
-  | 'transferOwnership'
-  | 'switchUserRole'
-  | 'manageData';
+  | 'transferOwnership';
 
-export type PermissionValue = 'yes' | 'no' | 'confirm';
+/** Было ещё 'confirm' — «пропустить, но показать лишний вопрос». Сервер
+ *  пропускал его наравне с 'yes', а показать вопрос было некому: значение
+ *  никто не читал, кроме плашки на экране ролей. Галочка выглядела
+ *  ограничением и им не была, поэтому состояния теперь два. */
+export type PermissionValue = 'yes' | 'no';
 
 /** What we put in a signed session token. */
 export type SessionPayload =

@@ -1,19 +1,31 @@
 export type PermissionKey =
   | 'approveVacancies'
+  | 'verifyEmployers'
+  | 'handleComplaints'
   | 'blockUsers'
+  | 'hideProfiles'
+  | 'switchUserRole'
   | 'viewSupportChats'
+  | 'managePromos'
+  | 'sendBroadcasts'
+  | 'manageTeam'
+  | 'viewTechHealth'
+  | 'manageData'
   | 'refundsPayouts'
   | 'changeCommission'
-  | 'manageTeam'
-  | 'transferOwnership'
-  | 'switchUserRole'
-  | 'manageData';
+  | 'transferOwnership';
 
-export type PermissionValue = 'yes' | 'no' | 'confirm';
+/** Третьего состояния больше нет — см. комментарий в worker/src/types.ts. */
+export type PermissionValue = 'yes' | 'no';
 
 export interface PermissionInfo {
   key: PermissionKey;
   label: string;
+  /** Вторая строка под названием — там, где по названию не видно
+   *  последствий. Необязательная. */
+  hint?: string;
+  /** Заголовок секции в таблице прав. */
+  group?: string;
 }
 
 export interface RoleDef {

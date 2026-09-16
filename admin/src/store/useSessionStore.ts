@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { PermissionKey, RoleDef } from '@/types';
+import { PERMISSIONS } from '@/data/permissions';
 import { loginWithTelegram, type TelegramLoginPayload } from '@/services/authApi';
 import { useRolesStore } from './useRolesStore';
 
@@ -67,23 +68,19 @@ export const useSessionStore = create<SessionState>()(
   ),
 );
 
+/** Роль по умолчанию, пока настоящая не загрузилась: не может ничего.
+ *
+ *  Список прав собирается из каталога, а не переписывается руками:
+ *  раньше это был литерал, и каждое новое право приходилось дублировать
+ *  здесь же — забыть означало сломать сборку в лучшем случае и раздать
+ *  лишний доступ в худшем. */
 const FALLBACK_ROLE: RoleDef = {
   id: 'unknown',
   name: 'Без роли',
   description: '',
   isSystem: true,
   color: '#6b6d76',
-  permissions: {
-    approveVacancies: 'no',
-    blockUsers: 'no',
-    viewSupportChats: 'no',
-    refundsPayouts: 'no',
-    changeCommission: 'no',
-    manageTeam: 'no',
-    transferOwnership: 'no',
-    switchUserRole: 'no',
-    manageData: 'no',
-  },
+  permissions: Object.fromEntries(PERMISSIONS.map((p) => [p.key, 'no'])) as RoleDef['permissions'],
 };
 
 /** The signed-in staff member's role, backed by the real roles list. */

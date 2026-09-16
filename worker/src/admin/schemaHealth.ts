@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
-import { attachSession, requireStaffMiddleware } from '../middleware/auth';
+import { attachSession, requirePermission } from '../middleware/auth';
 import { notifyAdmin } from '../lib/adminNotify';
 import sql0014 from '../../migrations/0014_shift_close_reviews.sql';
 import sql0015 from '../../migrations/0015_chat_notify_cooldown.sql';
@@ -125,7 +125,7 @@ function statementsOf(migration: string): string[] {
     .map((s) => `${s};`);
 }
 
-adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
+adminSchemaHealthRoutes.get('/schema', requirePermission('viewTechHealth'), async (c) => {
   const tables = [...new Set([...REQUIRED_COLUMNS.map((r) => r.table), ...REQUIRED_TABLES.map((t) => t.table)])];
   const present = new Map<string, Set<string>>();
 
@@ -165,7 +165,7 @@ adminSchemaHealthRoutes.get('/schema', requireStaffMiddleware, async (c) => {
  *  reason alerts never arrive is that nobody pressed Start in the bot's
  *  chat, and Telegram simply refuses ("chat not found") — which is
  *  invisible until something tries to send. */
-adminSchemaHealthRoutes.post('/test-alert', requireStaffMiddleware, async (c) => {
+adminSchemaHealthRoutes.post('/test-alert', requirePermission('viewTechHealth'), async (c) => {
   const configured = !!(c.env.ADMIN_CHAT_ID || c.env.OWNER_TELEGRAM_ID);
   if (!configured) return c.json({ error: 'no_admin_chat_id' }, 400);
 
@@ -184,7 +184,7 @@ function webhookUrl(c: { req: { url: string }; env: Env }): string {
 
 /** Never returns the URL as Telegram reports it — it contains the bot
  *  token. Only whether it points at this Worker. */
-adminSchemaHealthRoutes.get('/webhook', requireStaffMiddleware, async (c) => {
+adminSchemaHealthRoutes.get('/webhook', requirePermission('viewTechHealth'), async (c) => {
   if (!c.env.BOT_TOKEN) return c.json({ error: 'no_bot_token' }, 400);
 
   const res = await fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/getWebhookInfo`);
@@ -205,7 +205,7 @@ adminSchemaHealthRoutes.get('/webhook', requireStaffMiddleware, async (c) => {
   });
 });
 
-adminSchemaHealthRoutes.post('/webhook', requireStaffMiddleware, async (c) => {
+adminSchemaHealthRoutes.post('/webhook', requirePermission('viewTechHealth'), async (c) => {
   if (!c.env.BOT_TOKEN) return c.json({ error: 'no_bot_token' }, 400);
 
   const res = await fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/setWebhook`, {
