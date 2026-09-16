@@ -100,9 +100,13 @@ export function Feed() {
         </div>
       </div>
 
+      {/* Без «смена 8 из 40»: размер колоды — наша внутренняя кухня, а на
+          человека он работает против нас. Маленькое число выглядит как
+          «работы нет», большое превращает ленту в задание, которое надо
+          домотать до конца. Остаётся только область поиска. */}
       {deck.length > 0 && (
         <p className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-wide text-text-faint shrink-0">
-          Смена {Math.min(index + 1, deck.length)} из {deck.length} · {radiusLabel}
+          {radiusLabel}
         </p>
       )}
 
@@ -116,7 +120,7 @@ export function Feed() {
         empty={
           <EmptyState
             title="Смены закончились"
-            description={`Вы посмотрели все ${deck.length} смен по вашим фильтрам. Ослабьте их — покажем ещё.`}
+            description="Вы посмотрели все смены по вашим фильтрам. Ослабьте их — покажем ещё."
             actions={
               <>
                 <Button fullWidth onClick={() => setFilterOpen(true)}>
