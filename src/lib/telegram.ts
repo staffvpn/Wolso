@@ -97,3 +97,25 @@ export function tgBackButton(onBack: (() => void) | null) {
     tg.BackButton.offClick(onBack);
   };
 }
+
+/** Открыть внешнюю ссылку из мини-аппа.
+ *
+ *  window.open внутри Telegram ведёт себя непредсказуемо — от «ничего не
+ *  происходит» до выкидывания человека в системный браузер мимо самого
+ *  Telegram. Поэтому ссылки уходят через его собственный API:
+ *
+ *  - openTelegramLink для t.me — канал открывается прямо в Telegram, и
+ *    приложение остаётся живым, так что вернуться можно одной кнопкой;
+ *  - openLink для всего остального — встроенный браузер поверх Telegram.
+ *
+ *  Вне Telegram (браузерный превью при разработке) остаётся window.open —
+ *  там он и работает как надо. */
+export function openExternal(url: string, kind: 'telegram' | 'site' = 'site') {
+  const tg = getTelegram();
+  if (!tg) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if (kind === 'telegram') tg.openTelegramLink(url);
+  else tg.openLink(url);
+}

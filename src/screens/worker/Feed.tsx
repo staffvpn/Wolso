@@ -13,6 +13,7 @@ import { SafeImage } from '@/components/ui/SafeImage';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { SwipeDeck, type SwipeDeckHandle } from '@/components/deck/SwipeDeck';
 import { ShiftCard } from '@/components/deck/ShiftCard';
+import { PromoCard } from '@/components/deck/PromoCard';
 import { FilterSheet } from '@/components/FilterSheet';
 import { ProfileHidden } from './ProfileHidden';
 import { NeedOwnPhoto } from './NeedOwnPhoto';
@@ -22,6 +23,7 @@ import { useFiltersStore } from '@/store/useFiltersStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
+import { usePromoStore } from '@/store/usePromoStore';
 import { resolveCompany } from '@/data/companies';
 import { formatDistance, formatMoney, hourlyRateLabel, localDateStr, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { employmentTypeLabel } from '@/data/employmentTypes';
@@ -43,10 +45,16 @@ export function Feed() {
   const unread = useNotificationsStore((s) => s.unreadCount());
   const loadNotifications = useNotificationsStore((s) => s.load);
   const openPaywall = useEntitlementsStore((s) => s.openPaywall);
+  const promo = usePromoStore((s) => s.current);
+  const loadPromo = usePromoStore((s) => s.load);
+  const countShiftForPromo = usePromoStore((s) => s.countShift);
+  const dismissPromo = usePromoStore((s) => s.dismiss);
+  const clickPromo = usePromoStore((s) => s.click);
 
   useEffect(() => {
     loadDeck();
     loadNotifications();
+    loadPromo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,32 +118,50 @@ export function Feed() {
         </p>
       )}
 
-      <SwipeDeck
-        ref={deckRef}
-        items={remaining}
-        keyOf={(s) => s.id}
-        loading={loading}
-        renderCard={(shift) => <ShiftCard shift={shift} onOpenDetail={() => setDetailOpen(true)} />}
-        onSwiped={(_shift, direction) => swipe(direction)}
-        empty={
-          <EmptyState
-            title="Смены закончились"
-            description="Вы посмотрели все смены по вашим фильтрам. Ослабьте их — покажем ещё."
-            actions={
-              <>
-                <Button fullWidth onClick={() => setFilterOpen(true)}>
-                  Изменить фильтры
-                </Button>
-                {/* Was a button with no onClick at all. Now it goes where
-                    the setting actually lives — the bot does send this. */}
-                <Button fullWidth variant="dark" onClick={() => navigate('/w/settings')}>
-                  Уведомлять о новых сменах
-                </Button>
-              </>
-            }
-          />
-        }
-      />
+      {/* Область колоды. relative нужен рекламной карточке: она лежит
+          поверх колоды отдельным слоем и без этой обёртки позиционировалась
+          бы от корня приложения, накрывая шапку и кнопки. */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <SwipeDeck
+          ref={deckRef}
+          items={remaining}
+          keyOf={(s) => s.id}
+          loading={loading}
+          renderCard={(shift) => <ShiftCard shift={shift} onOpenDetail={() => setDetailOpen(true)} />}
+          onSwiped={(_shift, direction) => {
+            swipe(direction);
+            // Считаем просмотренные смены здесь, а не внутри store колоды:
+            // реклама не должна вмешиваться в логику откликов.
+            countShiftForPromo();
+          }}
+          empty={
+            <EmptyState
+              title="Смены закончились"
+              description="Вы посмотрели все смены по вашим фильтрам. Ослабьте их — покажем ещё."
+              actions={
+                <>
+                  <Button fullWidth onClick={() => setFilterOpen(true)}>
+                    Изменить фильтры
+                  </Button>
+                  {/* Was a button with no onClick at all. Now it goes where
+                      the setting actually lives — the bot does send this. */}
+                  <Button fullWidth variant="dark" onClick={() => navigate('/w/settings')}>
+                    Уведомлять о новых сменах
+                  </Button>
+                </>
+              }
+            />
+          }
+        />
+
+        {/* Ниже подробностей смены и экрана «отклик отправлен»: реклама не
+            должна перекрывать то, ради чего человек сюда пришёл. */}
+        <AnimatePresence>
+          {promo && !detailOpen && !lastApplied && (
+            <PromoCard promo={promo} onDismiss={dismissPromo} onClick={clickPromo} />
+          )}
+        </AnimatePresence>
+      </div>
 
       {current && (
         <div className="flex items-center justify-center gap-4 px-5 py-4 shrink-0">
