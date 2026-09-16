@@ -50,6 +50,19 @@ mediaRoutes.get('/workers/:id/photos/:photoId', async (c) => {
   return new Response(bytes, { headers: { 'Content-Type': row!.content_type ?? 'application/octet-stream', ...GALLERY_CACHE_HEADERS } });
 });
 
+/** Картинка рекламной карточки. Публичная, как и все остальные: её видит
+ *  каждый, кому показали промо. Не кэшируем — адрес не меняется при
+ *  замене картинки, ровно как у аватарки. */
+mediaRoutes.get('/promos/:id/image', async (c) => {
+  const row = await c.env.DB.prepare('SELECT image_data, image_content_type FROM promos WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ image_data: unknown; image_content_type: string | null }>()
+    .catch(() => null);
+  const bytes = toBytes(row?.image_data);
+  if (!bytes) return c.notFound();
+  return new Response(bytes, { headers: { 'Content-Type': row!.image_content_type ?? 'application/octet-stream', ...NO_CACHE_HEADERS } });
+});
+
 mediaRoutes.get('/companies/:id/avatar', async (c) => {
   const row = await c.env.DB.prepare('SELECT avatar_data, avatar_content_type FROM companies WHERE id = ?')
     .bind(c.req.param('id'))

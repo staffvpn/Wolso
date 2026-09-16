@@ -22,6 +22,7 @@ import sql0034 from '../../migrations/0034_shift_date_set.sql';
 import sql0035 from '../../migrations/0035_own_photo_reminder.sql';
 import sql0036 from '../../migrations/0036_pay_mode.sql';
 import sql0037 from '../../migrations/0037_hidden_review_request.sql';
+import sql0039 from '../../migrations/0039_promos.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -76,6 +77,8 @@ const REQUIRED_TABLES: { table: string; migration: string; breaks: string }[] = 
   { table: 'personal_shifts', migration: '0032_personal_shifts', breaks: 'личные смены в календаре соискателя' },
   { table: 'complaints', migration: '0031_complaints_and_employer_settings', breaks: 'жалобы' },
   { table: 'user_notes', migration: '0031_complaints_and_employer_settings', breaks: 'заметки по пользователю' },
+  { table: 'promos', migration: '0039_promos', breaks: 'рекламные карточки в ленте' },
+  { table: 'promo_views', migration: '0039_promos', breaks: 'дневной потолок показов рекламы' },
 ];
 
 /** The real migration files, bundled in as text (see the Text rule in
@@ -97,6 +100,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0026_suspension_reason': sql0026,
   '0027_hidden_profiles': sql0027,
   '0037_hidden_review_request': sql0037,
+  '0039_promos': sql0039,
   '0028_reminders': sql0028,
   '0029_worker_employment_type': sql0029,
   '0030_notification_settings': sql0030,

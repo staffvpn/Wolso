@@ -28,6 +28,8 @@ import { adminSupportRoutes } from './admin/support';
 import { adminDataRoutes } from './admin/data';
 import { adminVerificationRoutes } from './admin/verification';
 import { adminSchemaHealthRoutes } from './admin/schemaHealth';
+import { adminPromoRoutes } from './admin/promos';
+import { promoRoutes } from './routes/promos';
 import { adminBroadcastRoutes } from './admin/broadcast';
 import { adminComplaintRoutes } from './admin/complaints';
 import { adminExportRoutes } from './admin/export';
@@ -71,6 +73,7 @@ app.route('/media', mediaRoutes);
 app.route('/bot', botRoutes);
 app.route('/complaints', complaintRoutes);
 app.route('/personal-shifts', personalShiftRoutes);
+app.route('/promos', promoRoutes);
 
 app.route('/admin/users', adminUserRoutes);
 app.route('/admin/roles', adminRoleRoutes);
@@ -84,6 +87,7 @@ app.route('/admin/health', adminSchemaHealthRoutes);
 app.route('/admin/broadcast', adminBroadcastRoutes);
 app.route('/admin/complaints', adminComplaintRoutes);
 app.route('/admin/export', adminExportRoutes);
+app.route('/admin/promos', adminPromoRoutes);
 
 app.onError((err, c) => {
   console.error(err);
