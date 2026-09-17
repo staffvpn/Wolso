@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image as ImageIcon, Pause, Play, Plus, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -23,9 +23,10 @@ const EMPTY: PromoInput = {
 };
 
 export function Promos() {
-  const { promos, loading, loaded, error, load, create, setStatus, setImage, remove } = usePromosStore();
+  const { promos, loading, loaded, error, load, create, update, setStatus, setImage, remove } = usePromosStore();
   const canManage = useCan('managePromos');
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Promo | null>(null);
 
   useEffect(() => {
     load();
@@ -74,6 +75,7 @@ export function Promos() {
               key={promo.id}
               promo={promo}
               canManage={canManage}
+              onEdit={() => setEditing(promo)}
               onToggle={() => setStatus(promo.id, promo.status === 'active' ? 'paused' : 'active')}
               onImage={(file) => setImage(promo.id, file)}
               onDelete={() => remove(promo.id)}
@@ -82,7 +84,21 @@ export function Promos() {
         </div>
       </div>
 
-      <CreateModal open={createOpen} onClose={() => setCreateOpen(false)} onCreate={create} />
+      <PromoModal open={createOpen} onClose={() => setCreateOpen(false)} onSubmit={(input, image) => create(input, image)} />
+
+      {/* key сбрасывает форму при смене карточки: без него в окне
+          оставались бы поля предыдущей. */}
+      <PromoModal
+        key={editing?.id ?? 'none'}
+        open={!!editing}
+        promo={editing ?? undefined}
+        onClose={() => setEditing(null)}
+        onSubmit={async (input, image) => {
+          if (!editing) return;
+          await update(editing.id, input);
+          if (image) await setImage(editing.id, image);
+        }}
+      />
     </div>
   );
 }
@@ -90,12 +106,14 @@ export function Promos() {
 function PromoRow({
   promo,
   canManage,
+  onEdit,
   onToggle,
   onImage,
   onDelete,
 }: {
   promo: Promo;
   canManage: boolean;
+  onEdit: () => void;
   onToggle: () => void;
   onImage: (file: File) => void;
   onDelete: () => void;
@@ -150,8 +168,11 @@ function PromoRow({
             </>
           )}
         </Button>
-        <Button variant="outline" disabled={!canManage} onClick={() => fileRef.current?.click()}>
-          <ImageIcon size={15} /> {promo.imageUrl ? 'Заменить картинку' : 'Загрузить картинку'}
+        <Button variant="outline" disabled={!canManage} onClick={onEdit}>
+          <Pencil size={15} /> Изменить
+        </Button>
+        <Button variant="outline" disabled={!canManage} onClick={() => fileRef.current?.click()} aria-label="Картинка">
+          <ImageIcon size={15} />
         </Button>
         <span className="flex-1" />
         <Button variant="outline" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
@@ -208,16 +229,25 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CreateModal({
+/** Одна форма на создание и на правку.
+ *
+ *  Разводить два почти одинаковых окна не за чем: поля те же, проверки те
+ *  же, и разойтись они успели бы к первому же новому полю. Отличий ровно
+ *  три — заголовок, надпись на кнопке и то, что при правке картинка
+ *  необязательна. */
+function PromoModal({
   open,
+  promo,
   onClose,
-  onCreate,
+  onSubmit,
 }: {
   open: boolean;
+  promo?: Promo;
   onClose: () => void;
-  onCreate: (input: PromoInput, image: File | null) => Promise<void>;
+  onSubmit: (input: PromoInput, image: File | null) => Promise<void>;
 }) {
-  const [form, setForm] = useState<PromoInput>(EMPTY);
+  const editing = !!promo;
+  const [form, setForm] = useState<PromoInput>(promo ? toInput(promo) : EMPTY);
   const [image, setImage] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -234,9 +264,11 @@ function CreateModal({
     setError(null);
     setSaving(true);
     try {
-      await onCreate(form, image);
-      setForm(EMPTY);
-      setImage(null);
+      await onSubmit(form, image);
+      if (!editing) {
+        setForm(EMPTY);
+        setImage(null);
+      }
       onClose();
     } catch (err) {
       const code = (err as { code?: string }).code;
@@ -247,7 +279,7 @@ function CreateModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Новая реклама" width={520}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Изменить рекламу' : 'Новая реклама'} width={520}>
       <div className="space-y-3">
         <div>
           <Label>Заголовок</Label>
@@ -318,25 +350,45 @@ function CreateModal({
             onChange={(e) => setImage(e.target.files?.[0] ?? null)}
             className="text-[13px] text-text-muted"
           />
+          {editing && <p className="text-[12px] text-text-faint mt-1">Оставьте пустым, чтобы не менять текущую.</p>}
         </div>
 
         {error && <p className="text-danger text-[13px] leading-relaxed">{error}</p>}
 
         {/* Создаём всегда на паузе: карточка без картинки и с непроверенной
-            ссылкой не должна уехать в ленту по нажатию «Сохранить». */}
-        <p className="text-[12px] text-text-faint">
-          Карточка создастся на паузе — проверьте, как она выглядит, и включите её кнопкой в списке.
-        </p>
+            ссылкой не должна уехать в ленту по нажатию «Сохранить». Правка
+            статус не трогает — включённая реклама остаётся включённой. */}
+        {!editing && (
+          <p className="text-[12px] text-text-faint">
+            Карточка создастся на паузе — проверьте, как она выглядит, и включите её кнопкой в списке.
+          </p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Отмена
           </Button>
           <Button variant="primary" className="flex-1" disabled={saving} onClick={submit}>
-            {saving ? 'Сохраняем…' : 'Создать'}
+            {saving ? 'Сохраняем…' : editing ? 'Сохранить' : 'Создать'}
           </Button>
         </div>
       </div>
     </Modal>
   );
+}
+
+function toInput(promo: Promo): PromoInput {
+  return {
+    title: promo.title,
+    text: promo.text,
+    ctaLabel: promo.ctaLabel,
+    url: promo.url,
+    advertiser: promo.advertiser,
+    erid: promo.erid,
+    everyN: promo.everyN,
+    dailyCap: promo.dailyCap,
+    weight: promo.weight,
+    startsAt: promo.startsAt ?? null,
+    endsAt: promo.endsAt ?? null,
+  };
 }
