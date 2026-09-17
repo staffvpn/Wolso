@@ -763,6 +763,16 @@ function withWorkerPhotos<T extends CandidateWorkerRow>(row: T) {
  *  fetch per vacancy. Declined/cancelled applicants aren't included —
  *  nothing in the overview reads those, the reason lives in the
  *  notification each side already got. */
+/** Порядок случайный, а не по времени отклика.
+ *
+ *  Это колода со свайпами, а не список: работодатель почти никогда не
+ *  досматривает её до конца. При сортировке «кто раньше откликнулся»
+ *  первые несколько человек получали все просмотры, а остальные не
+ *  попадались на глаза вообще — сколько бы раз работодатель ни заходил,
+ *  он начинал с тех же лиц. Случайный порядок даёт шанс каждому.
+ *
+ *  Список кандидатов на конкретной вакансии ниже сортировку сохраняет:
+ *  там порядок постоянный и по нему ориентируются глазами. */
 employerRoutes.get('/candidates', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
@@ -774,7 +784,7 @@ employerRoutes.get('/candidates', async (c) => {
      JOIN shifts s ON s.id = a.shift_id
      JOIN workers w ON w.id = a.worker_id
      WHERE s.company_id = ? AND a.status IN ('pending', 'invited', 'accepted')
-     ORDER BY a.created_at ASC`,
+     ORDER BY RANDOM()`,
   )
     .bind(session.companyId)
     .all<CandidateWorkerRow>();
@@ -1125,7 +1135,10 @@ employerRoutes.get('/workers', async (c) => {
          WHERE company_id = ? AND created_at >= datetime('now', '-${PASS_COOLDOWN_DAYS} days')
        )
        AND w.id NOT IN (SELECT worker_id FROM chats WHERE company_id = ?)
-     ORDER BY w.created_at DESC
+     -- Случайный порядок: колода со свайпами, и при сортировке по дате
+     -- регистрации работодатель раз за разом видел одних и тех же людей
+     -- с начала, а зарегистрировавшиеся раньше не показывались никому.
+     ORDER BY RANDOM()
      LIMIT 100`,
   )
     .bind(...positions, ...positions, session.companyId, session.companyId)

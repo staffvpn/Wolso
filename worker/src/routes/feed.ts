@@ -96,7 +96,17 @@ feedRoutes.get('/', async (c) => {
   // API (or manual city/address geocoding) is in.
   void radiusKm;
 
-  const sql = `${SHIFT_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY s.created_at DESC LIMIT 100`;
+  // Порядок случайный на каждый запрос. Было ORDER BY created_at DESC —
+  // и человек, закрывший приложение, при следующем заходе видел ту же
+  // колоду с той же первой карточки: пропущенные смены нигде не
+  // записываются, так что он снова пролистывал уже виденное и до конца
+  // ленты не добирался никогда. Заодно это перестаёт хоронить смены,
+  // которые опубликовали давно, но на которые ещё нужны люди.
+  //
+  // RANDOM() сортирует всю выборку целиком, так что на большой базе это
+  // придётся заменить на выборку случайного окна. Пока смен сотни, а не
+  // сотни тысяч, разница незаметна.
+  const sql = `${SHIFT_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY RANDOM() LIMIT 100`;
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<ShiftRow>();
 
   return c.json({ shifts: results.map(shiftToJson) });
