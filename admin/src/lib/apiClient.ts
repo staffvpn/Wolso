@@ -83,3 +83,23 @@ export async function apiDownload(path: string, fallbackName: string): Promise<v
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/** Загружает файл сырым телом запроса — так же, как это делает мини-апп
+ *  с аватарками. Не multipart: на той стороне воркер читает arrayBuffer
+ *  целиком (см. lib/media.ts), и оборачивать одну картинку в форму незачем.
+ *  Тип содержимого берётся из самого файла, потому что по нему потом
+ *  отдаётся Content-Type при раздаче. */
+export async function apiUpload(path: string, file: File): Promise<void> {
+  if (!API_URL) throw new Error('VITE_API_URL is not set — see .env.example.');
+
+  const token = useSessionStore.getState().token;
+  const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: file });
+  if (res.status === 401) useSessionStore.getState().logout();
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (payload as { error?: string }).error);
+  }
+}

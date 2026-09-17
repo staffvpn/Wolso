@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone, Flag } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone, Flag, Sparkles } from 'lucide-react';
 import type { RoleDef } from '@/types';
 import { FEATURES } from '@/lib/features';
 
@@ -20,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   // должен смотреть каждый день, в отличие от справочных экранов ниже.
   { to: '/complaints', label: 'Жалобы', icon: Flag, visible: (r) => yes(r, 'handleComplaints') },
   { to: '/support', label: 'Поддержка', icon: LifeBuoy, visible: (r) => yes(r, 'viewSupportChats') },
+  { to: '/promos', label: 'Реклама', icon: Sparkles, visible: (r) => yes(r, 'managePromos') },
   { to: '/broadcast', label: 'Рассылка', icon: Megaphone, visible: (r) => yes(r, 'sendBroadcasts') },
   { to: '/finance', label: 'Финансы', icon: Wallet, visible: (r) => FEATURES.payments && yes(r, 'refundsPayouts') },
   { to: '/roles', label: 'Роли и права', icon: ShieldCheck, visible: (r) => yes(r, 'manageTeam') },

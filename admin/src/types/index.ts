@@ -345,3 +345,44 @@ export interface Complaint {
   resolvedBy?: string;
   createdMinAgo: number;
 }
+
+/** Рекламная карточка в ленте смен. */
+export interface Promo {
+  id: string;
+  title: string;
+  text: string;
+  ctaLabel: string;
+  url: string;
+  kind: 'telegram' | 'site';
+  /** Кто рекламодатель. Пусто для своего канала. */
+  advertiser: string;
+  /** Токен маркировки рекламы. Пусто для саморекламы. */
+  erid: string;
+  status: 'active' | 'paused';
+  startsAt?: string;
+  endsAt?: string;
+  /** Через сколько просмотренных смен показывать. */
+  everyN: number;
+  /** Потолок показов одному человеку в сутки. */
+  dailyCap: number;
+  /** Кого показывать чаще, когда активных несколько. */
+  weight: number;
+  impressions: number;
+  clicks: number;
+  createdAt: string;
+  imageUrl?: string;
+}
+
+export interface PromoInput {
+  title: string;
+  text: string;
+  ctaLabel: string;
+  url: string;
+  advertiser: string;
+  erid: string;
+  everyN: number;
+  dailyCap: number;
+  weight: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
