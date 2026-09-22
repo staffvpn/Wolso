@@ -132,14 +132,14 @@ export function WorkerProfileScreen() {
       {profile.bio && (
         <Card className="p-4 mt-4">
           <SectionLabel className="mb-1.5">О себе</SectionLabel>
-          <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{profile.bio}</p>
+          <p className="text-[15px] text-text leading-relaxed whitespace-pre-line">{profile.bio}</p>
         </Card>
       )}
 
       {profile.skills && (
         <Card className="p-4 mt-3">
           <SectionLabel className="mb-1.5">Навыки</SectionLabel>
-          <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{profile.skills}</p>
+          <p className="text-[15px] text-text-muted leading-relaxed whitespace-pre-line">{profile.skills}</p>
         </Card>
       )}
 

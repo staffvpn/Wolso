@@ -84,7 +84,7 @@ export function EmployerProfileScreen() {
       {company.description && (
         <Card className="p-4 mt-4">
           <SectionLabel className="mb-1.5">О компании</SectionLabel>
-          <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{company.description}</p>
+          <p className="text-[15px] text-text leading-relaxed whitespace-pre-line">{company.description}</p>
         </Card>
       )}
 
