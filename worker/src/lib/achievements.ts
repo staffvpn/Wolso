@@ -167,6 +167,15 @@ async function checkCondition(env: Env, workerId: number, a: AchievementRow): Pr
       return { earned: current >= target, current, target };
     }
 
+    // login_streak_days копится в routes/auth.ts на каждый вход и сбрасывается
+    // там же, если пропущен день, — здесь только сравнение с порогом.
+    case 'login_streak': {
+      const row = await env.DB.prepare('SELECT login_streak_days n FROM workers WHERE id = ?').bind(workerId).first<{ n: number }>();
+      const current = row?.n ?? 0;
+      const target = a.threshold ?? 3;
+      return { earned: current >= target, current, target };
+    }
+
     case 'reviews_given': {
       const row = await env.DB.prepare('SELECT COUNT(*) n FROM applications WHERE worker_id = ? AND rating IS NOT NULL')
         .bind(workerId)

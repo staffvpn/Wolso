@@ -113,10 +113,34 @@ authRoutes.post('/telegram', async (c) => {
   // Telegram usernames can change — keep the admin dashboard's copy fresh
   // on every real login instead of only capturing it once at signup.
   // Harmless no-op against whichever table doesn't have a matching row.
+  //
+  // The same trip also stamps last_seen_at (migration 0041) — it's what
+  // lets the win-back reminder in lib/reminders.ts tell a worker who
+  // stopped opening the app apart from one who's just quiet, and lets
+  // login_streak_days count consecutive days for the streak badges (see
+  // lib/achievements.ts). The streak math lives in SQL, not JS, so it
+  // still runs even when the row doesn't exist yet on the other table.
   c.executionCtx.waitUntil(
     Promise.all([
       c.env.DB.prepare('UPDATE workers SET telegram_username = ? WHERE telegram_id = ?').bind(user.username ?? null, user.id).run(),
       c.env.DB.prepare('UPDATE companies SET telegram_username = ? WHERE owner_telegram_id = ?').bind(user.username ?? null, user.id).run(),
+      c.env.DB.prepare(
+        `UPDATE workers SET
+           login_streak_days = CASE
+             WHEN last_seen_at IS NOT NULL AND date(last_seen_at) = date('now') THEN login_streak_days
+             WHEN last_seen_at IS NOT NULL AND date(last_seen_at) = date('now', '-1 day') THEN login_streak_days + 1
+             ELSE 1
+           END,
+           last_seen_at = datetime('now')
+         WHERE telegram_id = ?`,
+      )
+        .bind(user.id)
+        .run()
+        .catch(() => undefined),
+      c.env.DB.prepare('UPDATE companies SET last_seen_at = datetime(\'now\') WHERE owner_telegram_id = ?')
+        .bind(user.id)
+        .run()
+        .catch(() => undefined),
     ]),
   );
 

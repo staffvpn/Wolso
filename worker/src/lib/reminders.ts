@@ -20,13 +20,23 @@ import { photoReminderColumnExists } from './ownPhoto';
 const SIGNUP_REMINDER_AFTER_HOURS = 20;
 
 /** How long an applicant can sit unanswered before the employer hears
- *  about it. A shift is a time-sensitive thing — a worker waiting three
- *  days has usually taken something else by then. */
-const PENDING_REMINDER_AFTER_HOURS = 18;
+ *  about it. A shift is a time-sensitive thing — a worker waiting even a
+ *  couple of hours has usually started looking elsewhere, so this fires
+ *  fast rather than waiting for the situation to be clearly bad. */
+const PENDING_REMINDER_AFTER_HOURS = 2;
 
-/** …and how long before the same employer can be reminded again, so a
- *  permanently-ignored applicant doesn't produce a daily message. */
-const PENDING_REMINDER_COOLDOWN_DAYS = 3;
+/** …and how long before the same employer can be reminded again for the
+ *  same still-pending pile, so an employer who's ignoring the bot entirely
+ *  doesn't get paged every hour. Short, because the 2h trigger above means
+ *  someone who's just busy for the afternoon should still hear about it
+ *  again today instead of tomorrow. */
+const PENDING_REMINDER_COOLDOWN_HOURS = 6;
+
+/** How long a worker can go without opening the app before they're
+ *  considered dormant, and the matching cooldown before the same worker
+ *  can be nudged again — see remindDormantWorkers below. */
+const DORMANT_AFTER_DAYS = 4;
+const DORMANT_REMINDER_COOLDOWN_DAYS = 4;
 
 /** One cron run touches at most this many accounts per reminder. A Worker
  *  invocation has a wall-clock budget and the Bot API has a rate limit;
@@ -217,7 +227,7 @@ async function remindPendingCandidates(env: Env): Promise<number> {
      GROUP BY co.id
      ORDER BY waiting DESC LIMIT ?`,
   )
-    .bind(`-${PENDING_REMINDER_AFTER_HOURS} hours`, `-${PENDING_REMINDER_COOLDOWN_DAYS} days`, BATCH)
+    .bind(`-${PENDING_REMINDER_AFTER_HOURS} hours`, `-${PENDING_REMINDER_COOLDOWN_HOURS} hours`, BATCH)
     .all<{ id: number; owner_telegram_id: number; name: string; waiting: number; position_label: string }>();
 
   const now = new Date().toISOString();
@@ -236,6 +246,82 @@ async function remindPendingCandidates(env: Env): Promise<number> {
   }
 
   return results.length;
+}
+
+/** Whether migration 0041 has been applied — same caution as the other
+ *  gates in this file. */
+let winbackColumnsConfirmed = false;
+
+async function winbackColumnsExist(env: Env): Promise<boolean> {
+  if (winbackColumnsConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(workers)').all<{ name: string }>();
+    winbackColumnsConfirmed = results.some((r) => r.name === 'last_seen_at');
+    return winbackColumnsConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** People are in the bot, not using it, and hunting the same shifts
+ *  through random chats instead — because nothing ever tells them the
+ *  bot has anything new. This is that nudge: a worker who's gone quiet
+ *  for a few days hears about it only if their specialty actually has
+ *  fresh shifts to show for it, so it reads as news rather than a guilt
+ *  trip about not opening an app.
+ *
+ *  Reuses the `new_shifts` pref — it's the same kind of message
+ *  (routes/employer.ts's notifyMatchingWorkers) just batched into one
+ *  digest for someone who missed the individual pings while they were
+ *  away, instead of a switch of its own. */
+async function remindDormantWorkers(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT w.id, w.telegram_id, COALESCE(w.dormant_reminded_at, w.last_seen_at) as since
+     FROM workers w
+     WHERE w.status != 'suspended'
+       AND w.name != '' AND w.city != '' AND w.bio != '' AND w.skills != '' AND w.birthdate IS NOT NULL
+       AND EXISTS (SELECT 1 FROM worker_positions wp WHERE wp.worker_id = w.id AND wp.months > 0)
+       AND w.last_seen_at IS NOT NULL
+       AND w.last_seen_at <= datetime('now', ?)
+       AND (w.dormant_reminded_at IS NULL OR w.dormant_reminded_at <= datetime('now', ?))
+     ORDER BY w.last_seen_at ASC LIMIT ?`,
+  )
+    .bind(`-${DORMANT_AFTER_DAYS} days`, `-${DORMANT_REMINDER_COOLDOWN_DAYS} days`, BATCH)
+    .all<{ id: number; telegram_id: number; since: string }>();
+
+  const now = new Date().toISOString();
+  let sent = 0;
+
+  for (const w of results) {
+    // Stamped either way, sent or not — otherwise a dormant worker with
+    // nothing new for their specialty would get re-queried every single
+    // hour until something finally shows up, crowding out everyone else
+    // this batch could have reached instead.
+    await env.DB.prepare('UPDATE workers SET dormant_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
+
+    const match = await env.DB.prepare(
+      `SELECT COUNT(DISTINCT s.id) as n, MIN(s.position_label) as label
+       FROM shifts s JOIN worker_positions wp ON wp.position = s.position
+       WHERE wp.worker_id = ? AND s.status = 'active' AND s.created_at > ?`,
+    )
+      .bind(w.id, w.since)
+      .first<{ n: number; label: string | null }>();
+    const count = match?.n ?? 0;
+    if (count === 0) continue;
+
+    const shiftsWord = count === 1 ? 'смена' : count < 5 ? 'смены' : 'смен';
+    const sentOk = await notifyWorker(
+      env,
+      { id: w.id, telegramId: w.telegram_id },
+      'new_shifts',
+      `🔔 Пока вас не было, на Wolso появил${count === 1 ? 'ась' : 'ось'} ${count} ${shiftsWord} по вашей специальности` +
+        (match?.label ? ` — например «${match.label}»` : '') +
+        '.\n\nЗагляните — работодатели откликов долго не ждут.',
+    );
+    if (sentOk) sent++;
+  }
+
+  return sent;
 }
 
 /** «Напоминание перед сменой» in Настройки used to be a switch with
@@ -333,6 +419,16 @@ export async function runReminders(env: Env): Promise<void> {
     console.log('pending-candidate reminders sent', pending);
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
+  }
+
+  try {
+    if (await winbackColumnsExist(env)) {
+      console.log('win-back reminders sent', await remindDormantWorkers(env));
+    } else {
+      console.error('win-back reminders skipped — migration 0041_winback is not applied');
+    }
+  } catch (err) {
+    console.error('win-back reminders failed', err);
   }
 
   try {
