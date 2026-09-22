@@ -6,7 +6,7 @@ import { getTelegramUsername, sendTelegramMessage } from '../lib/telegramBot';
 import { probeBotStatus, botStatusColumnsExist } from '../lib/botStatus';
 import { hiddenColumnExists, hiddenEditColumnExists } from '../lib/hiddenProfiles';
 import { userNotesTableExists } from '../lib/complaints';
-import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
+import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings, recomputeWorkerShiftsCompleted } from '../lib/ratings';
 import { datesColumnExists, expandDates } from '../lib/shiftDates';
 import { achievementsTableExists, buildAchievementsList } from '../lib/achievements';
 
@@ -313,7 +313,7 @@ adminUserRoutes.post('/seekers/:id/applications/:appId/undo-completion', require
     .bind(appId)
     .run();
 
-  await c.env.DB.prepare('UPDATE workers SET shifts_completed = MAX(0, shifts_completed - 1) WHERE id = ?').bind(workerId).run();
+  await recomputeWorkerShiftsCompleted(c.env, workerId);
   await recomputeWorkerRating(c.env, workerId);
 
   const actor = await actorLabel(c.env, session);

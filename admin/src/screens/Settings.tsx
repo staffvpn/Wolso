@@ -49,11 +49,14 @@ function TestAlertButton() {
   );
 }
 
-/** Ratings are stored on the account and were only ever recalculated when a
- *  review was left — so anything that removed one (a deleted vacancy, a
- *  deleted review) left the old stars behind. Deletions recompute now, but
- *  scores that drifted before that had no way back short of editing the
- *  database. */
+/** Рейтинг и счётчик смен хранятся на аккаунте и пересчитываются только
+ *  в момент события (отзыв оставлен / смена сдана) — всё, что заставило
+ *  это событие исчезнуть задним числом (удалённая вакансия, удалённый
+ *  работодатель, удалённый отзыв), оставляет старое число висеть само по
+ *  себе. Например: у соискателя в «Завершённых сменах» пусто, а на
+ *  карточке всё ещё «1 смена» — вакансию или работодателя, за которыми
+ *  она числилась, кто-то удалил. Новые удаления пересчитываются сразу,
+ *  но то, что успело разъехаться раньше, без этой кнопки не починить. */
 function RecomputeRatingsCard() {
   const [state, setState] = useState<'idle' | 'busy'>('idle');
   const [message, setMessage] = useState('');
@@ -79,13 +82,15 @@ function RecomputeRatingsCard() {
 
   return (
     <Card className="p-6 sm:col-span-2">
-      <SectionLabel className="mb-4">Рейтинги</SectionLabel>
+      <SectionLabel className="mb-4">Рейтинги и счётчик смен</SectionLabel>
       <p className="text-[13px] text-text-muted leading-relaxed mb-4">
-        Пересчитывает звёзды у всех по отзывам, которые есть в базе сейчас. Нужно один раз — для тех, у кого рейтинг
-        остался от удалённых отзывов или вакансий. Дальше он пересчитывается сам.
+        Пересчитывает звёзды и число «отработанных смен» у всех — по отзывам и заявкам, которые реально есть в базе
+        сейчас. Нужно, когда у кого-то на карточке висит смена или рейтинг от давно удалённой вакансии/работодателя.
+        Достижения по числу смен эта кнопка не трогает — если бейдж уже выдан ошибочно, его нужно забрать вручную на
+        карточке человека.
       </p>
       <Button variant="dark" disabled={state === 'busy'} onClick={run}>
-        {state === 'busy' ? 'Пересчитываем…' : 'Пересчитать рейтинги'}
+        {state === 'busy' ? 'Пересчитываем…' : 'Пересчитать рейтинги и смены'}
       </Button>
       {message && (
         <p className={cn('text-[13px] mt-2.5 leading-relaxed', failed ? 'text-danger' : 'text-accent')}>{message}</p>

@@ -24,6 +24,24 @@ export async function recomputeWorkerRating(env: Env, workerId: number): Promise
     .run();
 }
 
+/** Тот же класс проблемы, что у рейтинга выше, только для счётчика смен:
+ *  shifts_completed растёт на 1 в момент, когда воркер сдаёт свой отзыв
+ *  (routes/applications.ts), и с тех пор нигде не трогается. Удалили
+ *  вакансию или работодателя, за которыми числилась уже сданная смена, —
+ *  заявка каскадом исчезает из applications (FK ON DELETE CASCADE), а
+ *  счётчик остаётся старым: в списке «Завершённые смены» пусто, а число
+ *  смен на карточке и завязанные на него достижения — нет. */
+export async function recomputeWorkerShiftsCompleted(env: Env, workerId: number): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE workers SET shifts_completed = (
+       SELECT COUNT(*) FROM applications
+       WHERE worker_id = ? AND work_stage IN ('employer_closed', 'reviewed')
+     ) WHERE id = ?`,
+  )
+    .bind(workerId, workerId)
+    .run();
+}
+
 export async function recomputeCompanyRating(env: Env, companyId: number): Promise<void> {
   await env.DB.prepare(
     `UPDATE companies SET
@@ -39,14 +57,22 @@ export async function recomputeCompanyRating(env: Env, companyId: number): Promi
     .run();
 }
 
-/** Rebuilds every stored rating from scratch. Used by the dashboard's
- *  "пересчитать" action to repair scores that already went stale before
- *  the recompute calls above existed. */
+/** Rebuilds every stored rating (and every worker's shifts_completed —
+ *  same class of drift, see recomputeWorkerShiftsCompleted above) from
+ *  scratch. Used by the dashboard's "пересчитать" action to repair stats
+ *  that already went stale before the recompute calls above existed. */
 export async function recomputeAllRatings(env: Env): Promise<{ workers: number; companies: number }> {
   await env.DB.prepare(
     `UPDATE workers SET rating = (
        SELECT COALESCE(AVG(a.employer_rating), 0) FROM applications a
        WHERE a.worker_id = workers.id AND a.employer_rating IS NOT NULL
+     )`,
+  ).run();
+
+  await env.DB.prepare(
+    `UPDATE workers SET shifts_completed = (
+       SELECT COUNT(*) FROM applications a
+       WHERE a.worker_id = workers.id AND a.work_stage IN ('employer_closed', 'reviewed')
      )`,
   ).run();
 
