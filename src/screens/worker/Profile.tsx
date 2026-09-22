@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, EyeOff, Pencil, Plus, Send } from 'lucide-react';
+import { Award, Camera, ChevronRight, EyeOff, Heart, Pencil, Plus, Send, Settings } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
@@ -46,10 +46,16 @@ export function WorkerProfileScreen() {
         </button>
         <Avatar name={profile.name} src={profile.avatarUrl} size={80} className="rounded-2xl ring-[3px] ring-accent" />
         <h1 className="text-[19px] font-extrabold mt-3">
-          {profile.name}
+          {profile.name || 'Без имени'}
           {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
         </h1>
-        <p className="text-[13px] text-text-muted mt-0.5">{positions[0]?.positionLabel} · {profile.city}</p>
+        {/* Город обязателен в базе, а вот позиция — нет: у новой анкеты без
+            добавленного опыта строка не должна начинаться с одинокого «·». */}
+        {(positions[0]?.positionLabel || profile.city) && (
+          <p className="text-[13px] text-text-muted mt-0.5">
+            {[positions[0]?.positionLabel, profile.city].filter(Boolean).join(' · ')}
+          </p>
+        )}
       </div>
 
       {/* Смены и рейтинг живут только тут — раньше рейтинг дублировался
@@ -177,16 +183,24 @@ export function WorkerProfileScreen() {
         <Card className="divide-y divide-border-soft px-1">
           <div className="px-3">
             <ListRow
+              icon={<Award size={16} />}
+              tone="accent"
               label="Достижения"
-              value={totalCount > 0 ? `${earnedCount}/${totalCount}` : undefined}
+              value={
+                totalCount > 0 ? (
+                  <span className="text-[11px] font-bold text-accent bg-accent-soft rounded-full px-2 py-0.5">
+                    {earnedCount}/{totalCount}
+                  </span>
+                ) : undefined
+              }
               onClick={() => navigate('/w/achievements')}
             />
           </div>
           <div className="px-3">
-            <ListRow label="Избранное" onClick={() => navigate('/w/favorites')} />
+            <ListRow icon={<Heart size={16} />} label="Избранное" onClick={() => navigate('/w/favorites')} />
           </div>
           <div className="px-3">
-            <ListRow label="Настройки" onClick={() => navigate('/w/settings')} />
+            <ListRow icon={<Settings size={16} />} label="Настройки" onClick={() => navigate('/w/settings')} />
           </div>
         </Card>
       </div>

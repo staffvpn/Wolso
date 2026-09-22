@@ -52,11 +52,13 @@ export function EmployerProfileScreen() {
         ) : (
           <LogoBadge initial={company.logoInitial} color={company.logoColor} size={80} className="ring-[3px] ring-accent" />
         )}
-        <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full">{company.name}</h1>
-        <p className="text-[13px] text-text-muted mt-0.5">
-          {company.address}
-          {company.foundedYear && ` · с ${company.foundedYear}`}
-        </p>
+        <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full">{company.name || 'Без названия'}</h1>
+        {(company.address || company.foundedYear) && (
+          <p className="text-[13px] text-text-muted mt-0.5">
+            {company.address}
+            {company.foundedYear && `${company.address ? ' · ' : ''}с ${company.foundedYear}`}
+          </p>
+        )}
       </div>
 
       {/* Рейтинг и число отзывов — только в третьей плитке ниже, не
