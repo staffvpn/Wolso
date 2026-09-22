@@ -275,6 +275,58 @@ adminUserRoutes.delete('/reviews/:appId/:side', requirePermission('manageData'),
   return c.json({ ok: true });
 });
 
+/** Отменяет уже «отработанную» смену — не просто снимает звёзды (это
+ *  делает /reviews выше), а полностью убирает её последствия: счётчик
+ *  смен, отзывы с обеих сторон, сам статус заявки. Для случаев вроде
+ *  технического сбоя, засчитавшего смену, которой по факту не было.
+ *
+ *  Достижения, завязанные на число смен, отдельно не трогаем — recompute
+ *  их только выдаёт, никогда не забирает, так что уже выданный «Первая
+ *  смена»/«10 смен» после отмены надо снять руками в блоке «Достижения»
+ *  на этой же карточке. */
+adminUserRoutes.post('/seekers/:id/applications/:appId/undo-completion', requirePermission('manageData'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const workerId = Number(c.req.param('id'));
+  const appId = c.req.param('appId');
+
+  const app = await c.env.DB.prepare(
+    `SELECT a.id, a.work_stage, s.position_label, co.name as company_name
+     FROM applications a JOIN shifts s ON s.id = a.shift_id JOIN companies co ON co.id = s.company_id
+     WHERE a.id = ? AND a.worker_id = ?`,
+  )
+    .bind(appId, workerId)
+    .first<{ id: number; work_stage: string; position_label: string; company_name: string }>();
+  if (!app) return c.json({ error: 'not_found' }, 404);
+  if (app.work_stage !== 'employer_closed' && app.work_stage !== 'reviewed') {
+    return c.json({ error: 'not_completed' }, 400);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE applications SET
+       status = 'cancelled', work_stage = 'upcoming',
+       cancelled_by = 'employer', cancel_reason = 'Отменено дашбордом: смена не отрабатывалась', cancelled_at = datetime('now'),
+       check_in_at = NULL, check_out_at = NULL, closed_by_employer_at = NULL,
+       rating = NULL, review_tags = NULL, review_comment = NULL,
+       employer_rating = NULL, employer_review_tags = NULL, employer_review_comment = NULL
+     WHERE id = ?`,
+  )
+    .bind(appId)
+    .run();
+
+  await c.env.DB.prepare('UPDATE workers SET shifts_completed = MAX(0, shifts_completed - 1) WHERE id = ?').bind(workerId).run();
+  await recomputeWorkerRating(c.env, workerId);
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(
+    c.env,
+    actor,
+    `отменила отработанную смену «${app.position_label}» (${app.company_name}) соискателю #${workerId} — техническая ошибка`,
+    'danger',
+  );
+
+  return c.json({ ok: true });
+});
+
 /** Rebuilds every stored rating from the reviews that exist right now.
  *  For scores that already drifted before deletions started recomputing —
  *  there was no way to fix those short of editing the database. */

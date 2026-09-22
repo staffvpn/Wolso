@@ -16,7 +16,7 @@ import { UserChatsAndNotes } from '@/components/UserChatsAndNotes';
 import { AchievementsBlock } from '@/components/AchievementsBlock';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useUserDetailStore } from '@/store/useUserDetailStore';
-import { deleteReview } from '@/services/usersApi';
+import { deleteReview, undoCompletedShift } from '@/services/usersApi';
 import { useRolesStore } from '@/store/useRolesStore';
 import { useCan } from '@/store/useSessionStore';
 import { roleById } from '@/data/permissions';
@@ -733,6 +733,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', city: '', bio: '', skills: '', birthdate: '' });
+  const [undoingApp, setUndoingApp] = useState<{ id: string; label: string } | null>(null);
 
   useEffect(() => {
     setEditing(false);
@@ -880,7 +881,17 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
                     <span className="font-semibold text-text">{a.positionLabel}</span>
                     {a.rating !== null && <Badge tone="neutral">★ {a.rating}</Badge>}
                   </div>
-                  <p className="text-text-faint mt-0.5">{a.companyName} · {formatShiftWhen(a.date, a.startHour, a.startMin)}</p>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className="text-text-faint">{a.companyName} · {formatShiftWhen(a.date, a.startHour, a.startMin)}</p>
+                    {canManageData && (
+                      <button
+                        onClick={() => setUndoingApp({ id: a.id, label: `${a.positionLabel} · ${a.companyName}` })}
+                        className="text-[12px] font-semibold text-danger shrink-0 hover:opacity-70"
+                      >
+                        Отменить
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -971,6 +982,20 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
         description={`${user.name} и вся его история (отклики, чаты, уведомления, избранное) удаляются без возможности восстановить.`}
         confirmLabel="Удалить"
         onConfirm={() => deleteUser(user.id, 'seeker')}
+      />
+
+      <ConfirmModal
+        open={!!undoingApp}
+        onClose={() => setUndoingApp(null)}
+        title="Отменить отработанную смену?"
+        description={`«${undoingApp?.label}» перестанет считаться отработанной: счётчик смен уменьшится на 1, отзывы с обеих сторон исчезнут. Если за неё уже выдано достижение по числу смен — его придётся снять отдельно, в блоке «Достижения» выше.`}
+        confirmLabel="Отменить смену"
+        onConfirm={async () => {
+          if (!undoingApp) return;
+          await undoCompletedShift(user.id, undoingApp.id);
+          await loadSeeker(user.id);
+          await refreshUsers();
+        }}
       />
 
       <BlockReasonModal

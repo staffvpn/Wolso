@@ -358,6 +358,15 @@ export async function deleteReview(applicationId: string, side: 'worker' | 'comp
   await apiFetch(`/admin/users/reviews/${applicationId}/${side}`, { method: 'DELETE' });
 }
 
+/** Полностью отменяет уже «отработанную» смену — не только звёзды (это
+ *  выше), а сам статус, обе стороны отзывов и счётчик смен соискателя.
+ *  Для случаев вроде технического сбоя, засчитавшего смену, которой не
+ *  было. Достижения по числу смен не трогает — их снимают отдельно, в
+ *  блоке «Достижения» на этой же карточке. */
+export async function undoCompletedShift(workerId: string, applicationId: string): Promise<void> {
+  await apiFetch(`/admin/users/seekers/${workerId}/applications/${applicationId}/undo-completion`, { method: 'POST' });
+}
+
 /** Rebuilds every stored rating from the reviews that exist right now. */
 export async function recomputeRatings(): Promise<{ workers: number; companies: number }> {
   return apiFetch('/admin/users/recompute-ratings', { method: 'POST' });
