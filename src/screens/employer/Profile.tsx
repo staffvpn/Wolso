@@ -37,7 +37,7 @@ export function EmployerProfileScreen() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
       <div
-        className="relative shrink-0 min-h-[180px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
+        className="relative shrink-0 min-h-[196px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
         style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
       >
         <button
@@ -48,9 +48,9 @@ export function EmployerProfileScreen() {
           <Pencil size={15} className="text-white" />
         </button>
         {company.avatarUrl ? (
-          <Avatar src={company.avatarUrl} name={company.name} size={80} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
+          <Avatar src={company.avatarUrl} name={company.name} size={96} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
         ) : (
-          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={80} className="ring-[3px] ring-accent shrink-0" />
+          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={96} className="ring-[3px] ring-accent shrink-0" />
         )}
         <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full shrink-0">{company.name || 'Без названия'}</h1>
         {(company.address || company.foundedYear) && (
@@ -64,20 +64,20 @@ export function EmployerProfileScreen() {
       {/* Рейтинг и число отзывов — только в третьей плитке ниже, не
           повторяются строкой под названием, как раньше. */}
       <div className="flex gap-2 mt-4">
-        <Card className="flex-1 p-3 text-center">
-          <p className="text-[18px] font-extrabold">{vacancies.length}</p>
+        <Card className="flex-1 min-h-[74px] p-3 flex flex-col items-center justify-center text-center">
+          <p className="text-[16px] font-extrabold truncate max-w-full">{vacancies.length}</p>
           <p className="text-[10.5px] text-text-muted mt-1">смен опубл.</p>
         </Card>
-        <Card className="flex-1 p-3 text-center">
-          <p className="text-[18px] font-extrabold">{hires}</p>
+        <Card className="flex-1 min-h-[74px] p-3 flex flex-col items-center justify-center text-center">
+          <p className="text-[16px] font-extrabold truncate max-w-full">{hires}</p>
           <p className="text-[10.5px] text-text-muted mt-1">нанято</p>
         </Card>
         <button
           onClick={() => navigate('/e/reviews')}
-          className="flex-1 rounded-card bg-surface border border-border-soft p-3 text-center"
+          className="flex-1 min-h-[74px] rounded-card bg-surface border border-border-soft p-3 flex flex-col items-center justify-center text-center"
         >
-          <p className="text-[18px] font-extrabold">{formatRating(company.rating)}</p>
-          <p className="text-[10.5px] text-text-muted mt-1">{company.reviewsCount} отзывов</p>
+          <p className="text-[16px] font-extrabold truncate max-w-full">{formatRating(company.rating)}</p>
+          <p className="text-[10.5px] text-text-muted mt-1 truncate max-w-full">{company.reviewsCount} отзывов</p>
         </button>
       </div>
 

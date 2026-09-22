@@ -34,7 +34,7 @@ export function WorkerProfileScreen() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
       <div
-        className="relative shrink-0 min-h-[180px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
+        className="relative shrink-0 min-h-[196px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
         style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
       >
         <button
@@ -44,7 +44,7 @@ export function WorkerProfileScreen() {
         >
           <Pencil size={15} className="text-white" />
         </button>
-        <Avatar name={profile.name} src={profile.avatarUrl} size={80} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
+        <Avatar name={profile.name} src={profile.avatarUrl} size={96} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
         <h1 className="text-[19px] font-extrabold mt-3 shrink-0">
           {profile.name || 'Без имени'}
           {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
@@ -63,21 +63,21 @@ export function WorkerProfileScreen() {
           раньше вела та строка — на отзывы. Стаж — сумма месяцев по всем
           позициям ниже, а не отдельное число, взятое с потолка. */}
       <div className="flex gap-2 mt-6 shrink-0">
-        <Card className="flex-1 p-3 text-center">
-          <p className="text-[18px] font-extrabold">{profile.shiftsCompleted}</p>
+        <Card className="flex-1 min-h-[74px] p-3 flex flex-col items-center justify-center text-center">
+          <p className="text-[16px] font-extrabold truncate max-w-full">{profile.shiftsCompleted}</p>
           <p className="text-[10.5px] text-text-muted mt-1">смены</p>
         </Card>
-        <Card className="flex-1 p-3 text-center">
-          <p className="text-[15px] font-extrabold whitespace-nowrap">
+        <Card className="flex-1 min-h-[74px] p-3 flex flex-col items-center justify-center text-center">
+          <p className="text-[16px] font-extrabold truncate max-w-full">
             {positions.length > 0 ? formatExperience(positions.reduce((sum, p) => sum + p.months, 0)) : '—'}
           </p>
           <p className="text-[10.5px] text-text-muted mt-1">общий стаж</p>
         </Card>
         <button
           onClick={() => navigate('/w/reviews')}
-          className="flex-1 rounded-card bg-surface border border-border-soft p-3 text-center"
+          className="flex-1 min-h-[74px] rounded-card bg-surface border border-border-soft p-3 flex flex-col items-center justify-center text-center"
         >
-          <p className="text-[18px] font-extrabold">{formatRating(profile.rating)}</p>
+          <p className="text-[16px] font-extrabold truncate max-w-full">{formatRating(profile.rating)}</p>
           <p className="text-[10.5px] text-text-muted mt-1">рейтинг</p>
         </button>
       </div>
