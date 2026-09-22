@@ -87,10 +87,21 @@ export function EmployerProfileScreen() {
       )}
 
       {(company.photos ?? []).length > 0 && (
-        <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">
-          {company.photos!.map((p) => (
-            <SafeImage key={p.id} src={p.url} alt="" className="h-24 w-24 rounded-2xl object-cover shrink-0" />
-          ))}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <SectionLabel className="mb-0">Фото</SectionLabel>
+            <span className="text-[12px] text-text-faint">{company.photos!.length} из 6</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto -mx-5 px-5">
+            {company.photos!.map((p) => (
+              <SafeImage
+                key={p.id}
+                src={p.url}
+                alt=""
+                className="h-24 w-24 rounded-2xl object-cover shrink-0 border border-border-soft"
+              />
+            ))}
+          </div>
         </div>
       )}
 
