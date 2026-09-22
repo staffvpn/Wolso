@@ -37,24 +37,24 @@ export function EmployerProfileScreen() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
       <div
-        className="relative rounded-card overflow-hidden p-5 flex flex-col items-center text-center"
+        className="relative shrink-0 min-h-[180px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
         style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
       >
         <button
           onClick={() => navigate('/e/profile/edit')}
           aria-label="Редактировать профиль"
-          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center"
+          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center shrink-0"
         >
           <Pencil size={15} className="text-white" />
         </button>
         {company.avatarUrl ? (
-          <Avatar src={company.avatarUrl} name={company.name} size={80} className="rounded-2xl ring-[3px] ring-accent" />
+          <Avatar src={company.avatarUrl} name={company.name} size={80} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
         ) : (
-          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={80} className="ring-[3px] ring-accent" />
+          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={80} className="ring-[3px] ring-accent shrink-0" />
         )}
-        <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full">{company.name || 'Без названия'}</h1>
+        <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full shrink-0">{company.name || 'Без названия'}</h1>
         {(company.address || company.foundedYear) && (
-          <p className="text-[13px] text-text-muted mt-0.5">
+          <p className="text-[13px] text-text-muted mt-0.5 shrink-0">
             {company.address}
             {company.foundedYear && `${company.address ? ' · ' : ''}с ${company.foundedYear}`}
           </p>

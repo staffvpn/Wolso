@@ -56,8 +56,17 @@ export function bootstrapTelegram() {
   // close/collapse/⋯ cluster at the top, still present even in fullscreen).
   // Both stack — content has to clear the device inset *and* Telegram's own
   // controls — so every top-anchored interactive element needs both added in.
+  // Замер на реальном устройстве показал: contentSafeAreaInset у части
+  // клиентов Telegram остаётся 0 (или занижен) даже когда плавающая
+  // кнопка «Закрыть / ⌄ •••» на экране есть и реально перекрывает верх —
+  // судя по всему, зависит от версии клиента, а не только от режима.
+  // Полагаться только на то, что API сообщил, оказалось недостаточно:
+  // шапка профиля пряталась под этой кнопкой. 56px — рост самой кнопки с
+  // отступами, тот минимум, который есть всегда, пока приложение открыто
+  // внутри Telegram, независимо от того, что вернул contentSafeAreaInset.
+  const MIN_TOP_CLEARANCE = 56;
   const syncSafeArea = () => {
-    const top = (tg.safeAreaInset?.top ?? 0) + (tg.contentSafeAreaInset?.top ?? 0);
+    const top = Math.max((tg.safeAreaInset?.top ?? 0) + (tg.contentSafeAreaInset?.top ?? 0), MIN_TOP_CLEARANCE);
     const bottom = (tg.safeAreaInset?.bottom ?? 0) + (tg.contentSafeAreaInset?.bottom ?? 0);
     document.documentElement.style.setProperty('--tg-safe-top', `${top}px`);
     document.documentElement.style.setProperty('--tg-safe-bottom', `${bottom}px`);

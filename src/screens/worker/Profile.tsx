@@ -34,25 +34,25 @@ export function WorkerProfileScreen() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
       <div
-        className="relative rounded-card overflow-hidden p-5 flex flex-col items-center text-center"
+        className="relative shrink-0 min-h-[180px] rounded-card overflow-hidden p-5 flex flex-col items-center justify-center text-center"
         style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
       >
         <button
           onClick={() => navigate('/w/profile/edit')}
           aria-label="Редактировать профиль"
-          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center"
+          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center shrink-0"
         >
           <Pencil size={15} className="text-white" />
         </button>
-        <Avatar name={profile.name} src={profile.avatarUrl} size={80} className="rounded-2xl ring-[3px] ring-accent" />
-        <h1 className="text-[19px] font-extrabold mt-3">
+        <Avatar name={profile.name} src={profile.avatarUrl} size={80} className="rounded-2xl ring-[3px] ring-accent shrink-0" />
+        <h1 className="text-[19px] font-extrabold mt-3 shrink-0">
           {profile.name || 'Без имени'}
           {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
         </h1>
         {/* Город обязателен в базе, а вот позиция — нет: у новой анкеты без
             добавленного опыта строка не должна начинаться с одинокого «·». */}
         {(positions[0]?.positionLabel || profile.city) && (
-          <p className="text-[13px] text-text-muted mt-0.5">
+          <p className="text-[13px] text-text-muted mt-0.5 shrink-0">
             {[positions[0]?.positionLabel, profile.city].filter(Boolean).join(' · ')}
           </p>
         )}
@@ -62,7 +62,7 @@ export function WorkerProfileScreen() {
           строкой прямо под именем. Клик по «рейтинг» ведёт туда же, куда
           раньше вела та строка — на отзывы. Стаж — сумма месяцев по всем
           позициям ниже, а не отдельное число, взятое с потолка. */}
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-2 mt-6 shrink-0">
         <Card className="flex-1 p-3 text-center">
           <p className="text-[18px] font-extrabold">{profile.shiftsCompleted}</p>
           <p className="text-[10.5px] text-text-muted mt-1">смены</p>
