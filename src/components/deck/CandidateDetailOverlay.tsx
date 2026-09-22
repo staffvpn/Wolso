@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { SafeImage } from '../ui/SafeImage';
-import { formatExperience, formatRating } from '@/lib/format';
+import { formatExperience, formatRating, lookingForLabel } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { CandidateProfile } from '@/types';
 
@@ -101,11 +101,8 @@ export function CandidateDetailOverlay({
             <Badge tone="accent">{formatRating(candidate.rating)}</Badge>
             <Badge tone="dark">{candidate.shiftsCompleted} смен отработано</Badge>
             {/* Worth knowing before the chat rather than after: someone
-                after weekend shifts isn't a candidate for a permanent job.
-                Absent on an anketa that predates the question. */}
-            {candidate.lookingFor && candidate.lookingFor !== 'any' && (
-              <Badge tone="dark">{candidate.lookingFor === 'shift' ? 'Ищет смены' : 'Ищет постоянную работу'}</Badge>
-            )}
+                after weekend shifts isn't a candidate for a permanent job. */}
+            {lookingForLabel(candidate.lookingFor) && <Badge tone="dark">{lookingForLabel(candidate.lookingFor)}</Badge>}
           </div>
 
           {candidate.bio && (

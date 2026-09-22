@@ -1,3 +1,5 @@
+import type { LookingFor } from '@/types';
+
 const rub = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
 export function formatMoney(value: number) {
@@ -227,4 +229,13 @@ export function ageFrom(birthdate?: string | null): number | undefined {
   const monthDiff = now.getMonth() - dob.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
   return age;
+}
+
+/** null for 'any' (or missing, on an anketa that predates migration 0029)
+ *  — that's the default, most-permissive state, so it doesn't earn a badge
+ *  of its own; only an actual preference is worth calling out. */
+export function lookingForLabel(lookingFor: LookingFor | undefined | null): string | null {
+  if (lookingFor === 'shift') return 'Ищет смены';
+  if (lookingFor === 'permanent') return 'Ищет постоянную работу';
+  return null;
 }

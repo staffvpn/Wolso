@@ -3,7 +3,7 @@ import type { CandidateProfile } from '@/types';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
-import { formatRating } from '@/lib/format';
+import { formatRating, lookingForLabel } from '@/lib/format';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -62,6 +62,10 @@ export function CandidateCard({ candidate, tall = false, onOpenDetail }: { candi
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 relative">
         <div className="flex flex-wrap gap-2">
           <Badge tone="accent">{formatRating(candidate.rating)} · {candidate.shiftsCompleted} смен</Badge>
+          {/* Worth knowing before opening «Подробнее»: someone after shifts
+              only isn't a candidate for a permanent role, and the swipe
+              itself is the decision moment. */}
+          {lookingForLabel(candidate.lookingFor) && <Badge tone="dark">{lookingForLabel(candidate.lookingFor)}</Badge>}
         </div>
 
         {candidate.bio && <p className="text-[14px] text-text leading-relaxed whitespace-pre-line">{candidate.bio}</p>}

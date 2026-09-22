@@ -5,10 +5,11 @@ import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
 import { Card, SectionLabel } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useAchievementsStore } from '@/store/useAchievementsStore';
-import { formatExperience, formatRating } from '@/lib/format';
+import { formatExperience, formatRating, lookingForLabel } from '@/lib/format';
 import { openExternal, hapticSelect } from '@/lib/telegram';
 
 const CHANNEL_URL = 'https://t.me/wolsoapp';
@@ -55,6 +56,9 @@ export function WorkerProfileScreen() {
           <p className="text-[13px] text-text-muted mt-0.5 shrink-0">
             {[positions[0]?.positionLabel, profile.city].filter(Boolean).join(' · ')}
           </p>
+        )}
+        {lookingForLabel(profile.lookingFor) && (
+          <Badge tone="accent" className="mt-2.5 shrink-0">{lookingForLabel(profile.lookingFor)}</Badge>
         )}
       </div>
 
@@ -122,12 +126,6 @@ export function WorkerProfileScreen() {
           </span>
         </button>
       )}
-
-      {/* Одной строкой, а не секцией с чипами: это справочный факт об
-          анкете, а не то, ради чего человек открыл экран. */}
-      <p className="text-[13px] text-text-muted mt-3">
-        Ищу: {profile.lookingFor === 'shift' ? 'смены' : profile.lookingFor === 'permanent' ? 'постоянную работу' : 'смены и постоянную работу'}
-      </p>
 
       {profile.bio && (
         <Card className="p-4 mt-4">
