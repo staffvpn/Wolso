@@ -99,6 +99,7 @@ const LEGACY_FALLBACK: Partial<Record<PermissionKey, PermissionKey | 'yes'>> = {
   handleComplaints: 'blockUsers',
   sendBroadcasts: 'manageData',
   managePromos: 'manageData',
+  manageAchievements: 'manageData',
   viewTechHealth: 'yes',
 };
 

@@ -33,6 +33,8 @@ import { promoRoutes } from './routes/promos';
 import { adminBroadcastRoutes } from './admin/broadcast';
 import { adminComplaintRoutes } from './admin/complaints';
 import { adminExportRoutes } from './admin/export';
+import { adminAchievementRoutes } from './admin/achievements';
+import { achievementRoutes } from './routes/achievements';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -74,6 +76,7 @@ app.route('/bot', botRoutes);
 app.route('/complaints', complaintRoutes);
 app.route('/personal-shifts', personalShiftRoutes);
 app.route('/promos', promoRoutes);
+app.route('/achievements', achievementRoutes);
 
 app.route('/admin/users', adminUserRoutes);
 app.route('/admin/roles', adminRoleRoutes);
@@ -88,6 +91,7 @@ app.route('/admin/broadcast', adminBroadcastRoutes);
 app.route('/admin/complaints', adminComplaintRoutes);
 app.route('/admin/export', adminExportRoutes);
 app.route('/admin/promos', adminPromoRoutes);
+app.route('/admin/achievements', adminAchievementRoutes);
 
 app.onError((err, c) => {
   console.error(err);

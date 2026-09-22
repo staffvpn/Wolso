@@ -7,6 +7,7 @@ export type PermissionKey =
   | 'switchUserRole'
   | 'viewSupportChats'
   | 'managePromos'
+  | 'manageAchievements'
   | 'sendBroadcasts'
   | 'manageTeam'
   | 'viewTechHealth'
@@ -385,4 +386,65 @@ export interface PromoInput {
   weight: number;
   startsAt?: string | null;
   endsAt?: string | null;
+}
+
+/** Условие, по которому авто-достижение засчитывается само — см.
+ *  checkCondition в worker/src/lib/achievements.ts. Null у ручных: там
+ *  формулы нет, есть только кнопка «Выдать» на карточке пользователя. */
+export type AchievementConditionType =
+  | 'first_response'
+  | 'shifts_completed'
+  | 'own_photo'
+  | 'profile_complete'
+  | 'active_week'
+  | 'distinct_positions'
+  | 'top_performer'
+  | 'no_cancel_streak'
+  | 'fast_response'
+  | 'tenure_months'
+  | 'reviews_given';
+
+export interface Achievement {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  kind: 'auto' | 'manual';
+  conditionType: AchievementConditionType | null;
+  threshold: number | null;
+  threshold2: number | null;
+  status: 'active' | 'paused';
+  sortOrder: number;
+  createdAt: string;
+  /** Скольким соискателям уже засчитано — auto и ручные вместе. */
+  earnedCount: number;
+}
+
+export interface AchievementInput {
+  title: string;
+  description: string;
+  icon: string;
+  kind: 'auto' | 'manual';
+  conditionType: AchievementConditionType | null;
+  threshold: number | null;
+  threshold2: number | null;
+  sortOrder: number;
+}
+
+/** То же достижение, но в контексте одного конкретного соискателя —
+ *  что видно на его карточке в «Пользователях» и на его собственном
+ *  экране «Достижения» в мини-аппе. */
+export interface WorkerAchievement {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  kind: 'auto' | 'manual';
+  earned: boolean;
+  earnedAt?: string;
+  note?: string;
+  current?: number;
+  target?: number;
 }

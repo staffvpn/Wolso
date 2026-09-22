@@ -13,6 +13,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { UserChatsAndNotes } from '@/components/UserChatsAndNotes';
+import { AchievementsBlock } from '@/components/AchievementsBlock';
 import { useUsersStore } from '@/store/useUsersStore';
 import { useUserDetailStore } from '@/store/useUserDetailStore';
 import { deleteReview } from '@/services/usersApi';
@@ -867,6 +868,7 @@ function SeekerDetail({ user }: { user: PlatformUser }) {
               await refreshUsers();
             }}
           />
+          <AchievementsBlock id={user.id} />
           <UserChatsAndNotes kind="seeker" id={user.id} />
           <div>
             <SectionLabel>Завершённые смены{completedApplications.length > 0 ? ` (${completedApplications.length})` : ''}</SectionLabel>

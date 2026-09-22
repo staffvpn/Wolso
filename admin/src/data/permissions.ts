@@ -36,6 +36,12 @@ export const PERMISSIONS: PermissionInfo[] = [
 
   { key: 'managePromos', label: 'Управлять рекламой', hint: 'Рекламные карточки в ленте смен', group: 'Площадка' },
   {
+    key: 'manageAchievements',
+    label: 'Управлять достижениями',
+    hint: 'Бейджи соискателей: условия, включение и ручная выдача конкретному человеку',
+    group: 'Площадка',
+  },
+  {
     key: 'sendBroadcasts',
     label: 'Рассылки всем пользователям',
     hint: 'Одно сообщение уходит всей базе и не отзывается',

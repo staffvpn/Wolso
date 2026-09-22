@@ -8,6 +8,7 @@ import { hiddenColumnExists, hiddenEditColumnExists } from '../lib/hiddenProfile
 import { userNotesTableExists } from '../lib/complaints';
 import { recomputeWorkerRating, recomputeCompanyRating, recomputeAllRatings } from '../lib/ratings';
 import { datesColumnExists, expandDates } from '../lib/shiftDates';
+import { achievementsTableExists, buildAchievementsList } from '../lib/achievements';
 
 export const adminUserRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminUserRoutes.use('*', attachSession);
@@ -907,5 +908,50 @@ adminUserRoutes.post('/notes/:kind/:id', requirePermission('blockUsers'), async 
 adminUserRoutes.delete('/notes/:id', requirePermission('blockUsers'), async (c) => {
   if (!(await userNotesTableExists(c.env))) return c.json({ ok: true });
   await c.env.DB.prepare('DELETE FROM user_notes WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ ok: true });
+});
+
+/** Только для карточки соискателя — у работодателей своих бейджей нет.
+ *  includeAll=true, в отличие от мини-аппа: команде нужно видеть и
+ *  приостановленные достижения (например, только что выключенные, но
+ *  ещё у кого-то выданные), не только активные. */
+adminUserRoutes.get('/seekers/:id/achievements', requireStaffMiddleware, async (c) => {
+  if (!(await achievementsTableExists(c.env))) return c.json({ error: 'migration_required' }, 400);
+  const achievements = await buildAchievementsList(c.env, Number(c.req.param('id')), true);
+  return c.json({ achievements });
+});
+
+adminUserRoutes.post('/seekers/:id/achievements', requirePermission('manageAchievements'), async (c) => {
+  if (!(await achievementsTableExists(c.env))) return c.json({ error: 'migration_required' }, 400);
+  const session = requireStaff(c as never)!;
+  const workerId = Number(c.req.param('id'));
+  const { achievementId, note } = await c.req.json<{ achievementId: string; note?: string }>();
+
+  const achievement = await c.env.DB.prepare('SELECT title FROM achievements WHERE id = ?').bind(achievementId).first<{ title: string }>();
+  if (!achievement) return c.json({ error: 'not_found' }, 404);
+
+  const actor = await actorLabel(c.env, session);
+  await c.env.DB.prepare(
+    `INSERT INTO worker_achievements (worker_id, achievement_id, granted_by, note) VALUES (?, ?, ?, ?)
+     ON CONFLICT (worker_id, achievement_id) DO NOTHING`,
+  )
+    .bind(workerId, achievementId, actor.name, (note ?? '').trim() || null)
+    .run();
+
+  await logAction(c.env, actor, `выдала достижение «${achievement.title}» соискателю #${workerId}`, 'accent');
+  return c.json({ ok: true });
+});
+
+adminUserRoutes.delete('/seekers/:id/achievements/:achievementId', requirePermission('manageAchievements'), async (c) => {
+  if (!(await achievementsTableExists(c.env))) return c.json({ error: 'migration_required' }, 400);
+  const session = requireStaff(c as never)!;
+  const workerId = Number(c.req.param('id'));
+  const achievementId = Number(c.req.param('achievementId'));
+
+  const achievement = await c.env.DB.prepare('SELECT title FROM achievements WHERE id = ?').bind(achievementId).first<{ title: string }>();
+  await c.env.DB.prepare('DELETE FROM worker_achievements WHERE worker_id = ? AND achievement_id = ?').bind(workerId, achievementId).run();
+
+  const actor = await actorLabel(c.env, session);
+  await logAction(c.env, actor, `забрала достижение «${achievement?.title ?? achievementId}» у соискателя #${workerId}`, 'danger');
   return c.json({ ok: true });
 });

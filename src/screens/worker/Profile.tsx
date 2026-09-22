@@ -7,6 +7,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
+import { useAchievementsStore } from '@/store/useAchievementsStore';
 import { formatExperience, formatRating } from '@/lib/format';
 import { openExternal, hapticSelect } from '@/lib/telegram';
 
@@ -16,9 +17,11 @@ export function WorkerProfileScreen() {
   const navigate = useNavigate();
   const profile = useProfileStore();
   const { positions, loaded, load } = profile;
+  const { earnedCount, totalCount, loaded: achievementsLoaded, load: loadAchievements } = useAchievementsStore();
 
   useEffect(() => {
     if (!loaded) load();
+    if (!achievementsLoaded) loadAchievements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -173,7 +176,11 @@ export function WorkerProfileScreen() {
       <div className="mt-6">
         <Card className="divide-y divide-border-soft px-1">
           <div className="px-3">
-            <ListRow label="Достижения" onClick={() => navigate('/w/achievements')} />
+            <ListRow
+              label="Достижения"
+              value={totalCount > 0 ? `${earnedCount}/${totalCount}` : undefined}
+              onClick={() => navigate('/w/achievements')}
+            />
           </div>
           <div className="px-3">
             <ListRow label="Избранное" onClick={() => navigate('/w/favorites')} />

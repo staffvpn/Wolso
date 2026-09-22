@@ -26,6 +26,7 @@ export type PermissionKey =
   | 'viewSupportChats'
   // Площадка
   | 'managePromos'
+  | 'manageAchievements'
   | 'sendBroadcasts'
   // Служебное
   | 'manageTeam'
