@@ -38,6 +38,11 @@ const PENDING_REMINDER_COOLDOWN_HOURS = 6;
 const DORMANT_AFTER_DAYS = 4;
 const DORMANT_REMINDER_COOLDOWN_DAYS = 4;
 
+/** How long an employer with a finished profile gets before being asked
+ *  why they haven't posted a single shift — long enough that someone who
+ *  just hasn't gotten to it yet isn't nagged the same day they signed up. */
+const NEVER_POSTED_REMINDER_AFTER_HOURS = 72;
+
 /** One cron run touches at most this many accounts per reminder. A Worker
  *  invocation has a wall-clock budget and the Bot API has a rate limit;
  *  the next run picks up where this one stopped, because everything sent
@@ -210,6 +215,46 @@ async function remindTelegramPhotos(env: Env): Promise<number> {
   return sent;
 }
 
+/** The employer-side equivalent of remindUnfinishedSignups: profile done,
+ *  but never once published a shift. Deliberately narrow — a company that
+ *  posted before and has simply been quiet since isn't nagged here, only
+ *  someone with zero shifts ever, because that's the one case where "they
+ *  already built a team through Wolso and don't need this" can't be true.
+ *  One nudge ever, same as the signup/photo reminders above. */
+const NEVER_POSTED_REMINDER_TEXT =
+  'Профиль заведения заполнен, а смену вы ещё ни разу не публиковали.\n\n' +
+  'Это минута: должность, дата и ставка — и отклики начнут приходить сами.';
+
+async function remindNeverPostedEmployers(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT co.id, co.owner_telegram_id
+     FROM companies co
+     WHERE co.never_posted_reminded_at IS NULL
+       AND co.status != 'suspended'
+       AND co.created_at <= datetime('now', ?)
+       AND co.name != '' AND co.description != '' AND co.founded_year IS NOT NULL
+       AND co.avatar_data IS NOT NULL AND co.inn IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM shifts s WHERE s.company_id = co.id)
+     ORDER BY co.created_at ASC LIMIT ?`,
+  )
+    .bind(`-${NEVER_POSTED_REMINDER_AFTER_HOURS} hours`, BATCH)
+    .all<{ id: number; owner_telegram_id: number }>();
+
+  const support = supportLine(env);
+  const text = support ? `${NEVER_POSTED_REMINDER_TEXT}\n\n${support}` : NEVER_POSTED_REMINDER_TEXT;
+  const now = new Date().toISOString();
+
+  let sent = 0;
+  for (const co of results) {
+    const result = await sendTelegramMessageResult(env, co.owner_telegram_id, text);
+    if (result === 'transient') continue;
+    if (result === 'sent') sent++;
+    await env.DB.prepare('UPDATE companies SET never_posted_reminded_at = ? WHERE id = ?').bind(now, co.id).run();
+  }
+
+  return sent;
+}
+
 /** Applicants nobody answered. One message per employer, not per
  *  applicant — someone with eight unanswered responses has one problem,
  *  not eight. */
@@ -246,6 +291,20 @@ async function remindPendingCandidates(env: Env): Promise<number> {
   }
 
   return results.length;
+}
+
+/** Whether migration 0042 has been applied. */
+let neverPostedColumnConfirmed = false;
+
+async function neverPostedColumnExists(env: Env): Promise<boolean> {
+  if (neverPostedColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(companies)').all<{ name: string }>();
+    neverPostedColumnConfirmed = results.some((r) => r.name === 'never_posted_reminded_at');
+    return neverPostedColumnConfirmed;
+  } catch {
+    return false;
+  }
 }
 
 /** Whether migration 0041 has been applied — same caution as the other
@@ -419,6 +478,16 @@ export async function runReminders(env: Env): Promise<void> {
     console.log('pending-candidate reminders sent', pending);
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
+  }
+
+  try {
+    if (await neverPostedColumnExists(env)) {
+      console.log('never-posted reminders sent', await remindNeverPostedEmployers(env));
+    } else {
+      console.error('never-posted reminders skipped — migration 0042_employer_activation is not applied');
+    }
+  } catch (err) {
+    console.error('never-posted reminders failed', err);
   }
 
   try {

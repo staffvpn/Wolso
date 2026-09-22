@@ -26,6 +26,7 @@ import sql0039 from '../../migrations/0039_promos.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
 import sql0040 from '../../migrations/0040_achievements.sql';
 import sql0041 from '../../migrations/0041_winback.sql';
+import sql0042 from '../../migrations/0042_employer_activation.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -73,6 +74,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'workers', column: 'last_seen_at', migration: '0041_winback', breaks: 'напоминание тем, кто давно не заходил, и стрик-бейджи' },
   { table: 'workers', column: 'login_streak_days', migration: '0041_winback', breaks: 'стрик-бейджи за заходы подряд' },
   { table: 'companies', column: 'last_seen_at', migration: '0041_winback', breaks: 'учёт последнего захода у работодателя' },
+  { table: 'companies', column: 'never_posted_reminded_at', migration: '0042_employer_activation', breaks: 'напоминание работодателю без ни одной смены' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -119,6 +121,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0036_pay_mode': sql0036,
   '0040_achievements': sql0040,
   '0041_winback': sql0041,
+  '0042_employer_activation': sql0042,
 };
 
 /** Strips the explanatory comments and splits into individual statements,
