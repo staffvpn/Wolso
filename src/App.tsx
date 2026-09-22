@@ -15,6 +15,7 @@ import { Responses } from './screens/worker/Responses';
 import { Shifts } from './screens/worker/Shifts';
 import { ShiftCheckout } from './screens/worker/ShiftCheckout';
 import { WorkerProfileScreen } from './screens/worker/Profile';
+import { Achievements } from './screens/worker/Achievements';
 import { Wallet } from './screens/worker/Wallet';
 import { Settings } from './screens/worker/Settings';
 import { Favorites } from './screens/worker/Favorites';
@@ -85,6 +86,7 @@ export default function App() {
               <Route path="/w/chats/:chatId" element={<ChatDetail />} />
               <Route path="/w/checkout/:applicationId" element={<ShiftCheckout />} />
               <Route path="/w/wallet" element={<Wallet />} />
+              <Route path="/w/achievements" element={<Achievements />} />
               <Route path="/w/settings" element={<Settings />} />
               <Route path="/w/favorites" element={<Favorites />} />
               <Route path="/w/notifications" element={<Notifications />} />

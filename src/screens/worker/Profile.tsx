@@ -1,14 +1,16 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, EyeOff, Pencil, Plus } from 'lucide-react';
+import { Camera, ChevronRight, EyeOff, Pencil, Plus, Send } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
 import { Card, SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { useProfileStore } from '@/store/useProfileStore';
-import { FEATURES } from '@/lib/features';
 import { formatExperience, formatRating } from '@/lib/format';
+import { openExternal, hapticSelect } from '@/lib/telegram';
+
+const CHANNEL_URL = 'https://t.me/wolsoapp';
 
 export function WorkerProfileScreen() {
   const navigate = useNavigate();
@@ -28,26 +30,46 @@ export function WorkerProfileScreen() {
   // 20 px в пустоту.
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
-      <div className="flex items-center gap-4">
-        <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[20px] font-extrabold truncate">
-            {profile.name}
-            {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
-          </h1>
-          <p className="text-[13px] text-text-muted">{positions[0]?.positionLabel} · {profile.city}</p>
-          <button onClick={() => navigate('/w/reviews')} className="flex items-center gap-1 mt-1 text-left">
-            <span className="text-accent text-[13px] font-bold">{formatRating(profile.rating)}</span>
-            <span className="text-text-faint text-[13px]">· {profile.shiftsCompleted} смен</span>
-            <ChevronRight size={13} className="text-text-faint" />
-          </button>
-        </div>
+      <div
+        className="relative rounded-card overflow-hidden p-5 flex flex-col items-center text-center"
+        style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
+      >
         <button
           onClick={() => navigate('/w/profile/edit')}
           aria-label="Редактировать профиль"
-          className="h-9 w-9 rounded-full bg-surface-2 flex items-center justify-center shrink-0"
+          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center"
         >
-          <Pencil size={15} className="text-text-muted" />
+          <Pencil size={15} className="text-white" />
+        </button>
+        <Avatar name={profile.name} src={profile.avatarUrl} size={80} className="rounded-2xl ring-[3px] ring-accent" />
+        <h1 className="text-[19px] font-extrabold mt-3">
+          {profile.name}
+          {profile.age && <span className="font-medium text-text-muted">, {profile.age}</span>}
+        </h1>
+        <p className="text-[13px] text-text-muted mt-0.5">{positions[0]?.positionLabel} · {profile.city}</p>
+      </div>
+
+      {/* Смены и рейтинг живут только тут — раньше рейтинг дублировался
+          строкой прямо под именем. Клик по «рейтинг» ведёт туда же, куда
+          раньше вела та строка — на отзывы. Стаж — сумма месяцев по всем
+          позициям ниже, а не отдельное число, взятое с потолка. */}
+      <div className="flex gap-2 mt-4">
+        <Card className="flex-1 p-3 text-center">
+          <p className="text-[18px] font-extrabold">{profile.shiftsCompleted}</p>
+          <p className="text-[10.5px] text-text-muted mt-1">смены</p>
+        </Card>
+        <Card className="flex-1 p-3 text-center">
+          <p className="text-[15px] font-extrabold whitespace-nowrap">
+            {positions.length > 0 ? formatExperience(positions.reduce((sum, p) => sum + p.months, 0)) : '—'}
+          </p>
+          <p className="text-[10.5px] text-text-muted mt-1">общий стаж</p>
+        </Card>
+        <button
+          onClick={() => navigate('/w/reviews')}
+          className="flex-1 rounded-card bg-surface border border-border-soft p-3 text-center"
+        >
+          <p className="text-[18px] font-extrabold">{formatRating(profile.rating)}</p>
+          <p className="text-[10.5px] text-text-muted mt-1">рейтинг</p>
         </button>
       </div>
 
@@ -98,7 +120,12 @@ export function WorkerProfileScreen() {
         Ищу: {profile.lookingFor === 'shift' ? 'смены' : profile.lookingFor === 'permanent' ? 'постоянную работу' : 'смены и постоянную работу'}
       </p>
 
-      {profile.bio && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{profile.bio}</p>}
+      {profile.bio && (
+        <Card className="p-4 mt-4">
+          <SectionLabel className="mb-1.5">О себе</SectionLabel>
+          <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{profile.bio}</p>
+        </Card>
+      )}
 
       {profile.skills && (
         <div className="mt-3">
@@ -134,11 +161,9 @@ export function WorkerProfileScreen() {
 
       <div className="mt-6">
         <Card className="divide-y divide-border-soft px-1">
-          {FEATURES.payments && (
-            <div className="px-3">
-              <ListRow label="Кошелёк" onClick={() => navigate('/w/wallet')} />
-            </div>
-          )}
+          <div className="px-3">
+            <ListRow label="Достижения" onClick={() => navigate('/w/achievements')} />
+          </div>
           <div className="px-3">
             <ListRow label="Избранное" onClick={() => navigate('/w/favorites')} />
           </div>
@@ -147,6 +172,23 @@ export function WorkerProfileScreen() {
           </div>
         </Card>
       </div>
+
+      <button
+        onClick={() => {
+          hapticSelect();
+          openExternal(CHANNEL_URL, 'telegram');
+        }}
+        className="mt-4 w-full flex items-center gap-3 rounded-card bg-accent-soft border border-border-soft p-3.5 text-left"
+      >
+        <span className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center text-accent-fg shrink-0">
+          <Send size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-bold text-text">Канал Wolso в Telegram</span>
+          <span className="block text-[11.5px] text-text-muted mt-0.5">Новости и смены, которых нет в ленте</span>
+        </span>
+        <ChevronRight size={15} className="text-text-faint shrink-0" />
+      </button>
     </div>
   );
 }

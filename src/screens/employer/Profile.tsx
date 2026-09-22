@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Pencil } from 'lucide-react';
+import { ChevronRight, Pencil, Send } from 'lucide-react';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Card, SectionLabel } from '@/components/ui/Card';
@@ -10,6 +10,9 @@ import { useCompanyStore } from '@/store/useCompanyStore';
 import { useEmployerStore } from '@/store/useEmployerStore';
 import { FEATURES } from '@/lib/features';
 import { formatRating } from '@/lib/format';
+import { openExternal, hapticSelect } from '@/lib/telegram';
+
+const CHANNEL_URL = 'https://t.me/wolsoapp';
 
 export function EmployerProfileScreen() {
   const navigate = useNavigate();
@@ -33,35 +36,55 @@ export function EmployerProfileScreen() {
   // 20 px в пустоту.
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden px-5 pt-5 safe-top pb-4">
-      <div className="flex items-center gap-4">
-        {company.avatarUrl ? (
-          <Avatar src={company.avatarUrl} name={company.name} size={64} className="rounded-2xl" />
-        ) : (
-          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={64} />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-[20px] font-extrabold truncate">{company.name}</h1>
-          </div>
-          <p className="text-[13px] text-text-muted">
-            {company.address}
-            {company.foundedYear && ` · с ${company.foundedYear}`}
-          </p>
-          <button onClick={() => navigate('/e/reviews')} className="flex items-center gap-1 mt-0.5 text-left">
-            <span className="text-accent text-[13px] font-bold">{formatRating(company.rating)} · {company.reviewsCount} отзывов</span>
-            <ChevronRight size={13} className="text-text-faint" />
-          </button>
-        </div>
+      <div
+        className="relative rounded-card overflow-hidden p-5 flex flex-col items-center text-center"
+        style={{ background: 'radial-gradient(120% 100% at 50% 0%, var(--color-accent-soft), transparent 65%)' }}
+      >
         <button
           onClick={() => navigate('/e/profile/edit')}
           aria-label="Редактировать профиль"
-          className="h-9 w-9 rounded-full bg-surface-2 flex items-center justify-center shrink-0"
+          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur flex items-center justify-center"
         >
-          <Pencil size={15} className="text-text-muted" />
+          <Pencil size={15} className="text-white" />
+        </button>
+        {company.avatarUrl ? (
+          <Avatar src={company.avatarUrl} name={company.name} size={80} className="rounded-2xl ring-[3px] ring-accent" />
+        ) : (
+          <LogoBadge initial={company.logoInitial} color={company.logoColor} size={80} className="ring-[3px] ring-accent" />
+        )}
+        <h1 className="text-[19px] font-extrabold mt-3 truncate max-w-full">{company.name}</h1>
+        <p className="text-[13px] text-text-muted mt-0.5">
+          {company.address}
+          {company.foundedYear && ` · с ${company.foundedYear}`}
+        </p>
+      </div>
+
+      {/* Рейтинг и число отзывов — только в третьей плитке ниже, не
+          повторяются строкой под названием, как раньше. */}
+      <div className="flex gap-2 mt-4">
+        <Card className="flex-1 p-3 text-center">
+          <p className="text-[18px] font-extrabold">{vacancies.length}</p>
+          <p className="text-[10.5px] text-text-muted mt-1">смен опубл.</p>
+        </Card>
+        <Card className="flex-1 p-3 text-center">
+          <p className="text-[18px] font-extrabold">{hires}</p>
+          <p className="text-[10.5px] text-text-muted mt-1">нанято</p>
+        </Card>
+        <button
+          onClick={() => navigate('/e/reviews')}
+          className="flex-1 rounded-card bg-surface border border-border-soft p-3 text-center"
+        >
+          <p className="text-[18px] font-extrabold">{formatRating(company.rating)}</p>
+          <p className="text-[10.5px] text-text-muted mt-1">{company.reviewsCount} отзывов</p>
         </button>
       </div>
 
-      {company.description && <p className="text-[14px] text-text leading-relaxed mt-4 whitespace-pre-line">{company.description}</p>}
+      {company.description && (
+        <Card className="p-4 mt-4">
+          <SectionLabel className="mb-1.5">О компании</SectionLabel>
+          <p className="text-[13px] text-text leading-relaxed whitespace-pre-line">{company.description}</p>
+        </Card>
+      )}
 
       {(company.photos ?? []).length > 0 && (
         <div className="mt-4 flex gap-2 overflow-x-auto -mx-5 px-5">
@@ -70,17 +93,6 @@ export function EmployerProfileScreen() {
           ))}
         </div>
       )}
-
-      <div className="flex gap-3 mt-6">
-        <Card className="flex-1 p-4">
-          <p className="text-[22px] font-extrabold">{vacancies.length}</p>
-          <p className="text-[12px] text-text-muted mt-0.5">смен опубликовано</p>
-        </Card>
-        <Card className="flex-1 p-4">
-          <p className="text-[22px] font-extrabold">{hires}</p>
-          <p className="text-[12px] text-text-muted mt-0.5">человек нанято</p>
-        </Card>
-      </div>
 
       {FEATURES.payments && (
         <div className="mt-6">
@@ -110,6 +122,23 @@ export function EmployerProfileScreen() {
           Wolso Business · тарифы скоро
         </Badge>
       </div>
+
+      <button
+        onClick={() => {
+          hapticSelect();
+          openExternal(CHANNEL_URL, 'telegram');
+        }}
+        className="mt-4 w-full flex items-center gap-3 rounded-card bg-accent-soft border border-border-soft p-3.5 text-left"
+      >
+        <span className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center text-accent-fg shrink-0">
+          <Send size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-bold text-text">Канал Wolso в Telegram</span>
+          <span className="block text-[11.5px] text-text-muted mt-0.5">Новости и смены, которых нет в ленте</span>
+        </span>
+        <ChevronRight size={15} className="text-text-faint shrink-0" />
+      </button>
     </div>
   );
 }
