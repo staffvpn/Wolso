@@ -111,11 +111,20 @@ input[type="date"] {
  * (close / collapse / ⋯) occupy, which is present even in fullscreen mode.
  * The env() fallback covers plain-browser / pre-bridge rendering.
  */
+/* margin, не padding: почти везде эти классы стоят на одном элементе
+ * рядом с обычным pt- / pb- (например `pt-5 safe-top`). Tailwind v4
+ * кладёт свои утилиты в @layer utilities, а это правило — обычный,
+ * ничем не обёрнутый CSS, и по спецификации слоёв он всегда побеждает
+ * слой utilities независимо от порядка классов в className. Держи это
+ * правило на padding — и pt-5 просто переставал существовать: отступ
+ * становился РОВНО отступом безопасной зоны, без запаса дизайна поверх
+ * него, и контент упирался прямо в плавающую шапку Telegram. margin —
+ * отдельное свойство, оно складывается с padding, а не спорит за него. */
 .safe-top {
-  padding-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
+  margin-top: var(--tg-safe-top, env(safe-area-inset-top, 0px));
 }
 .safe-bottom {
-  padding-bottom: var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px));
+  margin-bottom: var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 .wolso-slider {
