@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, requirePermission } from '../middleware/auth';
 import { notifyAdmin } from '../lib/adminNotify';
+import { runReminders, type ReminderRunSummary } from '../lib/reminders';
 import sql0014 from '../../migrations/0014_shift_close_reviews.sql';
 import sql0015 from '../../migrations/0015_chat_notify_cooldown.sql';
 import sql0016 from '../../migrations/0016_invite_and_cancel_flow.sql';
@@ -187,6 +188,17 @@ adminSchemaHealthRoutes.post('/test-alert', requirePermission('viewTechHealth'),
 
   await notifyAdmin(c.env, '🔔 Проверка уведомлений Wolso\nЕсли вы это видите — оповещения настроены и работают.');
   return c.json({ ok: true });
+});
+
+/** Runs the exact same reminder jobs the hourly cron does, on demand —
+ *  for checking a freshly applied migration actually works, or just not
+ *  wanting to wait for the next tick. Real sends, not a dry run: anyone
+ *  who currently qualifies (an employer with an unanswered applicant past
+ *  the wait window, a worker who's been away, and so on) gets the real
+ *  message, same as the cron would give them within the hour anyway. */
+adminSchemaHealthRoutes.post('/run-reminders', requirePermission('viewTechHealth'), async (c) => {
+  const summary: ReminderRunSummary = await runReminders(c.env);
+  return c.json({ ok: true, summary });
 });
 
 /** The my_chat_member webhook (see routes/bot.ts) has to be registered

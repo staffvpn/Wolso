@@ -458,65 +458,89 @@ async function shiftReminderColumnExists(env: Env): Promise<boolean> {
   }
 }
 
-/** Entry point for the cron trigger. Never throws: a scheduled handler
- *  that fails does so invisibly, so each job is isolated and logged. */
-export async function runReminders(env: Env): Promise<void> {
+/** One line per job: how many messages actually went out, or why none did
+ *  ('skipped' — migration not applied, 'failed' — threw). Returned so the
+ *  admin dashboard's manual "run now" button (see admin/schemaHealth.ts)
+ *  can show something more useful than "done" — the cron entry point below
+ *  just logs the same shape and ignores the return value. */
+export type ReminderJobResult = number | 'skipped' | 'failed';
+export type ReminderRunSummary = Record<string, ReminderJobResult>;
+
+/** Entry point for the cron trigger (and the admin "run now" button).
+ *  Never throws: a scheduled handler that fails does so invisibly, so each
+ *  job is isolated, logged, and recorded in the summary independently of
+ *  whether the others succeeded. */
+export async function runReminders(env: Env): Promise<ReminderRunSummary> {
+  const summary: ReminderRunSummary = {};
+
   if (!(await reminderColumnsExist(env))) {
     console.error('reminders skipped — migration 0028_reminders is not applied');
-    return;
+    summary.all = 'skipped';
+    return summary;
   }
 
   try {
-    const signups = await remindUnfinishedSignups(env);
-    console.log('signup reminders sent', signups);
+    summary.signupReminders = await remindUnfinishedSignups(env).then((r) => r.workers + r.companies);
   } catch (err) {
     console.error('signup reminders failed', err);
+    summary.signupReminders = 'failed';
   }
 
   try {
-    const pending = await remindPendingCandidates(env);
-    console.log('pending-candidate reminders sent', pending);
+    summary.pendingCandidateReminders = await remindPendingCandidates(env);
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
+    summary.pendingCandidateReminders = 'failed';
   }
 
   try {
     if (await neverPostedColumnExists(env)) {
-      console.log('never-posted reminders sent', await remindNeverPostedEmployers(env));
+      summary.neverPostedReminders = await remindNeverPostedEmployers(env);
     } else {
       console.error('never-posted reminders skipped — migration 0042_employer_activation is not applied');
+      summary.neverPostedReminders = 'skipped';
     }
   } catch (err) {
     console.error('never-posted reminders failed', err);
+    summary.neverPostedReminders = 'failed';
   }
 
   try {
     if (await winbackColumnsExist(env)) {
-      console.log('win-back reminders sent', await remindDormantWorkers(env));
+      summary.winbackReminders = await remindDormantWorkers(env);
     } else {
       console.error('win-back reminders skipped — migration 0041_winback is not applied');
+      summary.winbackReminders = 'skipped';
     }
   } catch (err) {
     console.error('win-back reminders failed', err);
+    summary.winbackReminders = 'failed';
   }
 
   try {
     if (await photoReminderColumnExists(env)) {
-      console.log('own-photo reminders sent', await remindTelegramPhotos(env));
+      summary.ownPhotoReminders = await remindTelegramPhotos(env);
     } else {
       console.error('own-photo reminders skipped — migration 0035_own_photo_reminder is not applied');
+      summary.ownPhotoReminders = 'skipped';
     }
   } catch (err) {
     console.error('own-photo reminders failed', err);
+    summary.ownPhotoReminders = 'failed';
   }
 
   try {
     if (await shiftReminderColumnExists(env)) {
-      console.log('shift reminders sent', await remindUpcomingShifts(env));
+      summary.shiftReminders = await remindUpcomingShifts(env);
     } else {
       console.error('shift reminders skipped — migration 0030_notification_settings is not applied');
+      summary.shiftReminders = 'skipped';
     }
   } catch (err) {
     console.error('shift reminders failed', err);
+    summary.shiftReminders = 'failed';
   }
+
+  console.log('reminders run', summary);
+  return summary;
 }

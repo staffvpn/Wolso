@@ -99,6 +99,69 @@ function RecomputeRatingsCard() {
   );
 }
 
+const REMINDER_JOB_LABELS: Record<string, string> = {
+  signupReminders: 'Незаконченные анкеты',
+  pendingCandidateReminders: 'Отклики без ответа',
+  neverPostedReminders: 'Ни одной опубликованной смены',
+  winbackReminders: 'Давно не заходили',
+  ownPhotoReminders: 'Фото из Telegram вместо своего',
+  shiftReminders: 'Смена скоро начнётся',
+};
+
+/** Same jobs the hourly cron runs, fired right now — for a migration
+ *  that was just applied and doesn't need to wait for the next tick, or
+ *  just to see whether anyone currently qualifies. Real sends: an
+ *  employer with an unanswered applicant right now gets the real
+ *  message, exactly like the cron would give them within the hour. */
+function RunRemindersCard() {
+  const [state, setState] = useState<'idle' | 'busy'>('idle');
+  const [summary, setSummary] = useState<Record<string, number | string> | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  async function run() {
+    setState('busy');
+    setSummary(null);
+    setFailed(false);
+    try {
+      const { summary } = await apiFetch<{ summary: Record<string, number | string> }>('/admin/health/run-reminders', {
+        method: 'POST',
+      });
+      setSummary(summary);
+    } catch {
+      setFailed(true);
+    } finally {
+      setState('idle');
+    }
+  }
+
+  return (
+    <Card className="p-6 sm:col-span-2">
+      <SectionLabel className="mb-4">Авто-напоминания в боте</SectionLabel>
+      <p className="text-[13px] text-text-muted leading-relaxed mb-4">
+        Запускает все напоминания прямо сейчас, не дожидаясь часового крона — незаконченные анкеты, отклики без ответа,
+        работодателей без единой смены, тех, кто давно не заходил, и так далее. Это реальная отправка: кому сейчас
+        положено сообщение по условиям — тот его получит, так же как получил бы в течение часа и без этой кнопки.
+      </p>
+      <Button variant="dark" disabled={state === 'busy'} onClick={run}>
+        {state === 'busy' ? 'Запускаем…' : 'Запустить напоминания сейчас'}
+      </Button>
+      {failed && <p className="text-[13px] mt-2.5 text-danger leading-relaxed">Не получилось запустить — проверьте, что воркер задеплоен.</p>}
+      {summary && (
+        <ul className="text-[13px] mt-3 leading-relaxed text-text-muted space-y-0.5">
+          {Object.entries(summary).map(([key, value]) => (
+            <li key={key}>
+              {REMINDER_JOB_LABELS[key] ?? key}:{' '}
+              <span className={cn(value === 'failed' && 'text-danger', typeof value === 'number' && value > 0 && 'text-accent')}>
+                {value === 'skipped' ? 'пропущено — миграция не применена' : value === 'failed' ? 'ошибка' : `отправлено ${value}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 interface WebhookState {
   connected: boolean;
   otherUrl: boolean;
@@ -334,6 +397,8 @@ export function Settings() {
         </Card>
 
         <RecomputeRatingsCard />
+
+        <RunRemindersCard />
 
         <WebhookCard />
 
