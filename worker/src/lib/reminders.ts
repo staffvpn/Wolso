@@ -14,10 +14,11 @@ import { photoReminderColumnExists } from './ownPhoto';
  *  written down before the next run can consider the same account. */
 
 /** How long someone gets to finish their profile in peace before the
- *  reminder goes out. Short enough to catch them the next day while they
- *  still remember signing up, long enough that someone who is filling the
- *  form in right now never gets nagged mid-typing. */
-const SIGNUP_REMINDER_AFTER_HOURS = 20;
+ *  reminder goes out. Short — someone who opened the app, started an
+ *  anketa and left within the hour is the exact person who forgets to
+ *  come back at all; catching them same-day while it's still fresh beats
+ *  catching them the next day after they've moved on. */
+const SIGNUP_REMINDER_AFTER_HOURS = 2;
 
 /** How long an applicant can sit unanswered before the employer hears
  *  about it. A shift is a time-sensitive thing — a worker waiting even a
