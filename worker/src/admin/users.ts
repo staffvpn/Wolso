@@ -27,6 +27,25 @@ async function activeOwnerCount(env: Env): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** Every column of `table` except `avatar_data`, qualified with `alias.` —
+ *  reads them from PRAGMA rather than hardcoding the list, the same way
+ *  the rest of this file checks for hand-applied migrations, since a
+ *  migration can be a step ahead or behind the deployed code. The list
+ *  screens (`/seekers`, `/employers`) don't render an avatar at all, but
+ *  `SELECT w.*` / `SELECT co.*` was still pulling the whole BLOB — and
+ *  Hono re-serialising it to JSON as a byte array — for every one of up
+ *  to 200 rows. That's what was blowing the worker's CPU budget and
+ *  turning the request into a 503; the picture itself is only ever
+ *  needed for one person at a time, on the detail screen. */
+async function columnsExcludingAvatar(env: Env, table: 'workers' | 'companies', alias: string): Promise<string> {
+  const { results } = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+  return results
+    .map((r) => r.name)
+    .filter((name) => name !== 'avatar_data')
+    .map((name) => `${alias}.${name}`)
+    .join(', ');
+}
+
 adminUserRoutes.get('/team', requireStaffMiddleware, async (c) => {
   const { results } = await c.env.DB.prepare(
     'SELECT s.*, r.name as role_name FROM staff s JOIN roles r ON r.id = s.role_id ORDER BY s.created_at ASC',
@@ -42,13 +61,14 @@ adminUserRoutes.get('/team', requireStaffMiddleware, async (c) => {
  *  list, so the person appeared twice. */
 adminUserRoutes.get('/seekers', requireStaffMiddleware, async (c) => {
   const search = c.req.query('q');
+  const cols = await columnsExcludingAvatar(c.env, 'workers', 'w');
   // LEFT JOIN, not JOIN: a handful of accounts predate the telegram_accounts
   // table and have never logged in since — those still belong in this list
   // by default (only an explicit 'employer' lock hides them).
   const sql = search
-    ? `SELECT w.* FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+    ? `SELECT ${cols} FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
        WHERE (t.active_role = 'worker' OR t.active_role IS NULL) AND w.name LIKE ? ORDER BY w.created_at DESC LIMIT 200`
-    : `SELECT w.* FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
+    : `SELECT ${cols} FROM workers w LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
        WHERE t.active_role = 'worker' OR t.active_role IS NULL ORDER BY w.created_at DESC LIMIT 200`;
   const { results } = await (search ? c.env.DB.prepare(sql).bind(`%${search}%`) : c.env.DB.prepare(sql)).all();
   return c.json({ seekers: results });
@@ -56,10 +76,11 @@ adminUserRoutes.get('/seekers', requireStaffMiddleware, async (c) => {
 
 adminUserRoutes.get('/employers', requireStaffMiddleware, async (c) => {
   const search = c.req.query('q');
+  const cols = await columnsExcludingAvatar(c.env, 'companies', 'co');
   const sql = search
-    ? `SELECT co.* FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
+    ? `SELECT ${cols} FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
        WHERE (t.active_role = 'employer' OR t.active_role IS NULL) AND co.name LIKE ? ORDER BY co.created_at DESC LIMIT 200`
-    : `SELECT co.* FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
+    : `SELECT ${cols} FROM companies co LEFT JOIN telegram_accounts t ON t.telegram_id = co.owner_telegram_id
        WHERE t.active_role = 'employer' OR t.active_role IS NULL ORDER BY co.created_at DESC LIMIT 200`;
   const { results } = await (search ? c.env.DB.prepare(sql).bind(`%${search}%`) : c.env.DB.prepare(sql)).all();
   return c.json({ employers: results });
