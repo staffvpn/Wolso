@@ -131,10 +131,10 @@ export function WorkerProfileScreen() {
       )}
 
       {profile.skills && (
-        <div className="mt-3">
-          <SectionLabel>Навыки</SectionLabel>
+        <Card className="p-4 mt-3">
+          <SectionLabel className="mb-1.5">Навыки</SectionLabel>
           <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{profile.skills}</p>
-        </div>
+        </Card>
       )}
 
       {profile.photos.length > 0 && (

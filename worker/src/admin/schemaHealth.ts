@@ -24,6 +24,7 @@ import sql0036 from '../../migrations/0036_pay_mode.sql';
 import sql0037 from '../../migrations/0037_hidden_review_request.sql';
 import sql0039 from '../../migrations/0039_promos.sql';
 import sql0031 from '../../migrations/0031_complaints_and_employer_settings.sql';
+import sql0040 from '../../migrations/0040_achievements.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -79,6 +80,8 @@ const REQUIRED_TABLES: { table: string; migration: string; breaks: string }[] = 
   { table: 'user_notes', migration: '0031_complaints_and_employer_settings', breaks: 'заметки по пользователю' },
   { table: 'promos', migration: '0039_promos', breaks: 'рекламные карточки в ленте' },
   { table: 'promo_views', migration: '0039_promos', breaks: 'дневной потолок показов рекламы' },
+  { table: 'achievements', migration: '0040_achievements', breaks: 'достижения соискателей' },
+  { table: 'worker_achievements', migration: '0040_achievements', breaks: 'достижения соискателей' },
 ];
 
 /** The real migration files, bundled in as text (see the Text rule in
@@ -110,6 +113,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0034_shift_date_set': sql0034,
   '0035_own_photo_reminder': sql0035,
   '0036_pay_mode': sql0036,
+  '0040_achievements': sql0040,
 };
 
 /** Strips the explanatory comments and splits into individual statements,
