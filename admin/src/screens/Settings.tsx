@@ -107,6 +107,7 @@ const REMINDER_JOB_LABELS: Record<string, string> = {
   winbackReminders: 'Давно не заходили',
   ownPhotoReminders: 'Фото из Telegram вместо своего',
   shiftReminders: 'Смена скоро начнётся',
+  closeShiftReminders: 'Прошедшие смены без закрытия',
   expiredShiftsDeleted: 'Просроченные незаполненные смены',
 };
 

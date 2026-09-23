@@ -60,6 +60,13 @@ const INVITE_REMINDER_COOLDOWN_HOURS = 1;
  *  this can clear a bigger batch per run than the notification jobs. */
 const EXPIRED_SHIFT_DELETE_BATCH = 200;
 
+/** How often an employer gets nagged about a confirmed hire whose shift
+ *  already happened but was never closed. Daily, not hourly — unlike an
+ *  invitation nobody's plans hinge on the timing of closing it out, but
+ *  left alone it quietly blocks the worker's shift count, rating and
+ *  achievements, and the review neither side can leave until it happens. */
+const CLOSE_SHIFT_REMINDER_COOLDOWN_HOURS = 24;
+
 /** One cron run touches at most this many accounts per reminder. A Worker
  *  invocation has a wall-clock budget and the Bot API has a rate limit;
  *  the next run picks up where this one stopped, because everything sent
@@ -533,6 +540,74 @@ async function deleteExpiredShiftVacancies(env: Env): Promise<number> {
   return results.length;
 }
 
+/** Whether migration 0044 has been applied. */
+let closeShiftReminderColumnConfirmed = false;
+
+async function closeShiftReminderColumnExists(env: Env): Promise<boolean> {
+  if (closeShiftReminderColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(applications)').all<{ name: string }>();
+    closeShiftReminderColumnConfirmed = results.some((r) => r.name === 'close_reminded_at');
+    return closeShiftReminderColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** The employer-side twin of remindUpcomingShifts below: a confirmed hire
+ *  whose shift has already happened, sitting there unclosed. Nothing
+ *  forces an employer back to a shift once it's over — no reminder was
+ *  ever the reason they'd notice — so it can sit indefinitely, and while
+ *  it does: the worker's shifts_completed and rating don't move, their
+ *  achievements don't update, and neither side's review exists (the
+ *  worker's own is gated on work_stage = 'employer_closed', same as the
+ *  close endpoint itself — see routes/employer.ts's /candidates/:appId/close).
+ *  Same eligibility check that endpoint uses (the shift's last day has to
+ *  have actually passed), so this never nags about something not yet
+ *  closable. Reuses `pending_reminder` — same "you have a decision
+ *  sitting in your queue" class of message as the unanswered-applicants
+ *  one, just a different queue. */
+async function remindUnclosedShifts(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT a.id, w.name as worker_name, s.position_label, co.id as company_id, co.owner_telegram_id, co.name as company_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE a.status = 'accepted'
+       AND a.closed_by_employer_at IS NULL
+       AND COALESCE(s.end_date, s.date) < date('now', '+3 hours')
+       AND (a.close_reminded_at IS NULL OR a.close_reminded_at <= datetime('now', ?))
+     ORDER BY COALESCE(s.end_date, s.date) ASC LIMIT ?`,
+  )
+    .bind(`-${CLOSE_SHIFT_REMINDER_COOLDOWN_HOURS} hours`, BATCH)
+    .all<{
+      id: number;
+      worker_name: string;
+      position_label: string;
+      company_id: number;
+      owner_telegram_id: number;
+      company_name: string;
+    }>();
+
+  const now = new Date().toISOString();
+  let sent = 0;
+
+  for (const r of results) {
+    await env.DB.prepare('UPDATE applications SET close_reminded_at = ? WHERE id = ?').bind(now, r.id).run();
+    const sentOk = await notifyCompany(
+      env,
+      { id: r.company_id, telegramId: r.owner_telegram_id },
+      'pending_reminder',
+      `Смена «${r.position_label}» с ${r.worker_name || 'исполнителем'} уже прошла, а вы её ещё не закрыли.\n\n` +
+        'Закройте её и оцените — без этого не обновится счётчик смен и рейтинг у исполнителя, и отзыв друг о друге вы оба оставить не сможете.',
+    );
+    if (sentOk) sent++;
+  }
+
+  return sent;
+}
+
 /** «Напоминание перед сменой» in Настройки used to be a switch with
  *  nothing behind it — no code anywhere sent such a message. This is it.
  *
@@ -708,6 +783,18 @@ export async function runReminders(env: Env): Promise<ReminderRunSummary> {
   } catch (err) {
     console.error('expired-shift cleanup failed', err);
     summary.expiredShiftsDeleted = 'failed';
+  }
+
+  try {
+    if (await closeShiftReminderColumnExists(env)) {
+      summary.closeShiftReminders = await remindUnclosedShifts(env);
+    } else {
+      console.error('close-shift reminders skipped — migration 0044_close_shift_reminder is not applied');
+      summary.closeShiftReminders = 'skipped';
+    }
+  } catch (err) {
+    console.error('close-shift reminders failed', err);
+    summary.closeShiftReminders = 'failed';
   }
 
   console.log('reminders run', summary);
