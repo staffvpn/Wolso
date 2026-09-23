@@ -41,6 +41,45 @@
   --radius-sheet: 1.5rem;
 }
 
+/* Светлая тема — тот же список переменных из @theme выше, переопределённый
+ * под [data-theme="light"] (ставится в lib/theme.ts на <html>, до первого
+ * рендера — см. main.tsx). Раз это переопределение того же custom property,
+ * а не второе объявление конфликтующего box-model свойства вроде padding, в
+ * игру не вступает баг с cascade layers, который сломал .safe-top: здесь
+ * обычная специфичность, и вся утилита вроде bg-surface у Tailwind и так
+ * читает var(--color-surface) в момент отрисовки, а не значение на этапе
+ * сборки. Акцент — не тот же #34d17c, что в тёмной: тот бледноват для
+ * текста на белом фоне, поэтому здесь он темнее (тот же тон, что
+ * --color-accent-dim у тёмной темы), а accent-fg — наоборот, светлый, раз
+ * сама заливка теперь тёмно-зелёная, а не салатовая. */
+:root[data-theme="light"] {
+  --color-accent: #1eab61;
+  --color-accent-dim: #157a45;
+  --color-accent-soft: rgba(30, 171, 97, 0.12);
+  --color-accent-fg: #ffffff;
+
+  --color-bg: #f5f6f1;
+  --color-bg-elevated: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #edf0e8;
+  --color-surface-hover: #e4e8de;
+  --color-border: #dfe3d8;
+  --color-border-soft: #ebeee5;
+
+  --color-text: #14170d;
+  --color-text-muted: #66705f;
+  --color-text-faint: #98a08c;
+
+  --color-danger: #d6394a;
+  --color-danger-soft: rgba(214, 57, 74, 0.1);
+  --color-warning: #b8791f;
+  --color-warning-soft: rgba(184, 121, 31, 0.12);
+
+  --color-info: #2f7dd1;
+  --color-info-soft: rgba(47, 125, 209, 0.1);
+  --color-info-fg: #ffffff;
+}
+
 html, body, #root {
   height: 100%;
 }

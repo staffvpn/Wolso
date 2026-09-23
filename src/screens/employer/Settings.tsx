@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TopBar } from '@/components/ui/TopBar';
 import { Toggle } from '@/components/ui/Toggle';
+import { ThemePicker } from '@/components/ui/ThemePicker';
 import { SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { useCompanyStore } from '@/store/useCompanyStore';
@@ -54,6 +55,9 @@ export function EmployerSettings() {
           </div>
         </div>
         {error && <p className="text-[13px] text-danger mt-2 leading-relaxed">{error}</p>}
+
+        <SectionLabel className="mt-6">Оформление</SectionLabel>
+        <ThemePicker />
 
         <SectionLabel className="mt-6">Заведение</SectionLabel>
         <div className="divide-y divide-border-soft">

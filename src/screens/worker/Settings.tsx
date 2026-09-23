@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Copy, Users2 } from 'lucide-react';
 import { TopBar } from '@/components/ui/TopBar';
 import { Toggle } from '@/components/ui/Toggle';
+import { ThemePicker } from '@/components/ui/ThemePicker';
 import { SectionLabel } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { IconButton } from '@/components/ui/IconButton';
@@ -89,6 +90,9 @@ export function Settings() {
           </div>
         </div>
         {error && <p className="text-[13px] text-danger mt-2 leading-relaxed">{error}</p>}
+
+        <SectionLabel className="mt-6">Оформление</SectionLabel>
+        <ThemePicker />
 
         <SectionLabel className="mt-6">Аккаунт</SectionLabel>
         <div className="divide-y divide-border-soft">

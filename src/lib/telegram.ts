@@ -4,6 +4,8 @@
  * too (no Telegram object present), which is how we develop/QA it.
  */
 
+import { getStoredTheme, themeChromeColor, type Theme } from './theme';
+
 export function getTelegram() {
   return typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
 }
@@ -46,9 +48,10 @@ export function bootstrapTelegram() {
     /* older client, ignore */
   }
 
-  tg.setHeaderColor?.('#0a0b0a');
-  tg.setBackgroundColor?.('#0a0b0a');
-  tg.setBottomBarColor?.('#0a0b0a');
+  const chromeColor = themeChromeColor(getStoredTheme());
+  tg.setHeaderColor?.(chromeColor);
+  tg.setBackgroundColor?.(chromeColor);
+  tg.setBottomBarColor?.(chromeColor);
   tg.enableClosingConfirmation();
 
   // `safeAreaInset` is the device notch/home-indicator area. `contentSafeAreaInset`
@@ -127,4 +130,17 @@ export function openExternal(url: string, kind: 'telegram' | 'site' = 'site') {
   }
   if (kind === 'telegram') tg.openTelegramLink(url);
   else tg.openLink(url);
+}
+
+/** Re-runs the three chrome calls bootstrapTelegram makes once at startup —
+ *  called live from the theme picker in Settings, so switching theme
+ *  doesn't leave Telegram's own frame (header, the area behind the app,
+ *  bottom bar) stuck on the old color around a freshly repainted app. */
+export function syncTelegramChrome(theme: Theme): void {
+  const tg = getTelegram();
+  if (!tg) return;
+  const color = themeChromeColor(theme);
+  tg.setHeaderColor?.(color);
+  tg.setBackgroundColor?.(color);
+  tg.setBottomBarColor?.(color);
 }
