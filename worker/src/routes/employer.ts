@@ -32,14 +32,23 @@ interface CompanyRow {
   ai_verification_summary: string | null;
 }
 
+/** Off while ИНН entry and admin verification are paused (temporary —
+ *  mirror of FEATURES.companyVerification on the client, which drives the
+ *  matching UI in CompleteEmployerProfile and AuthGate). Nothing about the
+ *  verification_status column or the admin review queue changes underneath
+ *  — turning this back on picks up right where it left off. */
+const COMPANY_VERIFICATION_ENABLED = false;
+
 /** Every field on this list must be present before a company profile counts
  *  as "complete" — see ProfileGate on the client. There's no Telegram photo
  *  fallback for companies (unlike workers), so the avatar has to be
  *  uploaded here. Completing the profile isn't the whole gate anymore —
  *  see verification_status below: a complete-but-unverified employer still
- *  can't publish vacancies or browse candidates until an admin approves it. */
+ *  can't publish vacancies or browse candidates until an admin approves it
+ *  (while COMPANY_VERIFICATION_ENABLED is on). */
 function companyIsComplete(company: CompanyRow) {
-  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data, !!company.inn];
+  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data];
+  if (COMPANY_VERIFICATION_ENABLED) fields.push(!!company.inn);
   return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
 }
 
@@ -90,6 +99,7 @@ async function loadCompanyProfile(env: Env, companyId: number) {
  *  profile is a different reason to block than an unfinished one, and the
  *  client shows a different screen for each (see ProfileGate/VerificationGate). */
 async function requireVerifiedCompany(env: Env, companyId: number): Promise<boolean> {
+  if (!COMPANY_VERIFICATION_ENABLED) return true;
   const row = await env.DB.prepare('SELECT verification_status FROM companies WHERE id = ?').bind(companyId).first<{
     verification_status: string;
   }>();
@@ -185,7 +195,7 @@ employerRoutes.patch('/me', async (c) => {
   const isComplete = after ? companyIsComplete(after).complete : false;
   const justCompleted = isComplete && !wasComplete;
   const resubmittingAfterRejection = isComplete && before.verification_status === 'rejected';
-  if (after && (justCompleted || resubmittingAfterRejection)) {
+  if (COMPANY_VERIFICATION_ENABLED && after && (justCompleted || resubmittingAfterRejection)) {
     await c.env.DB.prepare(
       "UPDATE companies SET verification_status = 'pending', verification_reason = NULL WHERE id = ?",
     )

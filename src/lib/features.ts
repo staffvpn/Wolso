@@ -22,4 +22,12 @@ export const FEATURES = {
    *  behind any of them, so every entry point is a promise the app can't
    *  keep. Turn on together with a real payment provider. */
   premium: false,
+  /** ИНН entry (CompleteEmployerProfile) and the admin-approval gate
+   *  (AuthGate's EmployerVerificationGate) — paused temporarily. Off means
+   *  a complete profile is enough to use the app; nothing about the
+   *  verification_status column or the admin queue changes underneath, so
+   *  turning this back on picks up right where it left off. Mirror of
+   *  COMPANY_VERIFICATION_ENABLED on the worker (routes/employer.ts) — flip
+   *  both together. */
+  companyVerification: false,
 } as const;

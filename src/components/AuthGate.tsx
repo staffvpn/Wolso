@@ -13,6 +13,7 @@ import { CompleteWorkerProfile } from '@/screens/onboarding/CompleteWorkerProfil
 import { CompleteEmployerProfile } from '@/screens/onboarding/CompleteEmployerProfile';
 import { EmployerVerificationPending } from '@/screens/onboarding/EmployerVerificationPending';
 import { ShiftCheckout } from '@/screens/worker/ShiftCheckout';
+import { FEATURES } from '@/lib/features';
 
 /** Every gate below blocks the entire app on one API call — if that call
  *  fails (and nothing here retries it automatically), showing the spinner
@@ -107,10 +108,15 @@ function EmployerVerificationGate({ children }: { children: ReactNode }) {
   // waiting so approval shows up without the employer having to relaunch
   // the app.
   useEffect(() => {
-    if (status !== 'pending') return;
+    if (!FEATURES.companyVerification || status !== 'pending') return;
     const interval = setInterval(load, 20000);
     return () => clearInterval(interval);
   }, [status, load]);
+
+  // Paused: a complete profile is enough, same as the worker side —
+  // nothing about verification_status itself changes underneath (see
+  // COMPANY_VERIFICATION_ENABLED on the worker), so this reverts cleanly.
+  if (!FEATURES.companyVerification) return <>{children}</>;
 
   if (status === 'rejected') return <CompleteEmployerProfile gate rejectionReason={rejectionReason} />;
   if (status === 'pending') return <EmployerVerificationPending />;

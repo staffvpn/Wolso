@@ -11,6 +11,7 @@ import { useCompanyStore } from '@/store/useCompanyStore';
 import { ApiError } from '@/lib/apiClient';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
+import { FEATURES } from '@/lib/features';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -60,7 +61,7 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
   if (!company) return null;
 
   const innDigits = inn.trim();
-  const innValid = /^\d{10}$|^\d{12}$/.test(innDigits);
+  const innValid = !FEATURES.companyVerification || /^\d{10}$|^\d{12}$/.test(innDigits);
 
   const missing: string[] = [];
   if (!name.trim()) missing.push('название');
@@ -68,7 +69,7 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
   if (!foundedYear) missing.push('год основания');
   // Same as the worker screen: «фото» didn't say which one.
   if (!company.avatarUrl) missing.push('главное фото');
-  if (!innDigits) missing.push('ИНН');
+  if (FEATURES.companyVerification && !innDigits) missing.push('ИНН');
 
   async function onAvatarChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -175,22 +176,24 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
             />
           </div>
 
-          <div>
-            <SectionLabel>
-              ИНН <span className="text-danger">*</span>
-            </SectionLabel>
-            <input
-              value={inn}
-              onChange={(e) => setInn(e.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="10 или 12 цифр"
-              inputMode="numeric"
-              className={FIELD_CLASS}
-              required
-            />
-            <p className="text-[12px] text-text-faint mt-1.5 leading-relaxed">
-              Мы запрашиваем ИНН, чтобы убедиться, что такое юридическое лицо действительно существует — это часть проверки перед публикацией вакансий.
-            </p>
-          </div>
+          {FEATURES.companyVerification && (
+            <div>
+              <SectionLabel>
+                ИНН <span className="text-danger">*</span>
+              </SectionLabel>
+              <input
+                value={inn}
+                onChange={(e) => setInn(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="10 или 12 цифр"
+                inputMode="numeric"
+                className={FIELD_CLASS}
+                required
+              />
+              <p className="text-[12px] text-text-faint mt-1.5 leading-relaxed">
+                Мы запрашиваем ИНН, чтобы убедиться, что такое юридическое лицо действительно существует — это часть проверки перед публикацией вакансий.
+              </p>
+            </div>
+          )}
 
           <div>
             <SectionLabel>Год основания</SectionLabel>
