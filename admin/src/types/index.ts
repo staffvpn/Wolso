@@ -261,11 +261,30 @@ export interface VacancyRecord {
   id: string;
   position: string;
   companyName: string;
+  companyAddress: string;
   city: string;
   hourlyRate: number;
+  totalPay: number;
+  payMode: 'hourly' | 'fixed';
   status: 'active' | 'closed' | 'rejected';
   responses: number;
   publishedMinAgo: number;
+  /** Everything below is exactly what the employer typed in when posting
+   *  it — the whole point of the detail panel is to show that verbatim,
+   *  not just the summary the list row needs. */
+  description: string;
+  requirements: string[];
+  meal: boolean;
+  urgent: boolean;
+  employmentType: 'shift' | 'permanent';
+  timeOfDay: 'morning' | 'day' | 'evening' | 'night';
+  date: string;
+  endDate?: string;
+  dates?: string[];
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
 }
 
 export interface DashboardDay {

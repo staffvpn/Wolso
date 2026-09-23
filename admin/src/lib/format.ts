@@ -48,6 +48,11 @@ export function formatDays(days: string[], maxListed = 4): string {
   return days.length > maxListed ? `${head} и ещё ${days.length - maxListed}` : head;
 }
 
+export function timeRange(startHour: number, startMin: number, endHour: number, endMin: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(startHour)}:${pad(startMin)}–${pad(endHour)}:${pad(endMin)}`;
+}
+
 export function formatMonthYear(date: Date) {
   return `${MONTHS_NOM[date.getMonth()]} ${date.getFullYear()}`;
 }

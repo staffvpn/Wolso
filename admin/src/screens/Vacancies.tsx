@@ -9,7 +9,8 @@ import { EmptyPanel } from '@/components/EmptyPanel';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useVacanciesStore } from '@/store/useVacanciesStore';
 import { useCan } from '@/store/useSessionStore';
-import { formatMoney, timeAgo } from '@/lib/format';
+import { SectionLabel } from '@/components/ui/Card';
+import { formatDays, formatMoney, timeAgo, timeRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { VacancyRecord } from '@/types';
 
@@ -18,6 +19,25 @@ const STATUS_BADGE: Record<VacancyRecord['status'], { label: string; tone: 'acce
   closed: { label: 'Закрыта', tone: 'neutral' },
   rejected: { label: 'Отклонена', tone: 'danger' },
 };
+
+const EMPLOYMENT_TYPE_LABEL: Record<VacancyRecord['employmentType'], string> = {
+  shift: 'Смена',
+  permanent: 'Постоянная работа',
+};
+
+const TIME_OF_DAY_LABEL: Record<VacancyRecord['timeOfDay'], string> = {
+  morning: 'Утро',
+  day: 'День',
+  evening: 'Вечер',
+  night: 'Ночь',
+};
+
+/** Same days list the employer picked, formatted the same way the mini-app
+ *  shows it back to them — see formatDays. A single day is just that date. */
+function scheduleLabel(v: VacancyRecord): string {
+  const days = v.dates && v.dates.length > 1 ? v.dates : [v.date];
+  return formatDays(days, 6);
+}
 
 export function Vacancies() {
   const vacancies = useVacanciesStore((s) => s.vacancies);
@@ -103,33 +123,81 @@ export function Vacancies() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
-          {!selected && <EmptyPanel title="Выберите вакансию" description="Нажмите на строку слева, чтобы увидеть подробности." />}
+        <Card className="lg:overflow-hidden flex flex-col">
+          {!selected && (
+            <div className="p-6">
+              <EmptyPanel title="Выберите вакансию" description="Нажмите на строку слева, чтобы увидеть подробности." />
+            </div>
+          )}
           {selected && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <Avatar name={selected.companyName} size={44} square />
-                <div>
-                  <p className="font-bold text-[17px] leading-tight">{selected.position}</p>
-                  <p className="text-[13px] text-text-muted mt-0.5">{selected.companyName} · {selected.city}</p>
+            <>
+              <div className="p-6 pb-0 lg:overflow-y-auto lg:min-h-0">
+                <div className="flex items-center gap-3 mb-4">
+                  <Avatar name={selected.companyName} size={44} square />
+                  <div>
+                    <p className="font-bold text-[17px] leading-tight">{selected.position}</p>
+                    <p className="text-[13px] text-text-muted mt-0.5">
+                      {selected.companyName} · {selected.city}
+                      {selected.companyAddress ? `, ${selected.companyAddress}` : ''}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 mb-5">
-                <Badge tone={STATUS_BADGE[selected.status].tone}>{STATUS_BADGE[selected.status].label}</Badge>
-                <Badge tone="neutral">{formatMoney(selected.hourlyRate)}/ч</Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-                  <p className="text-[11px] text-text-faint mb-0.5">Отклики</p>
-                  <p className="text-[14px] font-bold">{selected.responses}</p>
+
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                  <Badge tone={STATUS_BADGE[selected.status].tone}>{STATUS_BADGE[selected.status].label}</Badge>
+                  <Badge tone="neutral">{EMPLOYMENT_TYPE_LABEL[selected.employmentType]}</Badge>
+                  <Badge tone="neutral">{TIME_OF_DAY_LABEL[selected.timeOfDay]}</Badge>
+                  {selected.urgent && <Badge tone="warning">Срочно</Badge>}
+                  {selected.meal && <Badge tone="accent">Питание</Badge>}
                 </div>
-                <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-                  <p className="text-[11px] text-text-faint mb-0.5">Опубликовано</p>
-                  <p className="text-[14px] font-bold">{timeAgo(selected.publishedMinAgo)}</p>
+
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+                    <p className="text-[11px] text-text-faint mb-0.5">Отклики</p>
+                    <p className="text-[14px] font-bold">{selected.responses}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+                    <p className="text-[11px] text-text-faint mb-0.5">Опубликовано</p>
+                    <p className="text-[14px] font-bold">{timeAgo(selected.publishedMinAgo)}</p>
+                  </div>
                 </div>
+
+                <div className="mb-5">
+                  <SectionLabel className="mb-1.5">Оплата</SectionLabel>
+                  <p className="text-[14px] font-semibold text-text">
+                    {selected.payMode === 'fixed'
+                      ? `${formatMoney(selected.totalPay)} за ${selected.employmentType === 'permanent' ? 'день' : 'смену'}`
+                      : `${formatMoney(selected.hourlyRate)}/ч · ${formatMoney(selected.totalPay)} итого`}
+                  </p>
+                </div>
+
+                <div className="mb-5">
+                  <SectionLabel className="mb-1.5">Когда</SectionLabel>
+                  <p className="text-[14px] text-text">
+                    {scheduleLabel(selected)}, {timeRange(selected.startHour, selected.startMin, selected.endHour, selected.endMin)}
+                  </p>
+                </div>
+
+                {selected.description && (
+                  <div className="mb-5">
+                    <SectionLabel className="mb-1.5">Описание</SectionLabel>
+                    <p className="text-[14px] text-text leading-relaxed whitespace-pre-line">{selected.description}</p>
+                  </div>
+                )}
+
+                {selected.requirements.length > 0 && (
+                  <div className="mb-5">
+                    <SectionLabel className="mb-1.5">Требования</SectionLabel>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selected.requirements.map((r) => (
+                        <Badge key={r} tone="neutral">{r}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 p-6 pt-4 shrink-0">
                 {selected.status === 'active' && (
                   <Button variant="danger" className="w-full" disabled={!canManage} onClick={() => closeVacancy(selected.id)}>
                     Закрыть вакансию
@@ -144,7 +212,7 @@ export function Vacancies() {
                   Удалить навсегда
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </Card>
       </div>
