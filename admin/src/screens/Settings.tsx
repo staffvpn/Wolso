@@ -107,6 +107,7 @@ const REMINDER_JOB_LABELS: Record<string, string> = {
   winbackReminders: 'Давно не заходили',
   ownPhotoReminders: 'Фото из Telegram вместо своего',
   shiftReminders: 'Смена скоро начнётся',
+  expiredShiftsDeleted: 'Просроченные незаполненные смены',
 };
 
 /** Same jobs the hourly cron runs, fired right now — for a migration
@@ -153,7 +154,13 @@ function RunRemindersCard() {
             <li key={key}>
               {REMINDER_JOB_LABELS[key] ?? key}:{' '}
               <span className={cn(value === 'failed' && 'text-danger', typeof value === 'number' && value > 0 && 'text-accent')}>
-                {value === 'skipped' ? 'пропущено — миграция не применена' : value === 'failed' ? 'ошибка' : `отправлено ${value}`}
+                {value === 'skipped'
+                  ? 'пропущено — миграция не применена'
+                  : value === 'failed'
+                    ? 'ошибка'
+                    : key === 'expiredShiftsDeleted'
+                      ? `удалено ${value}`
+                      : `отправлено ${value}`}
               </span>
             </li>
           ))}

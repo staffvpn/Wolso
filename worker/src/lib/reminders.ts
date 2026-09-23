@@ -3,15 +3,17 @@ import { sendTelegramMessageResult } from './telegramBot';
 import { notifyCompany, notifyWorker } from './notifyPrefs';
 import { photoReminderColumnExists } from './ownPhoto';
 
-/** The two automatic bot reminders, run from the cron trigger (see
- *  wrangler.toml and the `scheduled` export in index.ts).
+/** Everything the hourly cron does (see wrangler.toml and the `scheduled`
+ *  export in index.ts) — mostly bot reminders, plus one cleanup job
+ *  (deleteExpiredShiftVacancies) that doesn't send anything at all.
  *
- *  Both are deliberately conservative. Telegram's rule of thumb is that a
- *  bot people don't want to hear from gets blocked, and a blocked bot
- *  stops delivering the messages that actually matter — invitations,
- *  cancellations, shift changes. So: one nudge ever for an unfinished
- *  registration, and a cooldown on the employer one, with every send
- *  written down before the next run can consider the same account. */
+ *  The notification jobs are deliberately conservative. Telegram's rule of
+ *  thumb is that a bot people don't want to hear from gets blocked, and a
+ *  blocked bot stops delivering the messages that actually matter —
+ *  invitations, cancellations, shift changes. So: mostly a nudge once or
+ *  on a cooldown, with every send written down before the next run can
+ *  consider the same account — remindUnansweredInvites is the deliberate
+ *  exception, with its own reasoning at its definition. */
 
 /** How long someone gets to finish their profile in peace before the
  *  reminder goes out. Short — someone who opened the app, started an
@@ -53,6 +55,10 @@ const NEVER_POSTED_REMINDER_AFTER_HOURS = 72;
  *  worker says anything at all in the chat with that employer. */
 const INVITE_REMINDER_AFTER_HOURS = 1;
 const INVITE_REMINDER_COOLDOWN_HOURS = 1;
+
+/** Deleting, not sending, so there's no Telegram rate limit to respect —
+ *  this can clear a bigger batch per run than the notification jobs. */
+const EXPIRED_SHIFT_DELETE_BATCH = 200;
 
 /** One cron run touches at most this many accounts per reminder. A Worker
  *  invocation has a wall-clock budget and the Bot API has a rate limit;
@@ -475,6 +481,49 @@ async function remindUnansweredInvites(env: Env): Promise<number> {
   return sent;
 }
 
+/** A one-off «смена» whose day (and, on its last day, its end time) is
+ *  fully in the past and that nobody was ever actually confirmed for is
+ *  just dead clutter in the feed and in search — not a record of anything
+ *  that happened, since nothing did. Deliberately narrow: «постоянная
+ *  работа» never expires this way (it isn't tied to a single date), and a
+ *  shift with even one 'accepted' application is left alone regardless of
+ *  its date — that's a real engagement, closed out through the normal
+ *  review flow (routes/applications.ts), not swept up here. A pending or
+ *  invited-but-never-answered application on an expiring shift has no such
+ *  history to preserve, so it goes with the shift (cascades — see
+ *  SHIFT_SELECT's callers for the same FK graph the admin's manual delete
+ *  relies on); the one thing that doesn't cascade is chats.shift_id
+ *  (ON DELETE SET NULL), hence the explicit delete below. */
+async function deleteExpiredShiftVacancies(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT s.id
+     FROM shifts s
+     WHERE s.status = 'active'
+       AND s.employment_type = 'shift'
+       AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.shift_id = s.id AND a.status = 'accepted')
+       AND (
+         COALESCE(s.end_date, s.date) < date('now', '+3 hours')
+         OR (
+           COALESCE(s.end_date, s.date) = date('now', '+3 hours')
+           AND (s.end_hour * 60 + s.end_min) <= (
+             CAST(strftime('%H', datetime('now', '+3 hours')) AS INTEGER) * 60
+             + CAST(strftime('%M', datetime('now', '+3 hours')) AS INTEGER)
+           )
+         )
+       )
+     LIMIT ?`,
+  )
+    .bind(EXPIRED_SHIFT_DELETE_BATCH)
+    .all<{ id: number }>();
+
+  for (const { id } of results) {
+    await env.DB.prepare('DELETE FROM chats WHERE shift_id = ?').bind(id).run();
+    await env.DB.prepare('DELETE FROM shifts WHERE id = ?').bind(id).run();
+  }
+
+  return results.length;
+}
+
 /** «Напоминание перед сменой» in Настройки used to be a switch with
  *  nothing behind it — no code anywhere sent such a message. This is it.
  *
@@ -643,6 +692,13 @@ export async function runReminders(env: Env): Promise<ReminderRunSummary> {
   } catch (err) {
     console.error('shift reminders failed', err);
     summary.shiftReminders = 'failed';
+  }
+
+  try {
+    summary.expiredShiftsDeleted = await deleteExpiredShiftVacancies(env);
+  } catch (err) {
+    console.error('expired-shift cleanup failed', err);
+    summary.expiredShiftsDeleted = 'failed';
   }
 
   console.log('reminders run', summary);
