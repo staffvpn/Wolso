@@ -426,6 +426,15 @@ async function inviteReminderColumnsExist(env: Env): Promise<boolean> {
  *  Reuses `employer_replies` — it's the same invitation notifyInvite
  *  already sends once, just repeated for someone who hasn't acted on it. */
 async function remindUnansweredInvites(env: Env): Promise<number> {
+  // Backfill for anyone invited before invited_at existed — otherwise
+  // every application already sitting in 'invited' when this shipped has
+  // invited_at NULL forever and the WHERE below never finds it, which is
+  // exactly backwards: those are the actual ignorers this was built for.
+  // created_at is the best stand-in available (the true invite moment
+  // isn't recorded pre-migration); idempotent, so running it every hour
+  // costs one no-op UPDATE once the backfill's done.
+  await env.DB.prepare("UPDATE applications SET invited_at = created_at WHERE status = 'invited' AND invited_at IS NULL").run();
+
   const { results } = await env.DB.prepare(
     `SELECT a.id, a.worker_id, a.shift_id, a.invited_at, w.telegram_id, s.position_label, s.company_id, co.name as company_name
      FROM applications a
