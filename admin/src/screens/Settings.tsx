@@ -102,6 +102,7 @@ function RecomputeRatingsCard() {
 const REMINDER_JOB_LABELS: Record<string, string> = {
   signupReminders: 'Незаконченные анкеты',
   pendingCandidateReminders: 'Отклики без ответа',
+  inviteReminders: 'Неотвеченные приглашения',
   neverPostedReminders: 'Ни одной опубликованной смены',
   winbackReminders: 'Давно не заходили',
   ownPhotoReminders: 'Фото из Telegram вместо своего',

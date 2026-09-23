@@ -896,7 +896,13 @@ employerRoutes.post('/vacancies/:shiftId/candidates/:appId/decide', async (c) =>
   if (app.status !== 'pending') return c.json({ error: 'already_decided' }, 409);
 
   const dbStatus = status === 'accepted' ? 'invited' : 'declined';
-  await c.env.DB.prepare('UPDATE applications SET status = ? WHERE id = ?').bind(dbStatus, appId).run();
+  await c.env.DB.prepare(
+    dbStatus === 'invited'
+      ? "UPDATE applications SET status = ?, invited_at = datetime('now'), invite_reminded_at = NULL WHERE id = ?"
+      : 'UPDATE applications SET status = ? WHERE id = ?',
+  )
+    .bind(dbStatus, appId)
+    .run();
 
   if (dbStatus === 'invited') {
     await notifyInvite(c, session.companyId, app.worker_id, shift);
@@ -944,12 +950,15 @@ employerRoutes.post('/vacancies/:shiftId/invite/:workerId', async (c) => {
     await c.env.DB.prepare(
       `UPDATE applications SET status = 'invited', work_stage = 'upcoming', check_in_at = NULL, closed_by_employer_at = NULL,
          rating = NULL, review_tags = NULL, review_comment = NULL,
-         cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL WHERE id = ?`,
+         cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL,
+         invited_at = datetime('now'), invite_reminded_at = NULL WHERE id = ?`,
     )
       .bind(existing.id)
       .run();
   } else {
-    await c.env.DB.prepare("INSERT INTO applications (shift_id, worker_id, status, work_stage) VALUES (?, ?, 'invited', 'upcoming')")
+    await c.env.DB.prepare(
+      "INSERT INTO applications (shift_id, worker_id, status, work_stage, invited_at) VALUES (?, ?, 'invited', 'upcoming', datetime('now'))",
+    )
       .bind(shiftId, workerId)
       .run();
   }

@@ -44,6 +44,16 @@ const DORMANT_REMINDER_COOLDOWN_DAYS = 4;
  *  just hasn't gotten to it yet isn't nagged the same day they signed up. */
 const NEVER_POSTED_REMINDER_AFTER_HOURS = 72;
 
+/** How long an invited worker gets before the first nudge, and how often
+ *  it repeats after that — deliberately as aggressive as the pending-
+ *  candidate one is conservative: an unanswered invitation is the one
+ *  thing on this list with an explicit ask to keep going every hour until
+ *  it's resolved, not just nudged once. It still stops the moment it's
+ *  resolved (see remindUnansweredInvites) — accepted, declined, or the
+ *  worker says anything at all in the chat with that employer. */
+const INVITE_REMINDER_AFTER_HOURS = 1;
+const INVITE_REMINDER_COOLDOWN_HOURS = 1;
+
 /** One cron run touches at most this many accounts per reminder. A Worker
  *  invocation has a wall-clock budget and the Bot API has a rate limit;
  *  the next run picks up where this one stopped, because everything sent
@@ -384,6 +394,87 @@ async function remindDormantWorkers(env: Env): Promise<number> {
   return sent;
 }
 
+/** Whether migration 0043 has been applied. */
+let inviteReminderColumnsConfirmed = false;
+
+async function inviteReminderColumnsExist(env: Env): Promise<boolean> {
+  if (inviteReminderColumnsConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(applications)').all<{ name: string }>();
+    inviteReminderColumnsConfirmed = results.some((r) => r.name === 'invited_at');
+    return inviteReminderColumnsConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** An invited worker who just doesn't answer — not declining, not
+ *  accepting, not even opening the chat — leaves the shift in limbo and
+ *  the employer with no idea whether to wait or invite someone else. This
+ *  nags every hour until it's actually resolved one of three ways:
+ *  accepted or declined (status leaves 'invited', so the WHERE below drops
+ *  it on its own), or the worker says anything at all in the chat with
+ *  that employer — silently opening it doesn't count, only sending
+ *  something does, same bar as "reacted".
+ *
+ *  Reuses `employer_replies` — it's the same invitation notifyInvite
+ *  already sends once, just repeated for someone who hasn't acted on it. */
+async function remindUnansweredInvites(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT a.id, a.worker_id, a.shift_id, a.invited_at, w.telegram_id, s.position_label, s.company_id, co.name as company_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE a.status = 'invited'
+       AND a.invited_at IS NOT NULL
+       AND a.invited_at <= datetime('now', ?)
+       AND (a.invite_reminded_at IS NULL OR a.invite_reminded_at <= datetime('now', ?))
+     ORDER BY a.invited_at ASC LIMIT ?`,
+  )
+    .bind(`-${INVITE_REMINDER_AFTER_HOURS} hours`, `-${INVITE_REMINDER_COOLDOWN_HOURS} hours`, BATCH)
+    .all<{
+      id: number;
+      worker_id: number;
+      shift_id: number;
+      invited_at: string;
+      telegram_id: number;
+      position_label: string;
+      company_id: number;
+      company_name: string;
+    }>();
+
+  const now = new Date().toISOString();
+  let sent = 0;
+
+  for (const r of results) {
+    // Stamped whether or not a message goes out this round — a worker who
+    // already answered in chat still shouldn't be re-queried every hour
+    // for the rest of this batch's run.
+    await env.DB.prepare('UPDATE applications SET invite_reminded_at = ? WHERE id = ?').bind(now, r.id).run();
+
+    const repliedInChat = await env.DB.prepare(
+      `SELECT 1 FROM chats c JOIN messages m ON m.chat_id = c.id
+       WHERE c.company_id = ? AND c.worker_id = ? AND c.shift_id = ? AND m.sender = 'worker' AND m.created_at > ?
+       LIMIT 1`,
+    )
+      .bind(r.company_id, r.worker_id, r.shift_id, r.invited_at)
+      .first();
+    if (repliedInChat) continue;
+
+    const sentOk = await notifyWorker(
+      env,
+      { id: r.worker_id, telegramId: r.telegram_id },
+      'employer_replies',
+      `⏰ Вы ещё не ответили на приглашение «${r.position_label}» от ${r.company_name}.\n\n` +
+        'Откройте «Отклики» и подтвердите или откажитесь — работодатель ждёт ответа.',
+    );
+    if (sentOk) sent++;
+  }
+
+  return sent;
+}
+
 /** «Напоминание перед сменой» in Настройки used to be a switch with
  *  nothing behind it — no code anywhere sent such a message. This is it.
  *
@@ -492,6 +583,18 @@ export async function runReminders(env: Env): Promise<ReminderRunSummary> {
   } catch (err) {
     console.error('pending-candidate reminders failed', err);
     summary.pendingCandidateReminders = 'failed';
+  }
+
+  try {
+    if (await inviteReminderColumnsExist(env)) {
+      summary.inviteReminders = await remindUnansweredInvites(env);
+    } else {
+      console.error('invite reminders skipped — migration 0043_invite_reminder is not applied');
+      summary.inviteReminders = 'skipped';
+    }
+  } catch (err) {
+    console.error('invite reminders failed', err);
+    summary.inviteReminders = 'failed';
   }
 
   try {
