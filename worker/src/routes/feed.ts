@@ -25,6 +25,18 @@ feedRoutes.get('/', async (c) => {
   const clauses = ["s.status = 'active'"];
   const binds: unknown[] = [];
 
+  // Scoped to the worker's own city — a shift in a different city was
+  // never actually reachable, it just used to show up anyway because
+  // nothing here compared the two. TRIM+LOWER rather than a plain `=`:
+  // city used to be free text (this migrated to a fixed list — see
+  // src/data/cities.ts on the client — but existing rows may still carry
+  // whatever casing/whitespace someone typed by hand).
+  const worker = await c.env.DB.prepare('SELECT city FROM workers WHERE id = ?').bind(session.workerId).first<{ city: string | null }>();
+  if (worker?.city?.trim()) {
+    clauses.push('LOWER(TRIM(c.city)) = LOWER(TRIM(?))');
+    binds.push(worker.city);
+  }
+
   if (positions.length) {
     clauses.push(`s.position IN (${positions.map(() => '?').join(',')})`);
     binds.push(...positions);

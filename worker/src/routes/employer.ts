@@ -47,7 +47,7 @@ const COMPANY_VERIFICATION_ENABLED = false;
  *  can't publish vacancies or browse candidates until an admin approves it
  *  (while COMPANY_VERIFICATION_ENABLED is on). */
 function companyIsComplete(company: CompanyRow) {
-  const fields = [!!company.name, !!company.description, !!company.founded_year, !!company.avatar_data];
+  const fields = [!!company.name, !!company.city, !!company.description, !!company.founded_year, !!company.avatar_data];
   if (COMPANY_VERIFICATION_ENABLED) fields.push(!!company.inn);
   return { complete: fields.every(Boolean), percent: Math.round((fields.filter(Boolean).length / fields.length) * 100) };
 }
@@ -1129,6 +1129,11 @@ employerRoutes.get('/workers', async (c) => {
   const positions = (c.req.query('positions') ?? '').split(',').filter(Boolean);
   if (positions.length === 0) return c.json({ workers: [] });
 
+  // Scoped to the employer's own city — same reasoning and the same
+  // TRIM+LOWER caution as the worker feed (see routes/feed.ts).
+  const company = await c.env.DB.prepare('SELECT city FROM companies WHERE id = ?').bind(session.companyId).first<{ city: string | null }>();
+  const cityFilter = company?.city?.trim() ? 'AND LOWER(TRIM(w.city)) = LOWER(TRIM(?))' : '';
+
   const notHidden = await excludeHiddenSql(c.env, 'w');
   // Someone who only wants weekend shifts is a bad match for a permanent
   // job and vice versa — both sides used to find that out in the chat.
@@ -1146,6 +1151,7 @@ employerRoutes.get('/workers', async (c) => {
      LEFT JOIN telegram_accounts t ON t.telegram_id = w.telegram_id
      WHERE wp.position IN (${placeholders})
        AND w.status != 'suspended'
+       ${cityFilter}
        ${notHidden}
        ${wantsType}
        AND (t.active_role = 'worker' OR t.active_role IS NULL)
@@ -1160,7 +1166,7 @@ employerRoutes.get('/workers', async (c) => {
      ORDER BY RANDOM()
      LIMIT 100`,
   )
-    .bind(...positions, ...positions, session.companyId, session.companyId)
+    .bind(...positions, ...positions, ...(cityFilter ? [company!.city] : []), session.companyId, session.companyId)
     .all<CandidateWorkerRow & { matched_position_label: string | null }>();
 
   return c.json({ workers: results.map(withWorkerPhotos) });

@@ -5,6 +5,7 @@ interface WorkerApiRow {
   id: number;
   name: string;
   city: string;
+  address?: string | null;
   rating: number;
   shifts_completed: number;
   referral_code: string | null;
@@ -34,6 +35,7 @@ function fromApi(r: MeResponse): WorkerProfile {
   return {
     name: r.worker.name,
     city: r.worker.city,
+    address: r.worker.address ?? undefined,
     rating: r.worker.rating,
     shiftsCompleted: r.worker.shifts_completed,
     profileCompletion: r.worker.profileCompletion,
@@ -69,6 +71,7 @@ export async function fetchMyProfile(): Promise<WorkerProfile> {
 export interface ProfileUpdate {
   name?: string;
   city?: string;
+  address?: string;
   bio?: string;
   birthdate?: string;
   skills?: string;

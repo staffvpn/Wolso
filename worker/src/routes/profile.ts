@@ -9,6 +9,20 @@ import { reportHiddenProfileEdit } from '../lib/hiddenProfiles';
 export const profileRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 profileRoutes.use('*', attachSession);
 
+/** Whether migration 0045 has been applied. */
+let addressColumnConfirmed = false;
+
+async function addressColumnExists(env: Env): Promise<boolean> {
+  if (addressColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(workers)').all<{ name: string }>();
+    addressColumnConfirmed = results.some((r) => r.name === 'address');
+    return addressColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
+
 interface WorkerRow {
   id: number;
   name: string;
@@ -168,6 +182,7 @@ profileRoutes.patch('/', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const body = await c.req.json<{
     city?: string;
+    address?: string;
     name?: string;
     bio?: string;
     birthdate?: string;
@@ -199,6 +214,11 @@ profileRoutes.patch('/', async (c) => {
       fields.push(`${key} = ?`);
       binds.push(body[key]);
     }
+  }
+  // Same "ignore until the migration lands" treatment as lookingFor below.
+  if (body.address !== undefined && (await addressColumnExists(c.env))) {
+    fields.push('address = ?');
+    binds.push(body.address);
   }
   // Silently ignored while migration 0029 is pending, rather than failing
   // the whole save (which would also lose the name and bio typed alongside

@@ -11,6 +11,7 @@ import { Logo } from '@/components/ui/Logo';
 import { ExperienceSheet } from '@/components/ExperienceSheet';
 import { useProfileStore } from '@/store/useProfileStore';
 import { POSITIONS } from '@/data/positions';
+import { RUSSIAN_CITIES } from '@/data/cities';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 import { formatExperience } from '@/lib/format';
@@ -46,6 +47,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
+  const [address, setAddress] = useState('');
   const [bio, setBio] = useState('');
   const [skills, setSkills] = useState('');
   const [birthdate, setBirthdate] = useState('');
@@ -65,6 +67,7 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     if (!loaded) return;
     setName(profile.name);
     setCity(profile.city);
+    setAddress(profile.address ?? '');
     setBio(profile.bio);
     setSkills(profile.skills);
     setBirthdate(profile.birthdate ?? '');
@@ -164,7 +167,15 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
     }
     setSaving(true);
     try {
-      await updateProfile({ name: name.trim(), city: city.trim(), bio: bio.trim(), skills: skills.trim(), birthdate, lookingFor });
+      await updateProfile({
+        name: name.trim(),
+        city: city.trim(),
+        address: address.trim(),
+        bio: bio.trim(),
+        skills: skills.trim(),
+        birthdate,
+        lookingFor,
+      });
       if (!gate) navigate(-1);
     } catch {
       setError('Не получилось сохранить — попробуйте ещё раз');
@@ -234,7 +245,26 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
 
           <div>
             <SectionLabel>Город</SectionLabel>
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Москва" className={FIELD_CLASS} />
+            <select value={city} onChange={(e) => setCity(e.target.value)} className={FIELD_CLASS}>
+              <option value="" disabled>Выберите город</option>
+              {/* Анкета, заполненная до этого списка, могла указывать город
+                  свободным текстом — не выбранный из RUSSIAN_CITIES не должен
+                  выглядеть как будто поле вдруг опустело. */}
+              {city && !(RUSSIAN_CITIES as readonly string[]).includes(city) && <option value={city}>{city}</option>}
+              {RUSSIAN_CITIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <SectionLabel>Адрес</SectionLabel>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Улица, дом (необязательно)"
+              className={FIELD_CLASS}
+            />
           </div>
 
           <div>

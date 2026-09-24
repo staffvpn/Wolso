@@ -17,6 +17,7 @@ import { useAuthStore } from './useAuthStore';
 interface ProfileState {
   name: string;
   city: string;
+  address?: string;
   rating: number;
   shiftsCompleted: number;
   profileCompletion: number;

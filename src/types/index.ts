@@ -185,6 +185,7 @@ export interface WorkerReview {
 export interface WorkerProfile {
   name: string;
   city: string;
+  address?: string;
   rating: number;
   shiftsCompleted: number;
   profileCompletion: number;

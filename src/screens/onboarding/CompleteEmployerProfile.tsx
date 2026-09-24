@@ -12,6 +12,7 @@ import { ApiError } from '@/lib/apiClient';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 import { FEATURES } from '@/lib/features';
+import { RUSSIAN_CITIES } from '@/data/cities';
 
 const FIELD_CLASS =
   'w-full rounded-2xl bg-surface border border-border p-3.5 text-[14px] text-text placeholder:text-text-faint outline-none focus:border-accent';
@@ -65,6 +66,7 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
 
   const missing: string[] = [];
   if (!name.trim()) missing.push('название');
+  if (!city.trim()) missing.push('город');
   if (!description.trim()) missing.push('описание');
   if (!foundedYear) missing.push('год основания');
   // Same as the worker screen: «фото» didn't say which one.
@@ -209,8 +211,19 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
           </div>
 
           <div>
-            <SectionLabel>Город</SectionLabel>
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Москва" className={FIELD_CLASS} />
+            <SectionLabel>
+              Город <span className="text-danger">*</span>
+            </SectionLabel>
+            <select value={city} onChange={(e) => setCity(e.target.value)} className={FIELD_CLASS}>
+              <option value="" disabled>Выберите город</option>
+              {/* Профиль, заполненный до этого списка, мог указывать город
+                  свободным текстом — не выбранный из RUSSIAN_CITIES не должен
+                  выглядеть как будто поле вдруг опустело. */}
+              {city && !(RUSSIAN_CITIES as readonly string[]).includes(city) && <option value={city}>{city}</option>}
+              {RUSSIAN_CITIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
 
           <div>
