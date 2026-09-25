@@ -257,6 +257,15 @@ export interface AuditLogEntry {
   tone: 'neutral' | 'danger' | 'accent';
 }
 
+export interface NotificationLogEntry {
+  id: string;
+  recipientRole: 'worker' | 'company';
+  recipientName: string;
+  kind: string;
+  text: string;
+  minutesAgo: number;
+}
+
 export interface VacancyRecord {
   id: string;
   position: string;

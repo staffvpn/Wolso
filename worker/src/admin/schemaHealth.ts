@@ -31,6 +31,7 @@ import sql0042 from '../../migrations/0042_employer_activation.sql';
 import sql0043 from '../../migrations/0043_invite_reminder.sql';
 import sql0044 from '../../migrations/0044_close_shift_reminder.sql';
 import sql0045 from '../../migrations/0045_worker_address.sql';
+import sql0046 from '../../migrations/0046_notification_log.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -95,6 +96,7 @@ const REQUIRED_TABLES: { table: string; migration: string; breaks: string }[] = 
   { table: 'promo_views', migration: '0039_promos', breaks: 'дневной потолок показов рекламы' },
   { table: 'achievements', migration: '0040_achievements', breaks: 'достижения соискателей' },
   { table: 'worker_achievements', migration: '0040_achievements', breaks: 'достижения соискателей' },
+  { table: 'notification_log', migration: '0046_notification_log', breaks: 'журнал отправленных авто-уведомлений' },
 ];
 
 /** The real migration files, bundled in as text (see the Text rule in
@@ -132,6 +134,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0043_invite_reminder': sql0043,
   '0044_close_shift_reminder': sql0044,
   '0045_worker_address': sql0045,
+  '0046_notification_log': sql0046,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { sendTelegramMessage } from './telegramBot';
+import { logNotification } from './notificationLog';
 
 /** Which switch in «Настройки» governs a given bot message.
  *  - `new_shifts`        — "появилась смена по вашей должности"
@@ -62,7 +63,9 @@ export async function notifyWorker(
   text: string,
 ): Promise<boolean> {
   if (!(await workerWantsNotification(env, worker.id, pref))) return false;
-  return sendTelegramMessage(env, worker.telegramId, text);
+  const sent = await sendTelegramMessage(env, worker.telegramId, text);
+  if (sent) await logNotification(env, 'worker', worker.id, pref, text);
+  return sent;
 }
 
 /** То же самое для работодателей: бот пишет им не меньше — новые отклики,
@@ -107,5 +110,7 @@ export async function notifyCompany(
   text: string,
 ): Promise<boolean> {
   if (!(await companyWantsNotification(env, company.id, pref))) return false;
-  return sendTelegramMessage(env, company.telegramId, text);
+  const sent = await sendTelegramMessage(env, company.telegramId, text);
+  if (sent) await logNotification(env, 'company', company.id, pref, text);
+  return sent;
 }

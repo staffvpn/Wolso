@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import { sendTelegramMessageResult } from './telegramBot';
 import { notifyCompany, notifyWorker } from './notifyPrefs';
 import { photoReminderColumnExists } from './ownPhoto';
+import { logNotification } from './notificationLog';
 
 /** Everything the hourly cron does (see wrangler.toml and the `scheduled`
  *  export in index.ts) — mostly bot reminders, plus one cleanup job
@@ -174,14 +175,20 @@ async function remindUnfinishedSignups(env: Env): Promise<{ workers: number; com
   for (const w of workers) {
     const result = await sendTelegramMessageResult(env, w.telegram_id, text);
     if (result === 'transient') continue;
-    if (result === 'sent') sentWorkers++;
+    if (result === 'sent') {
+      sentWorkers++;
+      await logNotification(env, 'worker', w.id, 'signup_reminder', text);
+    }
     await env.DB.prepare('UPDATE workers SET signup_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
   }
 
   for (const co of companies) {
     const result = await sendTelegramMessageResult(env, co.owner_telegram_id, text);
     if (result === 'transient') continue;
-    if (result === 'sent') sentCompanies++;
+    if (result === 'sent') {
+      sentCompanies++;
+      await logNotification(env, 'company', co.id, 'signup_reminder', text);
+    }
     await env.DB.prepare('UPDATE companies SET signup_reminded_at = ? WHERE id = ?').bind(now, co.id).run();
   }
 
@@ -232,7 +239,10 @@ async function remindTelegramPhotos(env: Env): Promise<number> {
   for (const w of results) {
     const result = await sendTelegramMessageResult(env, w.telegram_id, text);
     if (result === 'transient') continue;
-    if (result === 'sent') sent++;
+    if (result === 'sent') {
+      sent++;
+      await logNotification(env, 'worker', w.id, 'own_photo_reminder', text);
+    }
     await env.DB.prepare('UPDATE workers SET photo_reminded_at = ? WHERE id = ?').bind(now, w.id).run();
   }
 
@@ -272,7 +282,10 @@ async function remindNeverPostedEmployers(env: Env): Promise<number> {
   for (const co of results) {
     const result = await sendTelegramMessageResult(env, co.owner_telegram_id, text);
     if (result === 'transient') continue;
-    if (result === 'sent') sent++;
+    if (result === 'sent') {
+      sent++;
+      await logNotification(env, 'company', co.id, 'never_posted_reminder', text);
+    }
     await env.DB.prepare('UPDATE companies SET never_posted_reminded_at = ? WHERE id = ?').bind(now, co.id).run();
   }
 

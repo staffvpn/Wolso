@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
+import { Badge } from '@/components/ui/Badge';
 import { useAuditStore } from '@/store/useAuditStore';
+import { useNotificationLogStore } from '@/store/useNotificationLogStore';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -15,7 +17,7 @@ const TONE_FILTERS = [
 ];
 const TONE_DOT: Record<string, string> = { accent: 'bg-accent', danger: 'bg-danger', neutral: 'bg-text-faint' };
 
-export function AuditLog() {
+function StaffActionsLog() {
   const entries = useAuditStore((s) => s.entries);
   const actors = useAuditStore((s) => s.actors);
   const load = useAuditStore((s) => s.load);
@@ -33,12 +35,7 @@ export function AuditLog() {
   }, [actor, tone, query]);
 
   return (
-    <div className="pb-10">
-      <PageHeader
-        title="Аудит-лог"
-        subtitle="Все действия команды, без удаления"
-      />
-
+    <>
       <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap">
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по действию или человеку" className="w-full sm:w-[280px]" />
         {/* Сотрудники берутся из самого журнала, а не из состава команды:
@@ -78,6 +75,122 @@ export function AuditLog() {
           )}
         </Card>
       </div>
+    </>
+  );
+}
+
+const ROLE_FILTERS = [
+  { id: 'all', label: 'Все' },
+  { id: 'worker', label: 'Соискателям' },
+  { id: 'company', label: 'Работодателям' },
+];
+
+/** Виды, что реально встречаются в notification_log — pref-имена из
+ *  lib/notifyPrefs.ts плюс три, что шлются в обход них (см. лог-вызовы в
+ *  lib/reminders.ts). Ключ отсутствует в списке — просто покажем как есть,
+ *  не станет ошибкой. */
+const KIND_LABELS: Record<string, string> = {
+  new_shifts: 'Новые смены',
+  employer_replies: 'От работодателя',
+  shift_reminder: 'Напоминание о смене',
+  new_responses: 'Новые отклики',
+  worker_replies: 'От соискателя',
+  pending_reminder: 'Напоминание (отклики / закрытие)',
+  signup_reminder: 'Незаконченная анкета',
+  own_photo_reminder: 'Фото из Telegram',
+  never_posted_reminder: 'Ни одной смены',
+};
+
+function AutoNotificationsLog() {
+  const entries = useNotificationLogStore((s) => s.entries);
+  const kinds = useNotificationLogStore((s) => s.kinds);
+  const migrationPending = useNotificationLogStore((s) => s.migrationPending);
+  const load = useNotificationLogStore((s) => s.load);
+  const [query, setQuery] = useState('');
+  const [role, setRole] = useState('all');
+  const [kind, setKind] = useState('all');
+
+  useEffect(() => {
+    const t = setTimeout(() => load({ role, kind, q: query }), query ? 350 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, kind, query]);
+
+  if (migrationPending) {
+    return (
+      <div className="px-4 sm:px-8">
+        <Card className="p-6">
+          <p className="text-[13px] text-text-muted leading-relaxed">
+            Не применена миграция 0046_notification_log. Откройте Настройки → «Состояние базы данных» → «Проверить
+            миграции» — там будет готовый SQL.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="px-4 sm:px-8 pb-5 flex items-center gap-3 flex-wrap">
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по имени или тексту" className="w-full sm:w-[280px]" />
+        <Select value={kind} onChange={(e) => setKind(e.target.value)} className="w-full sm:w-[220px]">
+          <option value="all">Все виды</option>
+          {kinds.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k] ?? k}
+            </option>
+          ))}
+        </Select>
+        <Tabs value={role} onChange={setRole} options={ROLE_FILTERS} />
+      </div>
+
+      <div className="px-4 sm:px-8">
+        <Card className="p-6">
+          {entries.length === 0 ? (
+            <p className="text-center text-[13px] text-text-faint py-8">Ничего не найдено</p>
+          ) : (
+            <div className="divide-y divide-border-soft">
+              {entries.map((e) => (
+                <div key={e.id} className="py-3.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-semibold text-[14px] text-text">{e.recipientName}</span>
+                    <Badge tone={e.recipientRole === 'company' ? 'info' : 'accent'}>
+                      {e.recipientRole === 'company' ? 'Работодатель' : 'Соискатель'}
+                    </Badge>
+                    <Badge tone="neutral">{KIND_LABELS[e.kind] ?? e.kind}</Badge>
+                    <span className="text-[12px] text-text-faint ml-auto">{timeAgo(e.minutesAgo)}</span>
+                  </div>
+                  <p className="text-[13px] text-text-muted leading-relaxed whitespace-pre-line">{e.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    </>
+  );
+}
+
+const SECTIONS = [
+  { id: 'staff', label: 'Действия персонала' },
+  { id: 'notifications', label: 'Авто-уведомления' },
+];
+
+export function AuditLog() {
+  const [section, setSection] = useState('staff');
+
+  return (
+    <div className="pb-10">
+      <PageHeader
+        title="Аудит-лог"
+        subtitle={section === 'staff' ? 'Все действия команды, без удаления' : 'Кому и что реально ушло автоматически'}
+      />
+
+      <div className="px-4 sm:px-8 pb-5">
+        <Tabs value={section} onChange={setSection} options={SECTIONS} />
+      </div>
+
+      {section === 'staff' ? <StaffActionsLog /> : <AutoNotificationsLog />}
     </div>
   );
 }
