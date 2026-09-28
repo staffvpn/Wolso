@@ -20,4 +20,5 @@ export const RUSSIAN_CITIES = [
   'Воронеж',
   'Пермь',
   'Волгоград',
+  'Саратов',
 ] as const;
