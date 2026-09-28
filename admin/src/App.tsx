@@ -13,6 +13,7 @@ import { AuditLog } from './screens/AuditLog';
 import { Settings } from './screens/Settings';
 import { Complaints } from './screens/Complaints';
 import { Promos } from '@/screens/Promos';
+import { ProxyEmployers } from '@/screens/ProxyEmployers';
 import { Achievements } from '@/screens/Achievements';
 import { Support } from './screens/Support';
 import { BroadcastScreen } from './screens/Broadcast';
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
               <Route path="/vacancies" element={<Vacancies />} />
+              <Route path="/proxy-employers" element={<ProxyEmployers />} />
               <Route path="/verification" element={<Verification />} />
               <Route path="/complaints" element={<Complaints />} />
               <Route path="/support" element={<Support />} />

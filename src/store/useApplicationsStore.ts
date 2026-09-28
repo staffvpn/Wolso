@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Application, Shift } from '@/types';
 import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
+import { openExternal } from '@/lib/telegram';
 import { useNotificationsStore } from './useNotificationsStore';
 
 interface ApiApplication {
@@ -127,11 +128,15 @@ export const useApplicationsStore = create<ApplicationsState>((set) => ({
   },
 
   apply: async (shiftId) => {
-    const { application } = await apiFetch<{ application: ApiApplication }>('/applications', {
-      method: 'POST',
-      body: { shiftId: Number(shiftId) },
-    });
+    const { application, proxyTelegramUrl } = await apiFetch<{ application: ApiApplication; proxyTelegramUrl?: string }>(
+      '/applications',
+      { method: 'POST', body: { shiftId: Number(shiftId) } },
+    );
     set((s) => ({ applications: [fromApi(application), ...s.applications] }));
+    // Вакансия от прокси-работодателя (см. worker/migrations/0047) — тут
+    // некому принять отклик внутри приложения, поэтому вместо обычного
+    // «отклик отправлен» сразу открываем личку с готовым текстом.
+    if (proxyTelegramUrl) openExternal(proxyTelegramUrl, 'telegram');
   },
 
   checkIn: async (applicationId) => {

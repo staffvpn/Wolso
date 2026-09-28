@@ -621,6 +621,67 @@ async function remindUnclosedShifts(env: Env): Promise<number> {
   return sent;
 }
 
+/** Whether migration 0047 has been applied. */
+let proxyColumnConfirmed = false;
+
+async function proxyColumnExists(env: Env): Promise<boolean> {
+  if (proxyColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(companies)').all<{ name: string }>();
+    proxyColumnConfirmed = results.some((r) => r.name === 'is_proxy');
+    return proxyColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** Прокси-работодателя (см. migration 0047) закрыть некому — этой учёткой
+ *  управляет только админка, а не человек, который зашёл бы сам и нажал
+ *  «закрыть смену». Без этого шага работник навсегда застревал бы на
+ *  work_stage = 'upcoming': его собственный отзыв (routes/applications.ts's
+ *  /:id/review) ждёт ровно employer_closed, а сюда для прокси-вакансии
+ *  прийти неоткуда. Тот же критерий «смена действительно прошла», что и у
+ *  remindUnclosedShifts ниже, но здесь она сразу закрывается, а не только
+ *  напоминает; employer_rating остаётся NULL — оценки от работодателя в
+ *  этой связке просто нет, только отзыв самого работника.
+ *
+ *  Идёт в общем прогоне раньше remindUnclosedShifts: то, что здесь уже
+ *  закрыто, помечено closed_by_employer_at и отсекается его собственным
+ *  WHERE без отдельного исключения прокси-компаний из того запроса. */
+async function closeProxyShifts(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    `SELECT a.id, a.worker_id, w.telegram_id, s.position_label, co.name as company_name
+     FROM applications a
+     JOIN shifts s ON s.id = a.shift_id
+     JOIN companies co ON co.id = s.company_id
+     JOIN workers w ON w.id = a.worker_id
+     WHERE a.status = 'accepted'
+       AND a.closed_by_employer_at IS NULL
+       AND co.is_proxy = 1
+       AND COALESCE(s.end_date, s.date) < date('now', '+3 hours')
+     LIMIT ?`,
+  )
+    .bind(BATCH)
+    .all<{ id: number; worker_id: number; telegram_id: number; position_label: string; company_name: string }>();
+
+  for (const r of results) {
+    await env.DB.prepare(
+      "UPDATE applications SET work_stage = 'employer_closed', closed_by_employer_at = datetime('now') WHERE id = ?",
+    )
+      .bind(r.id)
+      .run();
+
+    const title = 'Смена завершена — оставьте отзыв';
+    const subtitle = `«${r.position_label}», ${r.company_name}`;
+    await env.DB.prepare('INSERT INTO notifications (worker_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+      .bind(r.worker_id, 'shift_closed', title, subtitle)
+      .run();
+    await notifyWorker(env, { id: r.worker_id, telegramId: r.telegram_id }, 'employer_replies', `✅ ${title}\n${subtitle}`);
+  }
+
+  return results.length;
+}
+
 /** «Напоминание перед сменой» in Настройки used to be a switch with
  *  nothing behind it — no code anywhere sent such a message. This is it.
  *
@@ -796,6 +857,18 @@ export async function runReminders(env: Env): Promise<ReminderRunSummary> {
   } catch (err) {
     console.error('expired-shift cleanup failed', err);
     summary.expiredShiftsDeleted = 'failed';
+  }
+
+  try {
+    if (await proxyColumnExists(env)) {
+      summary.proxyShiftsClosed = await closeProxyShifts(env);
+    } else {
+      console.error('proxy shift auto-close skipped — migration 0047_proxy_employers is not applied');
+      summary.proxyShiftsClosed = 'skipped';
+    }
+  } catch (err) {
+    console.error('proxy shift auto-close failed', err);
+    summary.proxyShiftsClosed = 'failed';
   }
 
   try {

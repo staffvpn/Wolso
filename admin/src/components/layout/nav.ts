@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone, Flag, Sparkles, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Wallet, ShieldCheck, History, Settings, LifeBuoy, DatabaseZap, BadgeCheck, Megaphone, Flag, Sparkles, Award, UserCog } from 'lucide-react';
 import type { RoleDef } from '@/types';
 import { FEATURES } from '@/lib/features';
 
@@ -15,6 +15,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Дашборд', icon: LayoutDashboard, visible: (r) => yes(r, 'changeCommission') || yes(r, 'refundsPayouts') },
   { to: '/users', label: 'Пользователи', icon: Users, visible: () => true },
   { to: '/vacancies', label: 'Вакансии и смены', icon: Briefcase, visible: (r) => yes(r, 'approveVacancies') },
+  { to: '/proxy-employers', label: 'Прокси-работодатели', icon: UserCog, visible: (r) => yes(r, 'manageData') },
   { to: '/verification', label: 'Проверка работодателей', icon: BadgeCheck, visible: (r) => yes(r, 'verifyEmployers') },
   // Рядом с «Проверкой работодателей»: обе — очереди, в которые кто-то
   // должен смотреть каждый день, в отличие от справочных экранов ниже.

@@ -44,6 +44,11 @@ export interface Company {
   notifyNewResponses?: boolean;
   notifyWorkerReplies?: boolean;
   notifyPendingReminder?: boolean;
+  /** Работодателя завёл сам админ вместо реального бизнеса — см.
+   *  worker/migrations/0047. Отклик на такую вакансию ведёт не в наш чат, а
+   *  прямой ссылкой в Telegram на telegramUsername. */
+  isProxy?: boolean;
+  telegramUsername?: string;
 }
 
 export type ShiftUrgency = 'normal' | 'urgent';

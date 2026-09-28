@@ -402,6 +402,70 @@ export interface Promo {
   imageUrl?: string;
 }
 
+export interface ProxyEmployer {
+  id: string;
+  name: string;
+  city: string;
+  address: string | null;
+  description: string;
+  foundedYear: number | null;
+  telegramUsername: string | null;
+  avatarUrl?: string;
+  photos: { id: string; url: string }[];
+  activeVacancies: number;
+}
+
+export interface ProxyEmployerInput {
+  name: string;
+  city: string;
+  address: string;
+  description: string;
+  foundedYear: number | null;
+  telegramUsername: string;
+}
+
+export interface ProxyVacancy {
+  id: string;
+  position: string;
+  positionLabel: string;
+  date: string;
+  endDate?: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  hourlyRate: number;
+  totalPay: number;
+  payMode: 'hourly' | 'fixed';
+  description: string;
+  meal: boolean;
+  urgency: 'normal' | 'urgent';
+  employmentType: 'shift' | 'permanent';
+  timeOfDay: string;
+  requirements: string[];
+  status: string;
+}
+
+export interface ProxyVacancyInput {
+  position: string;
+  positionLabel: string;
+  date: string;
+  endDate?: string;
+  startHour: number;
+  startMin: number;
+  endHour: number;
+  endMin: number;
+  hourlyRate: number;
+  payMode: 'hourly' | 'fixed';
+  totalPay?: number;
+  description: string;
+  meal: boolean;
+  urgency: 'normal' | 'urgent';
+  employmentType: 'shift' | 'permanent';
+  timeOfDay: string;
+  requirements: string[];
+}
+
 export interface PromoInput {
   title: string;
   text: string;

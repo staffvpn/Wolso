@@ -15,7 +15,7 @@ import { useApplicationsStore } from '@/store/useApplicationsStore';
 import { useChatStore } from '@/store/useChatStore';
 import { resolveCompany } from '@/data/companies';
 import { formatShiftDays, formatMoney, hourlyRateLabel, relativeShiftDays, timeRange } from '@/lib/format';
-import { hapticNotify } from '@/lib/telegram';
+import { hapticNotify, openExternal } from '@/lib/telegram';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { cn } from '@/lib/cn';
 import type { Application, ApplicationStatus } from '@/types';
@@ -178,6 +178,9 @@ function ResponseCard({
   const canCancel = app.status === 'accepted' && app.workStage === 'upcoming';
   const hours = shift.endHour - shift.startHour;
   const times = timeRange(shift.startHour, shift.startMin, shift.endHour, shift.endMin);
+  // Вакансия от прокси-работодателя (см. worker/migrations/0047) — чата в
+  // приложении у неё никогда не будет, общение идёт напрямую в Telegram.
+  const telegramUrl = company.isProxy && company.telegramUsername ? `https://t.me/${company.telegramUsername}` : undefined;
 
   return (
     <div className="rounded-card bg-surface border border-border-soft overflow-hidden">
@@ -249,6 +252,17 @@ function ResponseCard({
               <MessageCircle size={17} />
             </Button>
           )}
+          {!chatId && telegramUrl && (
+            <Button
+              variant="dark"
+              size="md"
+              className="w-11 px-0 shrink-0"
+              onClick={() => openExternal(telegramUrl, 'telegram')}
+              aria-label="Написать в Telegram"
+            >
+              <MessageCircle size={17} />
+            </Button>
+          )}
           <Button variant="dark" size="md" className="w-11 px-0 shrink-0" onClick={() => onRespond(app.id, false)} aria-label="Отклонить">
             <X size={17} />
           </Button>
@@ -276,18 +290,23 @@ function ResponseCard({
         </div>
       )}
 
-      {app.status === 'accepted' && (chatId || canCancel) && (
+      {app.status === 'accepted' && (chatId || telegramUrl || canCancel) && (
         <div className="flex items-center gap-2 px-4 pb-4">
           {chatId && (
             <Button size="md" className="flex-1" onClick={() => onOpenChat(chatId)}>
               <MessageCircle size={16} /> Открыть чат
             </Button>
           )}
+          {!chatId && telegramUrl && (
+            <Button size="md" className="flex-1" onClick={() => openExternal(telegramUrl, 'telegram')}>
+              <MessageCircle size={16} /> Написать в Telegram
+            </Button>
+          )}
           {canCancel && (
             <Button
               variant="danger"
               size="md"
-              className={cn('shrink-0', !chatId && 'flex-1')}
+              className={cn('shrink-0', !chatId && !telegramUrl && 'flex-1')}
               onClick={() => {
                 hapticNotify('warning');
                 onCancel(app);

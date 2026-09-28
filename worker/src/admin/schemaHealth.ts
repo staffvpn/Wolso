@@ -32,6 +32,7 @@ import sql0043 from '../../migrations/0043_invite_reminder.sql';
 import sql0044 from '../../migrations/0044_close_shift_reminder.sql';
 import sql0045 from '../../migrations/0045_worker_address.sql';
 import sql0046 from '../../migrations/0046_notification_log.sql';
+import sql0047 from '../../migrations/0047_proxy_employers.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -83,6 +84,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'applications', column: 'invited_at', migration: '0043_invite_reminder', breaks: 'часовое напоминание о неотвеченном приглашении' },
   { table: 'applications', column: 'close_reminded_at', migration: '0044_close_shift_reminder', breaks: 'напоминание закрыть прошедшую смену' },
   { table: 'workers', column: 'address', migration: '0045_worker_address', breaks: 'адрес в анкете соискателя' },
+  { table: 'companies', column: 'is_proxy', migration: '0047_proxy_employers', breaks: 'вакансии прокси-работодателей' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -135,6 +137,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0044_close_shift_reminder': sql0044,
   '0045_worker_address': sql0045,
   '0046_notification_log': sql0046,
+  '0047_proxy_employers': sql0047,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

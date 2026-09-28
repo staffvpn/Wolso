@@ -555,7 +555,14 @@ adminUserRoutes.patch('/seekers/:id', requirePermission('blockUsers'), async (c)
 adminUserRoutes.patch('/employers/:id', requirePermission('blockUsers'), async (c) => {
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
-  const body = await c.req.json<{ name?: string; address?: string; city?: string; description?: string; foundedYear?: number }>();
+  const body = await c.req.json<{
+    name?: string;
+    address?: string;
+    city?: string;
+    description?: string;
+    foundedYear?: number;
+    telegramUsername?: string;
+  }>();
 
   const company = await c.env.DB.prepare('SELECT name FROM companies WHERE id = ?').bind(id).first<{ name: string }>();
   if (!company) return c.json({ error: 'not_found' }, 404);
@@ -571,6 +578,15 @@ adminUserRoutes.patch('/employers/:id', requirePermission('blockUsers'), async (
   if (body.foundedYear !== undefined) {
     fields.push('founded_year = ?');
     binds.push(body.foundedYear);
+  }
+  // Для прокси-работодателя (см. migration 0047) это не автосинк с логина,
+  // а сам контакт: ссылка t.me для отклика собирается именно из этого поля
+  // (см. routes/applications.ts). Для обычного работодателя эта ручка
+  // теоретически тоже может его переписать — не страшно, при следующем
+  // логине routes/auth.ts всё равно перезапишет актуальным.
+  if (body.telegramUsername !== undefined) {
+    fields.push('telegram_username = ?');
+    binds.push(body.telegramUsername.replace(/^@/, '').trim() || null);
   }
   if (fields.length) {
     binds.push(id);

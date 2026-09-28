@@ -87,10 +87,30 @@ applicationRoutes.post('/', async (c) => {
     return c.json({ error: 'rate_limited' }, 429);
   }
 
-  const shift = await c.env.DB.prepare("SELECT id, company_id, position_label FROM shifts WHERE id = ? AND status = 'active'")
+  const shift = await c.env.DB.prepare(
+    `SELECT s.id, s.company_id, s.position_label, co.is_proxy, co.telegram_username, co.owner_telegram_id
+     FROM shifts s JOIN companies co ON co.id = s.company_id
+     WHERE s.id = ? AND s.status = 'active'`,
+  )
     .bind(shiftId)
-    .first<{ id: number; company_id: number; position_label: string }>();
+    .first<{
+      id: number;
+      company_id: number;
+      position_label: string;
+      is_proxy: number;
+      telegram_username: string | null;
+      owner_telegram_id: number;
+    }>();
   if (!shift) return c.json({ error: 'shift_not_found' }, 404);
+
+  // Прокси-работодатель (завёл админ, пока настоящий не зарегистрировался
+  // сам — см. migration 0047) никогда не зайдёт сам и не примет отклик, так
+  // что ждать его здесь нечего: заявка сразу встаёт в 'invited', ровно как
+  // если бы он уже пригласил — тот же экран подтверждения у воркера
+  // (см. /:id/respond ниже), то же часовое напоминание, если забудет
+  // (remindUnansweredInvites в lib/reminders.ts), без каких-либо
+  // дополнительных изменений там.
+  const isProxy = !!shift.is_proxy;
 
   const existing = await c.env.DB.prepare('SELECT id, status FROM applications WHERE shift_id = ? AND worker_id = ?')
     .bind(shiftId, session.workerId)
@@ -106,35 +126,45 @@ applicationRoutes.post('/', async (c) => {
     if (existing.status !== 'declined' && existing.status !== 'cancelled') return c.json({ error: 'already_applied' }, 409);
     inserted = await c.env.DB.prepare(
       `UPDATE applications
-       SET status = 'pending', work_stage = 'upcoming', check_in_at = NULL, closed_by_employer_at = NULL,
+       SET status = ?, work_stage = 'upcoming', check_in_at = NULL, closed_by_employer_at = NULL,
            rating = NULL, review_tags = NULL, review_comment = NULL,
-           cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL, created_at = datetime('now')
+           cancelled_by = NULL, cancel_reason = NULL, cancelled_at = NULL, created_at = datetime('now'),
+           invited_at = ?, invite_reminded_at = NULL
        WHERE id = ? RETURNING *`,
     )
-      .bind(existing.id)
+      .bind(isProxy ? 'invited' : 'pending', isProxy ? new Date().toISOString() : null, existing.id)
       .first<AppRow>();
   } else {
     inserted = await c.env.DB.prepare(
-      "INSERT INTO applications (shift_id, worker_id, status, work_stage) VALUES (?, ?, 'pending', 'upcoming') RETURNING *",
+      `INSERT INTO applications (shift_id, worker_id, status, work_stage, invited_at)
+       VALUES (?, ?, ?, 'upcoming', ?) RETURNING *`,
     )
-      .bind(shiftId, session.workerId)
+      .bind(shiftId, session.workerId, isProxy ? 'invited' : 'pending', isProxy ? new Date().toISOString() : null)
       .first<AppRow>();
   }
 
   const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
-  await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-    .bind(shift.company_id, 'new_response', 'Новый отклик на смену', worker?.name ?? 'Соискатель откликнулся')
-    .run();
 
-  const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
-    .bind(shift.company_id)
-    .first<{ owner_telegram_id: number }>();
-  if (company) {
+  let proxyTelegramUrl: string | undefined;
+  if (isProxy) {
+    // Диплинк, а не отправка ботом — Telegram не даёт ни одному приложению
+    // отправить сообщение в личку от чужого имени без нажатия человеком.
+    // Максимум — открыть чат с уже готовым текстом в поле ввода.
+    if (shift.telegram_username) {
+      const text = 'Здравствуйте, я увидел(а) вашу вакансию в Wolso приложении, хотел(а) бы откликнуться.';
+      proxyTelegramUrl = `https://t.me/${shift.telegram_username}?text=${encodeURIComponent(text)}`;
+    }
+  } else {
+    await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+      .bind(shift.company_id, 'new_response', 'Новый отклик на смену', worker?.name ?? 'Соискатель откликнулся')
+      .run();
     const text = `📩 Новый отклик на «${shift.position_label}»\n${worker?.name ?? 'Соискатель'} хочет выйти на смену`;
-    c.executionCtx.waitUntil(notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'new_responses', text));
+    c.executionCtx.waitUntil(
+      notifyCompany(c.env, { id: shift.company_id, telegramId: shift.owner_telegram_id }, 'new_responses', text),
+    );
   }
 
-  return c.json({ application: appToJson(inserted!) });
+  return c.json({ application: appToJson(inserted!), proxyTelegramUrl });
 });
 
 async function ownedApplication(env: Env, id: string, workerId: number) {
@@ -152,14 +182,21 @@ applicationRoutes.post('/:id/respond', async (c) => {
   if (app.status !== 'invited') return c.json({ error: 'not_invited' }, 400);
 
   const { accept } = await c.req.json<{ accept: boolean }>();
-  const shift = await c.env.DB.prepare('SELECT company_id, position_label FROM shifts WHERE id = ?')
+  const shift = await c.env.DB.prepare(
+    `SELECT s.company_id, s.position_label, co.is_proxy
+     FROM shifts s JOIN companies co ON co.id = s.company_id
+     WHERE s.id = ?`,
+  )
     .bind(app.shift_id)
-    .first<{ company_id: number; position_label: string }>();
+    .first<{ company_id: number; position_label: string; is_proxy: number }>();
   const worker = await c.env.DB.prepare('SELECT name FROM workers WHERE id = ?').bind(session.workerId).first<{ name: string }>();
 
   if (accept) {
     await c.env.DB.prepare("UPDATE applications SET status = 'accepted' WHERE id = ?").bind(app.id).run();
-    if (shift) {
+    // Прокси-работодателю (см. migration 0047) пушить нечего — этой
+    // учёткой никто не пользуется, а синтетический owner_telegram_id даже
+    // не примет запрос к Bot API.
+    if (shift && !shift.is_proxy) {
       const title = `${worker?.name ?? 'Кандидат'} подтвердил(а) смену`;
       const subtitle = `«${shift.position_label}»`;
       await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
@@ -177,18 +214,20 @@ applicationRoutes.post('/:id/respond', async (c) => {
     await c.env.DB.prepare("UPDATE applications SET status = 'declined' WHERE id = ?").bind(app.id).run();
     if (shift) {
       await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
-      const title = `${worker?.name ?? 'Кандидат'} отклонил(а) приглашение`;
-      const subtitle = `«${shift.position_label}»`;
-      await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-        .bind(shift.company_id, 'invite_declined', title, subtitle)
-        .run();
-      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
-        .bind(shift.company_id)
-        .first<{ owner_telegram_id: number }>();
-      if (company)
-        c.executionCtx.waitUntil(
-          notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `↩️ ${title}\n${subtitle}`),
-        );
+      if (!shift.is_proxy) {
+        const title = `${worker?.name ?? 'Кандидат'} отклонил(а) приглашение`;
+        const subtitle = `«${shift.position_label}»`;
+        await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+          .bind(shift.company_id, 'invite_declined', title, subtitle)
+          .run();
+        const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+          .bind(shift.company_id)
+          .first<{ owner_telegram_id: number }>();
+        if (company)
+          c.executionCtx.waitUntil(
+            notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `↩️ ${title}\n${subtitle}`),
+          );
+      }
     }
   }
 
@@ -262,9 +301,13 @@ applicationRoutes.post('/:id/cancel', async (c) => {
     .bind(reason.trim(), app.id)
     .run();
 
-  const shift = await c.env.DB.prepare('SELECT company_id, position_label FROM shifts WHERE id = ?')
+  const shift = await c.env.DB.prepare(
+    `SELECT s.company_id, s.position_label, co.is_proxy
+     FROM shifts s JOIN companies co ON co.id = s.company_id
+     WHERE s.id = ?`,
+  )
     .bind(app.shift_id)
-    .first<{ company_id: number; position_label: string }>();
+    .first<{ company_id: number; position_label: string; is_proxy: number }>();
   if (shift) {
     await deleteShiftChat(c.env, shift.company_id, session.workerId, app.shift_id);
 
@@ -278,18 +321,20 @@ applicationRoutes.post('/:id/cancel', async (c) => {
         workerId: session.workerId,
       }),
     );
-    const title = `${worker?.name ?? 'Сотрудник'} не сможет выйти на смену`;
-    const subtitle = `«${shift.position_label}» — причина: ${reason.trim()}`;
-    await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
-      .bind(shift.company_id, 'cancelled_by_worker', title, subtitle)
-      .run();
-    const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
-      .bind(shift.company_id)
-      .first<{ owner_telegram_id: number }>();
-    if (company)
-      c.executionCtx.waitUntil(
-        notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `❌ ${title}\n${subtitle}`),
-      );
+    if (!shift.is_proxy) {
+      const title = `${worker?.name ?? 'Сотрудник'} не сможет выйти на смену`;
+      const subtitle = `«${shift.position_label}» — причина: ${reason.trim()}`;
+      await c.env.DB.prepare('INSERT INTO notifications (company_id, kind, title, subtitle) VALUES (?, ?, ?, ?)')
+        .bind(shift.company_id, 'cancelled_by_worker', title, subtitle)
+        .run();
+      const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
+        .bind(shift.company_id)
+        .first<{ owner_telegram_id: number }>();
+      if (company)
+        c.executionCtx.waitUntil(
+          notifyCompany(c.env, { id: shift.company_id, telegramId: company.owner_telegram_id }, 'worker_replies', `❌ ${title}\n${subtitle}`),
+        );
+    }
   }
 
   return c.json({ ok: true });

@@ -45,6 +45,8 @@ export interface ShiftRow {
   company_has_avatar?: number;
   company_description?: string;
   company_photo_ids?: string | null;
+  company_is_proxy?: number;
+  company_telegram_username?: string | null;
 }
 
 function companyPhotosFrom(r: ShiftRow) {
@@ -94,6 +96,12 @@ export function shiftToJson(r: ShiftRow) {
           avatarUrl: r.company_has_avatar ? `/media/companies/${r.company_id}/avatar` : null,
           description: r.company_description || undefined,
           photos: companyPhotosFrom(r),
+          // Прокси-работодатель, которого завёл админ, пока настоящий не
+          // зарегистрировался сам (см. migration 0047) — отклик на такую
+          // вакансию ведёт не в наш чат, а прямой ссылкой в Telegram на
+          // telegramUsername, поэтому клиенту нужны оба поля.
+          isProxy: !!r.company_is_proxy,
+          telegramUsername: r.company_telegram_username || undefined,
         }
       : undefined,
   };
@@ -104,7 +112,8 @@ export const SHIFT_SELECT = `
          c.logo_initial as company_logo_initial, c.logo_color as company_logo_color,
          c.rating as company_rating, c.reviews_count as company_reviews_count,
          (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description,
-         (SELECT json_group_array(id) FROM company_photos cp WHERE cp.company_id = c.id) as company_photo_ids
+         (SELECT json_group_array(id) FROM company_photos cp WHERE cp.company_id = c.id) as company_photo_ids,
+         c.is_proxy as company_is_proxy, c.telegram_username as company_telegram_username
   FROM shifts s JOIN companies c ON c.id = s.company_id
 `;
 

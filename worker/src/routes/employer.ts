@@ -687,7 +687,7 @@ employerRoutes.delete('/vacancies/:id', async (c) => {
  *  match a worker would get by filtering the feed for it. Deliberately
  *  narrow: broadcasting every new shift to every worker regardless of
  *  what they do would just train people to ignore the bot. */
-async function notifyMatchingWorkers(env: Env, shift: ShiftRow, days: string[] = [], postings = 1): Promise<void> {
+export async function notifyMatchingWorkers(env: Env, shift: ShiftRow, days: string[] = [], postings = 1): Promise<void> {
   const { results: matches } = await env.DB.prepare(
     `SELECT DISTINCT w.id, w.telegram_id FROM workers w
      JOIN worker_positions wp ON wp.worker_id = w.id

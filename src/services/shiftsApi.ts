@@ -47,6 +47,8 @@ export interface ShiftApiResponse {
     reviewsCount?: number;
     avatarUrl?: string | null;
     photos?: { id: number; url: string }[];
+    isProxy?: boolean;
+    telegramUsername?: string;
   };
 }
 
@@ -96,6 +98,8 @@ export function fromApi(s: ShiftApiResponse): Shift {
           reviewsCount: s.company.reviewsCount ?? 0,
           avatarUrl: resolveMediaUrl(s.company.avatarUrl),
           photos: (s.company.photos ?? []).map((p) => ({ id: String(p.id), url: resolveMediaUrl(p.url)! })),
+          isProxy: s.company.isProxy,
+          telegramUsername: s.company.telegramUsername,
         }
       : undefined,
   };

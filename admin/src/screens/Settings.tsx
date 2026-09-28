@@ -109,6 +109,7 @@ const REMINDER_JOB_LABELS: Record<string, string> = {
   shiftReminders: 'Смена скоро начнётся',
   closeShiftReminders: 'Прошедшие смены без закрытия',
   expiredShiftsDeleted: 'Просроченные незаполненные смены',
+  proxyShiftsClosed: 'Смены прокси-работодателей закрыты',
 };
 
 /** Same jobs the hourly cron runs, fired right now — for a migration
@@ -161,7 +162,9 @@ function RunRemindersCard() {
                     ? 'ошибка'
                     : key === 'expiredShiftsDeleted'
                       ? `удалено ${value}`
-                      : `отправлено ${value}`}
+                      : key === 'proxyShiftsClosed'
+                        ? `закрыто ${value}`
+                        : `отправлено ${value}`}
               </span>
             </li>
           ))}

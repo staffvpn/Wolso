@@ -36,6 +36,7 @@ import { adminComplaintRoutes } from './admin/complaints';
 import { adminExportRoutes } from './admin/export';
 import { adminAchievementRoutes } from './admin/achievements';
 import { achievementRoutes } from './routes/achievements';
+import { adminProxyEmployerRoutes } from './admin/proxyEmployers';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -94,6 +95,7 @@ app.route('/admin/complaints', adminComplaintRoutes);
 app.route('/admin/export', adminExportRoutes);
 app.route('/admin/promos', adminPromoRoutes);
 app.route('/admin/achievements', adminAchievementRoutes);
+app.route('/admin/proxy-employers', adminProxyEmployerRoutes);
 
 app.onError((err, c) => {
   console.error(err);
