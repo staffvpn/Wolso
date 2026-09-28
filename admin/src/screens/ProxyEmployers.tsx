@@ -107,7 +107,13 @@ export function ProxyEmployers() {
         </div>
       </div>
 
-      <EmployerModal open={createOpen} onClose={() => setCreateOpen(false)} onSubmit={(input) => create(input)} />
+      <EmployerModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={async (input) => {
+          await create(input);
+        }}
+      />
 
       <EmployerModal
         key={editing?.id ?? 'none'}
