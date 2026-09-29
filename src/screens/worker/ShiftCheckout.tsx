@@ -109,10 +109,11 @@ export function ShiftCheckout({ gate = false }: { gate?: boolean }) {
           commentPlaceholder="Комментарий для заведения — по желанию"
         />
 
-        {error && <p className="text-danger text-[13px] mt-4 leading-relaxed">{error}</p>}
       </div>
 
-      <div className="px-5 pb-5 pt-2 shrink-0">
+      {/* Ошибка — у кнопки, а не в конце прокрутки: см. CompleteWorkerProfile.tsx. */}
+      <div className="px-5 pb-5 pt-2 shrink-0 space-y-2">
+        {error && <p className="text-danger text-[13px] leading-relaxed">{error}</p>}
         <Button fullWidth disabled={submitting} onClick={submit}>
           {submitting ? 'Отправляем…' : 'Отправить отзыв'}
         </Button>

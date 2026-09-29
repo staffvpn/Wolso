@@ -273,10 +273,13 @@ export function CompleteEmployerProfile({ gate = false, rejectionReason }: { gat
           </div>
         </div>
 
-        {error && <p className="text-danger text-[13px] mt-4 leading-relaxed">{error}</p>}
       </div>
 
-      <div className="px-5 pb-5 pt-2 shrink-0">
+      {/* См. CompleteWorkerProfile.tsx — та же причина: ошибка должна
+       *  сидеть у кнопки, а не в конце длинной прокрутки вне видимой
+       *  области. */}
+      <div className="px-5 pb-5 pt-2 shrink-0 space-y-2">
+        {error && <p className="text-danger text-[13px] leading-relaxed">{error}</p>}
         <Button fullWidth disabled={saving} onClick={save}>
           {saving ? 'Сохраняем…' : gate ? 'Готово' : 'Сохранить'}
         </Button>

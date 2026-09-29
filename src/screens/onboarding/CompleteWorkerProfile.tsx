@@ -395,10 +395,15 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
         </div>
 
-        {error && <p className="text-danger text-[13px] mt-4 leading-relaxed">{error}</p>}
       </div>
 
-      <div className="px-5 pb-5 pt-2 shrink-0">
+      {/* Кнопка сидит в отдельном зафиксированном блоке под прокручиваемой
+       *  формой — ошибка здесь же, а не в конце длинного списка полей выше.
+       *  Там, внизу прокрутки, «Заполните: …» после нажатия «Готово» рендерился
+       *  вне видимой области, если человек не долистал до самого низа: кнопка
+       *  не меняется, сообщения не видно — с виду «ничего не происходит». */}
+      <div className="px-5 pb-5 pt-2 shrink-0 space-y-2">
+        {error && <p className="text-danger text-[13px] leading-relaxed">{error}</p>}
         <Button fullWidth disabled={saving} onClick={save}>
           {saving ? 'Сохраняем…' : gate ? 'Готово' : 'Сохранить'}
         </Button>
