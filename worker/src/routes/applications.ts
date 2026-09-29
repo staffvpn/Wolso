@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
+import { getShiftSelect, proxyColumnExists, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { recomputeCompanyRating } from '../lib/ratings';
 import { workerIsHidden } from '../lib/hiddenProfiles';
 import { notifyCompany } from '../lib/notifyPrefs';
@@ -56,9 +56,10 @@ applicationRoutes.get('/', async (c) => {
     .bind(session.workerId)
     .all<AppRow>();
 
+  const shiftSelect = await getShiftSelect(c.env);
   const out = [];
   for (const a of results) {
-    const shiftRow = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(a.shift_id).first<ShiftRow>();
+    const shiftRow = await c.env.DB.prepare(`${shiftSelect} WHERE s.id = ?`).bind(a.shift_id).first<ShiftRow>();
     out.push(appToJson(a, shiftRow ? shiftToJson(shiftRow) : undefined));
   }
   return c.json({ applications: out });
@@ -87,8 +88,13 @@ applicationRoutes.post('/', async (c) => {
     return c.json({ error: 'rate_limited' }, 429);
   }
 
+  // is_proxy назван явно (не через s.*/co.*), поэтому без проверки
+  // миграции 0047 этот запрос падает на любой базе, где её ещё не накатили
+  // руками, — а это единственный запрос на пути «Откликнуться», так что
+  // сломанным оказался бы вообще весь отклик, не только прокси-вакансии.
+  const withProxy = await proxyColumnExists(c.env);
   const shift = await c.env.DB.prepare(
-    `SELECT s.id, s.company_id, s.position_label, co.is_proxy, co.telegram_username, co.owner_telegram_id
+    `SELECT s.id, s.company_id, s.position_label, ${withProxy ? 'co.is_proxy' : '0 as is_proxy'}, co.telegram_username, co.owner_telegram_id
      FROM shifts s JOIN companies co ON co.id = s.company_id
      WHERE s.id = ? AND s.status = 'active'`,
   )
@@ -182,8 +188,9 @@ applicationRoutes.post('/:id/respond', async (c) => {
   if (app.status !== 'invited') return c.json({ error: 'not_invited' }, 400);
 
   const { accept } = await c.req.json<{ accept: boolean }>();
+  const withProxyRespond = await proxyColumnExists(c.env);
   const shift = await c.env.DB.prepare(
-    `SELECT s.company_id, s.position_label, co.is_proxy
+    `SELECT s.company_id, s.position_label, ${withProxyRespond ? 'co.is_proxy' : '0 as is_proxy'}
      FROM shifts s JOIN companies co ON co.id = s.company_id
      WHERE s.id = ?`,
   )
@@ -301,8 +308,9 @@ applicationRoutes.post('/:id/cancel', async (c) => {
     .bind(reason.trim(), app.id)
     .run();
 
+  const withProxyCancel = await proxyColumnExists(c.env);
   const shift = await c.env.DB.prepare(
-    `SELECT s.company_id, s.position_label, co.is_proxy
+    `SELECT s.company_id, s.position_label, ${withProxyCancel ? 'co.is_proxy' : '0 as is_proxy'}
      FROM shifts s JOIN companies co ON co.id = s.company_id
      WHERE s.id = ?`,
   )

@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireCompany } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
+import { getShiftSelect, shiftToJson, deleteShiftChat, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { mskTodayStr } from '../lib/time';
 import { lookupInn } from '../lib/innLookup';
@@ -272,7 +272,7 @@ employerRoutes.get('/vacancies', async (c) => {
   const session = requireCompany(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
 
-  const { results } = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.company_id = ? ORDER BY s.created_at DESC`)
+  const { results } = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.company_id = ? ORDER BY s.created_at DESC`)
     .bind(session.companyId)
     .all<ShiftRow>();
 
@@ -361,6 +361,7 @@ employerRoutes.post('/vacancies', async (c) => {
     return c.json({ error: 'migration_required', migration: '0034_shift_date_set' }, 400);
   }
 
+  const shiftSelect = await getShiftSelect(c.env);
   const rows: ShiftRow[] = [];
   for (const group of groups) {
     const columns = [
@@ -402,7 +403,7 @@ employerRoutes.post('/vacancies', async (c) => {
       .bind(...values)
       .first<{ id: number }>();
 
-    const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
+    const row = await c.env.DB.prepare(`${shiftSelect} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
     rows.push(row!);
   }
 
@@ -436,7 +437,7 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
   if (!session) return c.json({ error: 'auth_required' }, 401);
   const id = c.req.param('id');
 
-  const existing = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ? AND s.company_id = ?`)
+  const existing = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ? AND s.company_id = ?`)
     .bind(id, session.companyId)
     .first<ShiftRow>();
   if (!existing) return c.json({ error: 'not_found' }, 404);
@@ -573,7 +574,7 @@ employerRoutes.patch('/vacancies/:id', async (c) => {
     }
   }
 
-  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
+  const row = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(id).first<ShiftRow>();
   return c.json({ shift: shiftToJson(row!) });
 });
 

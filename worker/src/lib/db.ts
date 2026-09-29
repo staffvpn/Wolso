@@ -107,15 +107,39 @@ export function shiftToJson(r: ShiftRow) {
   };
 }
 
-export const SHIFT_SELECT = `
-  SELECT s.*, c.name as company_name, c.address as company_address, c.city as company_city,
-         c.logo_initial as company_logo_initial, c.logo_color as company_logo_color,
-         c.rating as company_rating, c.reviews_count as company_reviews_count,
-         (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description,
-         (SELECT json_group_array(id) FROM company_photos cp WHERE cp.company_id = c.id) as company_photo_ids,
-         c.is_proxy as company_is_proxy, c.telegram_username as company_telegram_username
-  FROM shifts s JOIN companies c ON c.id = s.company_id
-`;
+/** Применена ли миграция 0047 (companies.is_proxy). В отличие от `s.*`,
+ *  которое молча подхватывает любые новые колонки shifts, `c.is_proxy`
+ *  назван явно — и без этой проверки ронял бы SHIFT_SELECT целиком (а с
+ *  ним ленту, отклики, избранное — вообще всё, что читает смену) на любой
+ *  базе, где миграцию ещё не накатили руками. */
+let proxyColumnConfirmed = false;
+
+export async function proxyColumnExists(env: Env): Promise<boolean> {
+  if (proxyColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(companies)').all<{ name: string }>();
+    proxyColumnConfirmed = results.some((r) => r.name === 'is_proxy');
+    return proxyColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** Раньше был плоской константой — переехало в функцию именно из-за
+ *  company_is_proxy выше. telegram_username (миграция 0018) старый и
+ *  безопасный, его оставляем как есть. */
+export async function getShiftSelect(env: Env): Promise<string> {
+  const proxyCol = (await proxyColumnExists(env)) ? ', c.is_proxy as company_is_proxy' : '';
+  return `
+    SELECT s.*, c.name as company_name, c.address as company_address, c.city as company_city,
+           c.logo_initial as company_logo_initial, c.logo_color as company_logo_color,
+           c.rating as company_rating, c.reviews_count as company_reviews_count,
+           (c.avatar_data IS NOT NULL) as company_has_avatar, c.description as company_description,
+           (SELECT json_group_array(id) FROM company_photos cp WHERE cp.company_id = c.id) as company_photo_ids,
+           c.telegram_username as company_telegram_username${proxyCol}
+    FROM shifts s JOIN companies c ON c.id = s.company_id
+  `;
+}
 
 export async function getRolePermissions(env: Env, roleId: string): Promise<Record<PermissionKey, PermissionValue> | null> {
   const row = await env.DB.prepare('SELECT permissions FROM roles WHERE id = ?').bind(roleId).first<{ permissions: string }>();

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { getShiftSelect, shiftToJson, type ShiftRow } from '../lib/db';
 
 export const favoriteRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 favoriteRoutes.use('*', attachSession);
@@ -13,9 +13,10 @@ favoriteRoutes.get('/', async (c) => {
   const { results: shiftIds } = await c.env.DB.prepare('SELECT shift_id FROM favorite_shifts WHERE worker_id = ?')
     .bind(session.workerId)
     .all<{ shift_id: number }>();
+  const shiftSelect = await getShiftSelect(c.env);
   const shifts = [];
   for (const { shift_id } of shiftIds) {
-    const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(shift_id).first<ShiftRow>();
+    const row = await c.env.DB.prepare(`${shiftSelect} WHERE s.id = ?`).bind(shift_id).first<ShiftRow>();
     if (row) shifts.push(shiftToJson(row));
   }
 

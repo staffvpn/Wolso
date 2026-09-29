@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { getShiftSelect, shiftToJson, type ShiftRow } from '../lib/db';
 import { readUpload, setAvatar, addGalleryPhoto, deleteGalleryPhoto } from '../lib/media';
 import { datesColumnExists, datesColumnValue, expandDates, isConsecutive, normalizeDates } from '../lib/shiftDates';
 import { asPayMode, derivePay, payModeColumnExists } from '../lib/payMode';
@@ -198,7 +198,7 @@ adminProxyEmployerRoutes.get('/:id/vacancies', requirePermission('manageData'), 
   const id = Number(c.req.param('id'));
   if (!(await requireProxyCompany(c.env, id))) return c.json({ error: 'not_found' }, 404);
 
-  const { results } = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.company_id = ? ORDER BY s.created_at DESC`)
+  const { results } = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.company_id = ? ORDER BY s.created_at DESC`)
     .bind(id)
     .all<ShiftRow>();
   return c.json({ shifts: results.map(shiftToJson) });
@@ -294,7 +294,7 @@ adminProxyEmployerRoutes.post('/:id/vacancies', requirePermission('manageData'),
     .bind(...values)
     .first<{ id: number }>();
 
-  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
+  const row = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(inserted!.id).first<ShiftRow>();
 
   c.executionCtx.waitUntil(notifyMatchingWorkers(c.env, row!, picked, 1));
 
@@ -312,7 +312,7 @@ adminProxyEmployerRoutes.patch('/:id/vacancies/:shiftId', requirePermission('man
   const shiftId = c.req.param('shiftId');
   if (!(await requireProxyCompany(c.env, companyId))) return c.json({ error: 'not_found' }, 404);
 
-  const existing = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ? AND s.company_id = ?`)
+  const existing = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ? AND s.company_id = ?`)
     .bind(shiftId, companyId)
     .first<ShiftRow>();
   if (!existing) return c.json({ error: 'not_found' }, 404);
@@ -435,7 +435,7 @@ adminProxyEmployerRoutes.patch('/:id/vacancies/:shiftId', requirePermission('man
   const actor = await actorLabel(c.env, session);
   await logAction(c.env, actor, `отредактировала вакансию «${next.positionLabel}» прокси-работодателя #${companyId}`, 'neutral');
 
-  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(shiftId).first<ShiftRow>();
+  const row = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(shiftId).first<ShiftRow>();
   return c.json({ shift: shiftToJson(row!) });
 });
 

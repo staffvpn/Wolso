@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { actorLabel, attachSession, logAction, requirePermission, requireStaff, requireStaffMiddleware } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { getShiftSelect, shiftToJson, type ShiftRow } from '../lib/db';
 import { recomputeWorkerRating, recomputeCompanyRating } from '../lib/ratings';
 
 export const adminVacancyRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
@@ -10,7 +10,7 @@ adminVacancyRoutes.use('*', attachSession);
 /** Every shift ever posted, any status — the full "Вакансии и смены" table.
  *  Adds a response count per row so the list doesn't need N+1 calls. */
 adminVacancyRoutes.get('/', requireStaffMiddleware, async (c) => {
-  const { results } = await c.env.DB.prepare(`${SHIFT_SELECT} ORDER BY s.created_at DESC LIMIT 500`).all<ShiftRow>();
+  const { results } = await c.env.DB.prepare(`${await getShiftSelect(c.env)} ORDER BY s.created_at DESC LIMIT 500`).all<ShiftRow>();
 
   const vacancies = [];
   for (const row of results) {
@@ -27,7 +27,7 @@ adminVacancyRoutes.delete('/:id', requirePermission('manageData'), async (c) => 
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
 
-  const shift = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
+  const shift = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(id).first<ShiftRow>();
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
   const { results: reviewed } = await c.env.DB.prepare(
@@ -57,7 +57,7 @@ adminVacancyRoutes.post('/:id/close', requirePermission('approveVacancies'), asy
   const session = requireStaff(c as never)!;
   const id = c.req.param('id');
 
-  const shift = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(id).first<ShiftRow>();
+  const shift = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(id).first<ShiftRow>();
   if (!shift) return c.json({ error: 'not_found' }, 404);
 
   await c.env.DB.prepare("UPDATE shifts SET status = 'closed' WHERE id = ?").bind(id).run();

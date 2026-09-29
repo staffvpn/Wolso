@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { attachSession, requireWorker } from '../middleware/auth';
-import { SHIFT_SELECT, shiftToJson, type ShiftRow } from '../lib/db';
+import { getShiftSelect, shiftToJson, type ShiftRow } from '../lib/db';
 import { datesColumnExists } from '../lib/shiftDates';
 
 export const feedRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
@@ -118,7 +118,7 @@ feedRoutes.get('/', async (c) => {
   // RANDOM() сортирует всю выборку целиком, так что на большой базе это
   // придётся заменить на выборку случайного окна. Пока смен сотни, а не
   // сотни тысяч, разница незаметна.
-  const sql = `${SHIFT_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY RANDOM() LIMIT 100`;
+  const sql = `${await getShiftSelect(c.env)} WHERE ${clauses.join(' AND ')} ORDER BY RANDOM() LIMIT 100`;
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<ShiftRow>();
 
   return c.json({ shifts: results.map(shiftToJson) });
@@ -127,7 +127,7 @@ feedRoutes.get('/', async (c) => {
 feedRoutes.get('/:id', async (c) => {
   const session = requireWorker(c as never);
   if (!session) return c.json({ error: 'auth_required' }, 401);
-  const row = await c.env.DB.prepare(`${SHIFT_SELECT} WHERE s.id = ?`).bind(c.req.param('id')).first<ShiftRow>();
+  const row = await c.env.DB.prepare(`${await getShiftSelect(c.env)} WHERE s.id = ?`).bind(c.req.param('id')).first<ShiftRow>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   return c.json({ shift: shiftToJson(row) });
 });
