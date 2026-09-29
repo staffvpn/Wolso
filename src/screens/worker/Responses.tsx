@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Check, X, ChevronRight } from 'lucide-react';
+import { MessageCircle, Check, X, ChevronRight, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
@@ -203,6 +203,11 @@ function ResponseCard({
           <p className="text-[13px] text-text-muted truncate mt-0.5">
             {relativeShiftDays(shift)} · {formatMoney(shift.totalPay)}
           </p>
+          {company.isProxy && (
+            <p className="text-[11px] font-semibold text-accent flex items-center gap-1 mt-1">
+              <Sparkles size={11} /> Wolso рекомендует
+            </p>
+          )}
         </div>
         <ChevronRight size={16} className={cn('text-text-faint shrink-0 transition-transform', open && 'rotate-90')} />
       </button>

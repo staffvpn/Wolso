@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Map as MapIcon, Rocket, X, Check, ChevronLeft, Heart } from 'lucide-react';
+import { Bell, Map as MapIcon, Rocket, X, Check, ChevronLeft, Heart, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
@@ -360,6 +360,11 @@ function ShiftDetailOverlay({
           <h2 className="text-[26px] font-extrabold mt-5">{shift.positionLabel}</h2>
 
           <div className="flex flex-wrap gap-2 mt-3">
+            {company.isProxy && (
+              <Badge tone="accent">
+                <Sparkles size={11} /> Wolso рекомендует
+              </Badge>
+            )}
             <Badge tone={shift.employmentType === 'permanent' ? 'accent' : 'dark'}>
               {employmentTypeLabel(shift.employmentType)}
             </Badge>

@@ -5,7 +5,7 @@ import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
 import { formatDistance, formatMoney, hourlyRateLabel, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
-import { ChevronRight, Heart } from 'lucide-react';
+import { ChevronRight, Heart, Sparkles } from 'lucide-react';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { cn } from '@/lib/cn';
 import { hapticSelect } from '@/lib/telegram';
@@ -85,6 +85,14 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
         <h2 className="text-[24px] font-extrabold">{shift.positionLabel}</h2>
 
         <div className="flex flex-wrap gap-2 mt-3">
+          {/* Вакансии, которые завела сама площадка вместо ещё не
+              зарегистрированного бизнеса (см. worker/migrations/0047) — тот
+              же company.isProxy, что решает, куда ведёт «Откликнуться». */}
+          {company.isProxy && (
+            <Badge tone="accent">
+              <Sparkles size={11} /> Wolso рекомендует
+            </Badge>
+          )}
           <Badge tone={shift.employmentType === 'permanent' ? 'accent' : 'dark'}>
             {employmentTypeLabel(shift.employmentType)}
           </Badge>
