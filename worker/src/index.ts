@@ -8,7 +8,6 @@ import { runUnreadChatPings } from './lib/unreadChats';
 import { authRoutes } from './routes/auth';
 import { feedRoutes } from './routes/feed';
 import { applicationRoutes } from './routes/applications';
-import { favoriteRoutes } from './routes/favorites';
 import { chatRoutes } from './routes/chats';
 import { notificationRoutes } from './routes/notifications';
 import { profileRoutes } from './routes/profile';
@@ -59,7 +58,7 @@ app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));
 // '/me'. /auth is excluded on purpose: sign-in has to be able to answer
 // with the reason, and /media serves avatars that other people's screens
 // still legitimately show.
-for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifications', '/me', '/employer', '/support', '/complaints', '/personal-shifts']) {
+for (const base of ['/shifts', '/applications', '/chats', '/notifications', '/me', '/employer', '/support', '/complaints', '/personal-shifts']) {
   app.use(base, attachSession, rejectSuspended);
   app.use(`${base}/*`, attachSession, rejectSuspended);
 }
@@ -67,7 +66,6 @@ for (const base of ['/shifts', '/applications', '/favorites', '/chats', '/notifi
 app.route('/auth', authRoutes);
 app.route('/shifts', feedRoutes);
 app.route('/applications', applicationRoutes);
-app.route('/favorites', favoriteRoutes);
 app.route('/chats', chatRoutes);
 app.route('/notifications', notificationRoutes);
 app.route('/me', profileRoutes);

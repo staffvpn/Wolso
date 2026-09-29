@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Award, Camera, ChevronRight, EyeOff, Heart, Pencil, Plus, Send, Settings } from 'lucide-react';
+import { Award, Camera, ChevronRight, EyeOff, Pencil, Plus, Send, Settings } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { Chip } from '@/components/ui/Chip';
@@ -193,9 +193,6 @@ export function WorkerProfileScreen() {
               }
               onClick={() => navigate('/w/achievements')}
             />
-          </div>
-          <div className="px-3">
-            <ListRow icon={<Heart size={16} />} label="Избранное" onClick={() => navigate('/w/favorites')} />
           </div>
           <div className="px-3">
             <ListRow icon={<Settings size={16} />} label="Настройки" onClick={() => navigate('/w/settings')} />

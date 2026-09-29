@@ -5,10 +5,8 @@ import { LogoBadge } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { SafeImage } from '../ui/SafeImage';
 import { formatDistance, formatMoney, hourlyRateLabel, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
-import { ChevronRight, Heart, Sparkles } from 'lucide-react';
-import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { hapticSelect } from '@/lib/telegram';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 
 export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?: () => void }) {
@@ -16,8 +14,6 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
   const day = relativeShiftDays(shift);
   const days = shiftDays(shift).length;
   const durationH = shift.endHour - shift.startHour;
-  const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
-  const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
 
   // Avatar first, then any gallery photos the employer uploaded — same
   // Tinder-style tap-through as CandidateCard, so a shift with real photos
@@ -61,17 +57,6 @@ export function ShiftCard({ shift, onOpenDetail }: { shift: Shift; onOpenDetail?
               .join(' · ')}
           </p>
         </div>
-
-        <button
-          onClick={() => {
-            hapticSelect();
-            toggleFavorite(shift.id);
-          }}
-          aria-label="В избранное"
-          className="absolute top-3 right-3 z-10 h-9 w-9 rounded-full bg-black/30 backdrop-blur flex items-center justify-center"
-        >
-          <Heart size={17} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-white')} />
-        </button>
 
         {hasPhotos && photos.length > 1 && (
           <>

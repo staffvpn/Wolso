@@ -18,7 +18,6 @@ import { WorkerProfileScreen } from './screens/worker/Profile';
 import { Achievements } from './screens/worker/Achievements';
 import { Wallet } from './screens/worker/Wallet';
 import { Settings } from './screens/worker/Settings';
-import { Favorites } from './screens/worker/Favorites';
 
 import { Candidates } from './screens/employer/Candidates';
 import { FindWorkers } from './screens/employer/FindWorkers';
@@ -88,7 +87,6 @@ export default function App() {
               <Route path="/w/wallet" element={<Wallet />} />
               <Route path="/w/achievements" element={<Achievements />} />
               <Route path="/w/settings" element={<Settings />} />
-              <Route path="/w/favorites" element={<Favorites />} />
               <Route path="/w/notifications" element={<Notifications />} />
               <Route path="/w/support" element={<Support />} />
               <Route path="/w/profile/edit" element={<CompleteWorkerProfile />} />

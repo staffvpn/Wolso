@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Map as MapIcon, Rocket, X, Check, ChevronLeft, Heart, Sparkles } from 'lucide-react';
+import { Bell, Map as MapIcon, Rocket, X, Check, ChevronLeft, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { IconButton } from '@/components/ui/IconButton';
@@ -20,7 +20,6 @@ import { NeedOwnPhoto } from './NeedOwnPhoto';
 import { useShiftsStore } from '@/store/useShiftsStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useFiltersStore } from '@/store/useFiltersStore';
-import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
 import { useEntitlementsStore } from '@/store/useEntitlementsStore';
 import { usePromoStore } from '@/store/usePromoStore';
@@ -28,7 +27,6 @@ import { resolveCompany } from '@/data/companies';
 import { formatDistance, formatMoney, hourlyRateLabel, localDateStr, relativeShiftDays, shiftDays, pluralizeShifts, timeRange } from '@/lib/format';
 import { employmentTypeLabel } from '@/data/employmentTypes';
 import { FEATURES } from '@/lib/features';
-import { hapticSelect } from '@/lib/telegram';
 import { cn } from '@/lib/cn';
 import type { Shift } from '@/types';
 
@@ -277,8 +275,6 @@ function ShiftDetailOverlay({
   const day = relativeShiftDays(shift);
   const days = shiftDays(shift).length;
   const durationH = shift.endHour - shift.startHour;
-  const isFavorite = useFavoritesStore((s) => s.shiftIds.includes(shift.id));
-  const toggleFavorite = useFavoritesStore((s) => s.toggleShift);
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const photos = [company.avatarUrl, ...(company.photos ?? []).map((p) => p.url)].filter((p): p is string => !!p);
@@ -295,17 +291,6 @@ function ShiftDetailOverlay({
       <div className="flex items-center gap-2 px-3 pt-2 pb-1 shrink-0">
         <IconButton size={40} onClick={onClose} aria-label="Назад">
           <ChevronLeft size={20} />
-        </IconButton>
-        <span className="flex-1" />
-        <IconButton
-          size={40}
-          onClick={() => {
-            hapticSelect();
-            toggleFavorite(shift.id);
-          }}
-          aria-label="В избранное"
-        >
-          <Heart size={18} className={cn(isFavorite ? 'fill-danger text-danger' : 'text-text-muted')} />
         </IconButton>
       </div>
 
