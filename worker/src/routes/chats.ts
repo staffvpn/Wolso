@@ -22,6 +22,11 @@ interface ChatRow {
   worker_photo_url?: string | null;
   online?: number;
   last_message_at?: string | null;
+  last_text?: string | null;
+  last_kind?: string | null;
+  last_sender?: string | null;
+  last_preview_at?: string | null;
+  unread?: number;
 }
 
 function actorFromSession(session: SessionPayload | null) {
@@ -68,36 +73,47 @@ chatRoutes.get('/', async (c) => {
   // человек с открытым недавним разговором мог просто не заметить, что
   // ему ответили в другом. Для чата без единого сообщения (только что
   // пригласили) — время создания, другого ориентира ещё нет.
+  //
+  // Превью последнего сообщения и счётчик непрочитанных — тоже
+  // подзапросами прямо здесь, а не отдельным запросом на каждый чат из
+  // списка (как было раньше): список из N чатов стоил 1 + 2N обращений к
+  // базе, и при опросе каждые 5 секунд (см. ChatList.tsx) это и съело
+  // дневной лимит D1 на чтения. idx_messages_chat_created (миграция 0049)
+  // превращает «последнее сообщение» в точечный поиск по индексу вместо
+  // перебора всей истории чата.
   const lastMessageAt = '(SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id)';
+  const previewWhere = 'm.chat_id = ch.id AND (m.visible_to IS NULL OR m.visible_to = ?)';
+  const previewOrder = 'ORDER BY m.created_at DESC, m.id DESC LIMIT 1';
+  const previewCols = `
+    (SELECT m.text FROM messages m WHERE ${previewWhere} ${previewOrder}) as last_text,
+    (SELECT m.kind FROM messages m WHERE ${previewWhere} ${previewOrder}) as last_kind,
+    (SELECT m.sender FROM messages m WHERE ${previewWhere} ${previewOrder}) as last_sender,
+    (SELECT m.created_at FROM messages m WHERE ${previewWhere} ${previewOrder}) as last_preview_at,
+    (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ch.id AND m.read = 0 AND m.sender != ? AND (m.visible_to IS NULL OR m.visible_to = ?)) as unread`;
   const sql =
     actor.role === 'worker'
       ? `SELECT ch.*, co.name as company_name, co.logo_initial as company_logo_initial, co.logo_color as company_logo_color,
            (co.avatar_data IS NOT NULL) as company_has_avatar, ${onlineExpr('co.last_seen_at')} as online,
-           ${lastMessageAt} as last_message_at
+           ${lastMessageAt} as last_message_at, ${previewCols}
          FROM chats ch JOIN companies co ON co.id = ch.company_id WHERE ch.worker_id = ?
-         ORDER BY COALESCE(${lastMessageAt}, ch.created_at) DESC`
+         ORDER BY COALESCE(last_message_at, ch.created_at) DESC`
       : `SELECT ch.*, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
-           ${onlineExpr('w.last_seen_at')} as online, ${lastMessageAt} as last_message_at
+           ${onlineExpr('w.last_seen_at')} as online, ${lastMessageAt} as last_message_at, ${previewCols}
          FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ?
-         ORDER BY COALESCE(${lastMessageAt}, ch.created_at) DESC`;
+         ORDER BY COALESCE(last_message_at, ch.created_at) DESC`;
 
-  const { results } = await c.env.DB.prepare(sql).bind(actor.id).all<ChatRow>();
+  // Порядок плейсхолдеров: 4 подзапроса превью (каждому своё `?` на
+  // visible_to) + unread (sender, visible_to) + финальный WHERE по id.
+  const { results } = await c.env.DB.prepare(sql)
+    .bind(actor.role, actor.role, actor.role, actor.role, actor.role, actor.role, actor.id)
+    .all<ChatRow>();
 
   const chats = [];
   for (const row of results) {
-    // A system message can be scoped to just one side (visible_to) — keep
-    // it out of the other side's preview and unread count entirely, same
-    // as it's kept out of their message list below.
-    const last = await c.env.DB.prepare(
-      'SELECT text, kind, sender, created_at FROM messages WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?) ORDER BY created_at DESC LIMIT 1',
-    )
-      .bind(row.id, actor.role)
-      .first<{ text: string; kind: string; sender: string; created_at: string }>();
-    const unread = await c.env.DB.prepare(
-      "SELECT COUNT(*) as n FROM messages WHERE chat_id = ? AND read = 0 AND sender != ? AND (visible_to IS NULL OR visible_to = ?)",
-    )
-      .bind(row.id, actor.role, actor.role)
-      .first<{ n: number }>();
+    const last =
+      row.last_kind != null
+        ? { text: row.last_text ?? '', kind: row.last_kind, sender: row.last_sender, created_at: row.last_preview_at }
+        : null;
 
     const avatarUrl =
       actor.role === 'worker'
@@ -118,7 +134,7 @@ chatRoutes.get('/', async (c) => {
       logoInitial: row.company_logo_initial,
       logoColor: row.company_logo_color,
       lastMessage: last?.kind === 'image' ? { text: '📷 Фото', created_at: last.created_at } : last,
-      unread: unread?.n ?? 0,
+      unread: row.unread ?? 0,
       online: !!row.online,
       lastMessageAt: row.last_message_at ?? row.created_at,
     });
