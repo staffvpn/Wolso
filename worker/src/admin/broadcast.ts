@@ -158,42 +158,53 @@ adminBroadcastRoutes.get('/cities', requirePermission('sendBroadcasts'), async (
   return c.json({ cities });
 });
 
-/** Resolves the audience and stores it — nothing is sent yet. Sending is
- *  driven by /:id/send-batch below so a long run can't blow a Worker's
- *  request budget, and so an interrupted broadcast can be resumed instead
- *  of restarted from the top. */
-adminBroadcastRoutes.post('/', requirePermission('sendBroadcasts'), async (c) => {
-  const session = requireStaff(c as never)!;
-  const body = await c.req.json<{ text: string; audience?: string; city?: string; telegramIds?: number[] }>();
-  const text = body.text?.trim();
-  if (!text) return c.json({ error: 'text_required' }, 400);
+/** Резолвит аудиторию и сохраняет черновик — само отправление не начинается
+ *  (им управляет sendBroadcastBatch ниже, повторными вызовами, чтобы не
+ *  упереться в бюджет одного запроса Worker'а и чтобы прерванную рассылку
+ *  можно было продолжить, а не начинать заново). Общая для дашборда
+ *  (POST / ниже) и для команды /broadcast из самого бота (routes/bot.ts) —
+ *  у владельца должен быть тот же самый, проверенный путь, а не отдельная
+ *  copy-paste версия. */
+export async function createBroadcast(
+  env: Env,
+  params: { text: string; audience?: string; city?: string | null; telegramIds?: number[]; createdBy: string },
+): Promise<{ id: number; total: number } | { error: 'text_required' | 'no_recipients' }> {
+  const text = params.text?.trim();
+  if (!text) return { error: 'text_required' };
 
-  const audience = parseAudience(body.audience);
+  const audience = parseAudience(params.audience);
   // A hand-picked list is about specific people, so the city filter has no
   // say in it — resolveRecipients ignores city for 'custom'.
-  const city = audience === 'custom' ? null : body.city?.trim() || null;
-  const chosen = Array.isArray(body.telegramIds) ? body.telegramIds.filter((n) => Number.isFinite(n)) : undefined;
-  const recipients = await resolveRecipients(c.env, audience, city, chosen);
-  if (recipients.length === 0) return c.json({ error: 'no_recipients' }, 400);
+  const city = audience === 'custom' ? null : params.city?.trim() || null;
+  const chosen = params.telegramIds?.filter((n) => Number.isFinite(n));
+  const recipients = await resolveRecipients(env, audience, city, chosen);
+  if (recipients.length === 0) return { error: 'no_recipients' };
 
-  const actor = await actorLabel(c.env, session);
-  const inserted = await c.env.DB.prepare(
+  const inserted = await env.DB.prepare(
     `INSERT INTO broadcasts (text, audience, city, recipients, total, created_by)
      VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
   )
-    .bind(text, audience, city, JSON.stringify(recipients), recipients.length, actor.name)
+    .bind(text, audience, city, JSON.stringify(recipients), recipients.length, params.createdBy)
     .first<{ id: number }>();
 
-  await logAction(c.env, actor, `запустила рассылку на ${recipients.length} чел.`, 'neutral');
-  return c.json({ id: inserted!.id, total: recipients.length });
-});
+  return { id: inserted!.id, total: recipients.length };
+}
 
-/** Sends the next batch and moves the cursor. Safe to call again after a
- *  failure: the cursor only advances past recipients this call actually
- *  attempted, so a retry resumes rather than re-sending to everyone. */
-adminBroadcastRoutes.post('/:id/send-batch', requirePermission('sendBroadcasts'), async (c) => {
-  const id = c.req.param('id');
-  const row = await c.env.DB.prepare('SELECT * FROM broadcasts WHERE id = ?').bind(id).first<{
+export interface BroadcastBatchResult {
+  id: number;
+  processed: number;
+  total: number;
+  sent: number;
+  failed: number;
+  done: boolean;
+}
+
+/** Отправляет следующую пачку и двигает курсор. Безопасно звать повторно
+ *  после сбоя: курсор продвигается ровно на то, что эта попытка реально
+ *  обработала, так что повтор продолжает, а не рассылает всем заново.
+ *  `null` — такой рассылки нет. */
+export async function sendBroadcastBatch(env: Env, id: number): Promise<BroadcastBatchResult | null> {
+  const row = await env.DB.prepare('SELECT * FROM broadcasts WHERE id = ?').bind(id).first<{
     id: number;
     text: string;
     recipients: string;
@@ -202,7 +213,7 @@ adminBroadcastRoutes.post('/:id/send-batch', requirePermission('sendBroadcasts')
     sent_count: number;
     failed_count: number;
   }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (!row) return null;
 
   const recipients = JSON.parse(row.recipients) as number[];
   const slice = recipients.slice(row.cursor, row.cursor + BATCH_SIZE);
@@ -213,25 +224,49 @@ adminBroadcastRoutes.post('/:id/send-batch', requirePermission('sendBroadcasts')
     // sendTelegramMessage swallows its own errors (blocked bot, deleted
     // account) and reports false-ish by logging — check the result so a
     // blocked user counts as "не доставлено" rather than silently as sent.
-    const ok = await sendTelegramMessage(c.env, telegramId, row.text);
+    const ok = await sendTelegramMessage(env, telegramId, row.text);
     if (ok) sent++;
     else failed++;
     if (GAP_MS > 0) await new Promise((resolve) => setTimeout(resolve, GAP_MS));
   }
 
   const cursor = row.cursor + slice.length;
-  await c.env.DB.prepare('UPDATE broadcasts SET cursor = ?, sent_count = ?, failed_count = ? WHERE id = ?')
+  await env.DB.prepare('UPDATE broadcasts SET cursor = ?, sent_count = ?, failed_count = ? WHERE id = ?')
     .bind(cursor, row.sent_count + sent, row.failed_count + failed, id)
     .run();
 
-  return c.json({
+  return {
     id: row.id,
     processed: cursor,
     total: row.total,
     sent: row.sent_count + sent,
     failed: row.failed_count + failed,
     done: cursor >= row.total,
+  };
+}
+
+adminBroadcastRoutes.post('/', requirePermission('sendBroadcasts'), async (c) => {
+  const session = requireStaff(c as never)!;
+  const body = await c.req.json<{ text: string; audience?: string; city?: string; telegramIds?: number[] }>();
+  const actor = await actorLabel(c.env, session);
+
+  const result = await createBroadcast(c.env, {
+    text: body.text,
+    audience: body.audience,
+    city: body.city,
+    telegramIds: body.telegramIds,
+    createdBy: actor.name,
   });
+  if ('error' in result) return c.json({ error: result.error }, 400);
+
+  await logAction(c.env, actor, `запустила рассылку на ${result.total} чел.`, 'neutral');
+  return c.json(result);
+});
+
+adminBroadcastRoutes.post('/:id/send-batch', requirePermission('sendBroadcasts'), async (c) => {
+  const result = await sendBroadcastBatch(c.env, Number(c.req.param('id')));
+  if (!result) return c.json({ error: 'not_found' }, 404);
+  return c.json(result);
 });
 
 /** Past broadcasts, newest first — what was sent, to whom, and how it

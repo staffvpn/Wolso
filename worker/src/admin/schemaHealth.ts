@@ -259,9 +259,11 @@ adminSchemaHealthRoutes.post('/webhook', requirePermission('viewTechHealth'), as
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       url: webhookUrl(c),
-      // Only membership changes. Without this Telegram would also post
-      // every message sent to the bot, which nothing here handles.
-      allowed_updates: ['my_chat_member'],
+      // my_chat_member — подписка/отписка от бота. message — личные
+      // команды владельца (см. routes/bot.ts): бот реагирует только в
+      // приватном чате и только если отправитель — OWNER_TELEGRAM_ID или
+      // ADMIN_CHAT_ID, остальным сообщениям отвечать нечем.
+      allowed_updates: ['my_chat_member', 'message'],
     }),
   });
 
