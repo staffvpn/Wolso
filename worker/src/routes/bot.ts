@@ -75,9 +75,48 @@ async function runBroadcastToCompletion(env: Env, id: number, chatId: number): P
 
 const HELP_TEXT =
   'Команды для владельца:\n\n' +
+  '/status — быстрая сводка по площадке\n' +
   '/broadcast <текст> — подготовить рассылку всем, у кого есть бот\n' +
   '/confirm <id> — разослать подготовленную рассылку #id\n' +
   '/help — это сообщение';
+
+/** Сводка в одно сообщение — специально лёгкая (голые COUNT по индексам,
+ *  без джойнов и без воронки, как у дашборда), чтобы с телефона за пару
+ *  секунд понять «а точно ли что-то сломалось», не открывая веб-админку.
+ *  Любая из таблиц может не существовать на базе, где накатаны не все
+ *  миграции (см. весь этот кодбейз) — тогда просто сообщаем об этом,
+ *  а не роняем всю команду. */
+async function statusSummary(env: Env): Promise<string> {
+  const count = async (sql: string): Promise<number> => (await env.DB.prepare(sql).first<{ n: number }>())?.n ?? 0;
+
+  try {
+    const [workers, companies, activeShifts, pendingVerification, newComplaints, unreadSupport, newWorkersToday, newCompaniesToday] =
+      await Promise.all([
+        count('SELECT COUNT(*) as n FROM workers'),
+        count('SELECT COUNT(*) as n FROM companies'),
+        count("SELECT COUNT(*) as n FROM shifts WHERE status = 'active'"),
+        count("SELECT COUNT(*) as n FROM companies WHERE verification_status = 'pending'"),
+        count("SELECT COUNT(*) as n FROM complaints WHERE status = 'new'"),
+        count("SELECT COUNT(*) as n FROM support_messages WHERE sender = 'user' AND read = 0"),
+        count("SELECT COUNT(*) as n FROM workers WHERE date(created_at) = date('now')"),
+        count("SELECT COUNT(*) as n FROM companies WHERE date(created_at) = date('now')"),
+      ]);
+
+    return (
+      `📊 Wolso сейчас\n\n` +
+      `Соискателей всего: ${workers}\n` +
+      `Работодателей всего: ${companies}\n` +
+      `Активных вакансий: ${activeShifts}\n\n` +
+      `Сегодня зарегистрировалось: ${newWorkersToday + newCompaniesToday} (${newWorkersToday} соискателей, ${newCompaniesToday} работодателей)\n\n` +
+      `На проверке (работодатели): ${pendingVerification}\n` +
+      `Новых жалоб: ${newComplaints}\n` +
+      `Непрочитано в поддержке: ${unreadSupport}`
+    );
+  } catch (err) {
+    console.error('bot /status failed', err);
+    return 'Не получилось собрать сводку — похоже, воркер или база недоступны.';
+  }
+}
 
 async function handleOwnerCommand(
   env: Env,
@@ -92,6 +131,11 @@ async function handleOwnerCommand(
 
   if (cmd === '/start' || cmd === '/help') {
     await reply(env, chatId, HELP_TEXT);
+    return;
+  }
+
+  if (cmd === '/status') {
+    await reply(env, chatId, await statusSummary(env));
     return;
   }
 
