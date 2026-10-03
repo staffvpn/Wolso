@@ -21,17 +21,34 @@ async function getOrCreateThread(env: Env, actor: { col: 'worker_id' | 'company_
   return inserted!.id;
 }
 
-/** The caller's own support thread + its messages — creates the thread
- *  lazily so there's nothing to provision at onboarding. */
+/** The caller's own support thread + its messages, либо только то, что
+ *  появилось после сообщения `after`. Экран опрашивает эту ручку раз в 4
+ *  секунды, пока открыт (см. src/screens/shared/Support.tsx) — без курсора
+ *  это гоняло бы всю историю переписки заново на каждый тик, тот же класс
+ *  перерасхода лимита D1 на чтения, что чинили в основном чате. Создаёт
+ *  тред лениво, так что при онбординге провижинить нечего. */
 supportRoutes.get('/thread', async (c) => {
   const actor = actorFromSession(c.get('session'));
   if (!actor) return c.json({ error: 'auth_required' }, 401);
 
   const threadId = await getOrCreateThread(c.env, actor);
-  const { results } = await c.env.DB.prepare('SELECT * FROM support_messages WHERE thread_id = ? ORDER BY created_at ASC')
-    .bind(threadId)
+
+  const afterParam = c.req.query('after');
+  const after = afterParam && /^\d+$/.test(afterParam) ? Number(afterParam) : null;
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM support_messages WHERE thread_id = ?${after === null ? '' : ' AND id > ?'} ORDER BY id ASC`,
+  )
+    .bind(...(after === null ? [threadId] : [threadId, after]))
     .all();
-  await c.env.DB.prepare("UPDATE support_messages SET read = 1 WHERE thread_id = ? AND sender = 'staff'").bind(threadId).run();
+
+  // Как и в основном чате — пишем в базу только когда есть что отмечать,
+  // а не на каждый пустой тик опроса.
+  if (after === null || results.length > 0) {
+    await c.env.DB.prepare("UPDATE support_messages SET read = 1 WHERE thread_id = ? AND sender = 'staff' AND read = 0")
+      .bind(threadId)
+      .run();
+  }
 
   return c.json({ threadId, messages: results });
 });

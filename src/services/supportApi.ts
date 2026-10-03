@@ -21,8 +21,11 @@ function fromApi(m: ApiSupportMessage): ChatMessage {
   };
 }
 
-export async function fetchSupportThread(as: Actor): Promise<ChatMessage[]> {
-  const { messages } = await apiFetch<{ messages: ApiSupportMessage[] }>('/support/thread', { as });
+/** Вся переписка, либо только то, что появилось после сообщения `after` —
+ *  см. chatApi.ts's fetchMessages про тот же курсор в основном чате. */
+export async function fetchSupportThread(as: Actor, after?: string): Promise<ChatMessage[]> {
+  const cursor = after && /^\d+$/.test(after) ? `?after=${after}` : '';
+  const { messages } = await apiFetch<{ messages: ApiSupportMessage[] }>(`/support/thread${cursor}`, { as });
   return messages.map(fromApi);
 }
 
