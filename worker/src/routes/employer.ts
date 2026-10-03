@@ -276,11 +276,22 @@ employerRoutes.get('/vacancies', async (c) => {
     .bind(session.companyId)
     .all<ShiftRow>();
 
-  const shifts = [];
-  for (const row of results) {
-    const responses = await c.env.DB.prepare('SELECT COUNT(*) as n FROM applications WHERE shift_id = ?').bind(row.id).first<{ n: number }>();
-    shifts.push({ ...shiftToJson(row), responseCount: responses?.n ?? 0 });
+  // Счётчик откликов — одним сгруппированным запросом на все вакансии
+  // разом, а не отдельным запросом на каждую (тот же класс N+1, что чинили
+  // в GET /chats).
+  const shiftIds = results.map((r) => r.id);
+  const countsById = new Map<number, number>();
+  if (shiftIds.length > 0) {
+    const placeholders = shiftIds.map(() => '?').join(',');
+    const { results: counts } = await c.env.DB.prepare(
+      `SELECT shift_id, COUNT(*) as n FROM applications WHERE shift_id IN (${placeholders}) GROUP BY shift_id`,
+    )
+      .bind(...shiftIds)
+      .all<{ shift_id: number; n: number }>();
+    for (const row of counts) countsById.set(row.shift_id, row.n);
   }
+
+  const shifts = results.map((row) => ({ ...shiftToJson(row), responseCount: countsById.get(row.id) ?? 0 }));
   return c.json({ shifts });
 });
 

@@ -56,12 +56,21 @@ applicationRoutes.get('/', async (c) => {
     .bind(session.workerId)
     .all<AppRow>();
 
-  const shiftSelect = await getShiftSelect(c.env);
-  const out = [];
-  for (const a of results) {
-    const shiftRow = await c.env.DB.prepare(`${shiftSelect} WHERE s.id = ?`).bind(a.shift_id).first<ShiftRow>();
-    out.push(appToJson(a, shiftRow ? shiftToJson(shiftRow) : undefined));
+  // Все смены одним запросом (WHERE s.id IN (...)), а не отдельным запросом
+  // на каждый отклик — тот же класс бага, что и в GET /chats, просто реже
+  // вызывается (загрузка экрана, а не опрос каждые несколько секунд).
+  const shiftIds = [...new Set(results.map((a) => a.shift_id))];
+  const shiftsById = new Map<number, ShiftRow>();
+  if (shiftIds.length > 0) {
+    const shiftSelect = await getShiftSelect(c.env);
+    const placeholders = shiftIds.map(() => '?').join(',');
+    const { results: shiftRows } = await c.env.DB.prepare(`${shiftSelect} WHERE s.id IN (${placeholders})`)
+      .bind(...shiftIds)
+      .all<ShiftRow>();
+    for (const row of shiftRows) shiftsById.set(row.id, row);
   }
+
+  const out = results.map((a) => appToJson(a, shiftsById.has(a.shift_id) ? shiftToJson(shiftsById.get(a.shift_id)!) : undefined));
   return c.json({ applications: out });
 });
 
