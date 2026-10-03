@@ -12,7 +12,7 @@ import { Chip } from '@/components/ui/Chip';
 import { ReportSheet } from '@/components/ReportSheet';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
-import { QUICK_REPLIES } from '@/data/chats';
+import { QUICK_REPLIES, EMPLOYER_QUICK_REPLIES } from '@/data/chats';
 import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
 import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 import { cn } from '@/lib/cn';
@@ -308,15 +308,13 @@ export function ChatDetail() {
           placeholder="Сообщение…"
           className="flex-1 min-w-0 h-11 rounded-2xl bg-surface border border-border px-4 text-[14px] outline-none focus:border-accent placeholder:text-text-faint"
         />
-        {role === 'worker' && (
-          <button
-            onClick={() => setQuickRepliesOpen(true)}
-            className="h-11 w-11 rounded-2xl bg-surface border border-border text-text-muted flex items-center justify-center shrink-0"
-            aria-label="Готовые ответы"
-          >
-            <Zap size={17} />
-          </button>
-        )}
+        <button
+          onClick={() => setQuickRepliesOpen(true)}
+          className="h-11 w-11 rounded-2xl bg-surface border border-border text-text-muted flex items-center justify-center shrink-0"
+          aria-label="Готовые ответы"
+        >
+          <Zap size={17} />
+        </button>
         <button
           onClick={() => handleSend(text)}
           className="h-11 w-11 rounded-2xl bg-accent text-accent-fg flex items-center justify-center shrink-0"
@@ -326,24 +324,22 @@ export function ChatDetail() {
         </button>
       </div>
 
-      {role === 'worker' && (
-        <BottomSheet open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)}>
-          <p className="font-bold text-[16px] mb-4">Готовые ответы</p>
-          <div className="flex flex-wrap gap-2 pb-2">
-            {QUICK_REPLIES.map((r) => (
-              <Chip
-                key={r}
-                onClick={() => {
-                  setQuickRepliesOpen(false);
-                  handleSend(r);
-                }}
-              >
-                {r}
-              </Chip>
-            ))}
-          </div>
-        </BottomSheet>
-      )}
+      <BottomSheet open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)}>
+        <p className="font-bold text-[16px] mb-4">Готовые ответы</p>
+        <div className="flex flex-wrap gap-2 pb-2">
+          {(role === 'worker' ? QUICK_REPLIES : EMPLOYER_QUICK_REPLIES).map((r) => (
+            <Chip
+              key={r}
+              onClick={() => {
+                setQuickRepliesOpen(false);
+                handleSend(r);
+              }}
+            >
+              {r}
+            </Chip>
+          ))}
+        </div>
+      </BottomSheet>
 
       {reportTargetId && (
         <ReportSheet
