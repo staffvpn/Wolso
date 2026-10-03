@@ -13,8 +13,9 @@ interface ApiChat {
   logoInitial?: string;
   logoColor?: string;
   unread: number;
-  lastMessage?: { text: string } | null;
+  lastMessage?: { text: string; created_at?: string } | null;
   online?: boolean;
+  lastMessageAt?: string;
 }
 
 interface ApiMessage {
@@ -41,6 +42,7 @@ function chatFromApi(c: ApiChat): Chat {
     unread: c.unread,
     lastMessagePreview: c.lastMessage?.text?.split('\n')[0],
     online: !!c.online,
+    lastMessageAt: c.lastMessageAt,
   };
 }
 

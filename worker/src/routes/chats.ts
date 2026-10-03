@@ -21,6 +21,7 @@ interface ChatRow {
   worker_has_avatar?: number;
   worker_photo_url?: string | null;
   online?: number;
+  last_message_at?: string | null;
 }
 
 function actorFromSession(session: SessionPayload | null) {
@@ -62,14 +63,23 @@ chatRoutes.get('/', async (c) => {
 
   c.executionCtx.waitUntil(touchLastSeen(c.env, actor));
 
+  // Отсортированы по последнему сообщению, а не по моменту создания чата —
+  // иначе ответ в старый чат никогда не поднимал бы его наверх списка, и
+  // человек с открытым недавним разговором мог просто не заметить, что
+  // ему ответили в другом. Для чата без единого сообщения (только что
+  // пригласили) — время создания, другого ориентира ещё нет.
+  const lastMessageAt = '(SELECT MAX(m.created_at) FROM messages m WHERE m.chat_id = ch.id)';
   const sql =
     actor.role === 'worker'
       ? `SELECT ch.*, co.name as company_name, co.logo_initial as company_logo_initial, co.logo_color as company_logo_color,
-           (co.avatar_data IS NOT NULL) as company_has_avatar, ${onlineExpr('co.last_seen_at')} as online
-         FROM chats ch JOIN companies co ON co.id = ch.company_id WHERE ch.worker_id = ? ORDER BY ch.created_at DESC`
+           (co.avatar_data IS NOT NULL) as company_has_avatar, ${onlineExpr('co.last_seen_at')} as online,
+           ${lastMessageAt} as last_message_at
+         FROM chats ch JOIN companies co ON co.id = ch.company_id WHERE ch.worker_id = ?
+         ORDER BY COALESCE(${lastMessageAt}, ch.created_at) DESC`
       : `SELECT ch.*, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
-           ${onlineExpr('w.last_seen_at')} as online
-         FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ? ORDER BY ch.created_at DESC`;
+           ${onlineExpr('w.last_seen_at')} as online, ${lastMessageAt} as last_message_at
+         FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ?
+         ORDER BY COALESCE(${lastMessageAt}, ch.created_at) DESC`;
 
   const { results } = await c.env.DB.prepare(sql).bind(actor.id).all<ChatRow>();
 
@@ -107,9 +117,10 @@ chatRoutes.get('/', async (c) => {
       avatarUrl,
       logoInitial: row.company_logo_initial,
       logoColor: row.company_logo_color,
-      lastMessage: last?.kind === 'image' ? { text: '📷 Фото' } : last,
+      lastMessage: last?.kind === 'image' ? { text: '📷 Фото', created_at: last.created_at } : last,
       unread: unread?.n ?? 0,
       online: !!row.online,
+      lastMessageAt: row.last_message_at ?? row.created_at,
     });
   }
   return c.json({ chats });

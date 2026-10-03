@@ -7,6 +7,7 @@ import { Avatar, LogoBadge } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
+import { timeAgoSince } from '@/lib/format';
 
 export function ChatList() {
   const navigate = useNavigate();
@@ -55,8 +56,17 @@ export function ChatList() {
                   {chat.online && <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full bg-accent ring-2 ring-bg" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[15px] truncate">{chat.contactName}</p>
-                  <p className="text-[13px] text-text-muted truncate">{chat.lastMessagePreview ?? 'Нет сообщений'}</p>
+                  <div className="flex items-baseline gap-1.5">
+                    {/* Точка — та же привязка к смене, что и бейдж «Смена» в
+                        самом чате (ChatDetail.tsx), просто компактнее для
+                        строки списка. */}
+                    {chat.shiftId && <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />}
+                    <p className="font-semibold text-[15px] truncate flex-1 min-w-0">{chat.contactName}</p>
+                    {chat.lastMessageAt && (
+                      <span className="text-[11px] text-text-faint shrink-0">{timeAgoSince(chat.lastMessageAt)}</span>
+                    )}
+                  </div>
+                  <p className="text-[13px] text-text-muted truncate mt-0.5">{chat.lastMessagePreview ?? 'Нет сообщений'}</p>
                 </div>
                 {chat.unread > 0 && (
                   <span className="h-5 min-w-5 px-1.5 rounded-full bg-accent text-accent-fg text-[11px] font-bold flex items-center justify-center shrink-0">

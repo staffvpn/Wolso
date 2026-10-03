@@ -163,6 +163,10 @@ export interface Chat {
   shiftId?: string;
   unread: number;
   lastMessagePreview?: string;
+  /** Время последнего сообщения — список чатов сортирован по нему, не по
+   *  моменту создания чата. У только что созданного чата без сообщений —
+   *  время самого чата. */
+  lastMessageAt?: string;
   /** Был(а) в разделе чатов в последние пару минут. */
   online?: boolean;
 }
