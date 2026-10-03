@@ -414,6 +414,7 @@ export interface ChatMessageRow {
   id: string;
   sender: 'worker' | 'company' | 'system';
   text: string;
+  kind: string;
   createdAt: string;
 }
 
@@ -447,13 +448,14 @@ export async function fetchUserChats(kind: 'seeker' | 'employer', id: string): P
 
 export async function fetchChatMessages(chatId: string): Promise<ChatMessageRow[]> {
   const { messages } = await apiFetch<{
-    messages: { id: number; sender: string; text: string; created_at: string }[];
+    messages: { id: number; sender: string; text: string; kind: string; created_at: string }[];
   }>(`/admin/users/chat-messages/${chatId}`);
 
   return messages.map((m) => ({
     id: String(m.id),
     sender: m.sender as ChatMessageRow['sender'],
     text: m.text,
+    kind: m.kind,
     createdAt: m.created_at,
   }));
 }

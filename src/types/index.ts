@@ -143,7 +143,13 @@ export interface ChatMessage {
   from: 'me' | 'them';
   text: string;
   createdAt: string;
-  kind?: 'text' | 'location' | 'system';
+  kind?: 'text' | 'location' | 'system' | 'image';
+  /** Прочитал ли собеседник — только для своих сообщений (from === 'me'),
+   *  для галочек доставлено/прочитано под пузырём. */
+  read?: boolean;
+  /** kind === 'image': само вложение подгружается отдельно и лениво (см.
+   *  useChatStore's loadImage) — здесь только факт, что оно есть. */
+  hasImage?: boolean;
 }
 
 export interface Chat {
@@ -157,6 +163,8 @@ export interface Chat {
   shiftId?: string;
   unread: number;
   lastMessagePreview?: string;
+  /** Был(а) в разделе чатов в последние пару минут. */
+  online?: boolean;
 }
 
 export interface WorkerExperience {

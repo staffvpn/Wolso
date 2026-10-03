@@ -72,3 +72,21 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
+
+/** Для приватных вложений (фото в чате — routes/chats.ts's GET
+ *  .../messages/:id/image): обычный `<img src>` не может послать токен в
+ *  заголовке, а эта ручка — не публичная раздача вроде аватарок
+ *  (routes/media.ts), её нарочно спрятали за attachSession, потому что
+ *  личную переписку чужому человеку по ссылке видеть не положено.
+ *  Поэтому вместо прямого src — authenticated fetch и blob-URL. */
+export async function apiFetchBlob(path: string, as: 'worker' | 'company' = 'worker'): Promise<string> {
+  if (!API_URL) throw new Error('VITE_API_URL is not set — see .env.example.');
+
+  const token = as === 'company' ? useAuthStore.getState().companyToken : useAuthStore.getState().workerToken;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (!res.ok) throw new ApiError(res.status);
+  return URL.createObjectURL(await res.blob());
+}

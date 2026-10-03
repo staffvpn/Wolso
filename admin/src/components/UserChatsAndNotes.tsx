@@ -83,7 +83,7 @@ function ChatsBlock({ kind, id }: { kind: 'seeker' | 'employer'; id: string }) {
                 <span className="font-semibold text-text-muted">
                   {m.sender === 'worker' ? openChat.workerName : m.sender === 'company' ? openChat.companyName : 'Система'}:
                 </span>{' '}
-                <span className="text-text whitespace-pre-line">{m.text}</span>
+                <span className="text-text whitespace-pre-line">{m.kind === 'image' ? '📷 Фото' : m.text}</span>
               </div>
             ))}
           </div>

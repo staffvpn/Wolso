@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession } from '../middleware/auth';
 import { MESSAGE_LIMIT, overLimit } from '../lib/rateLimit';
+import { readUpload } from '../lib/media';
 
 export const chatRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 chatRoutes.use('*', attachSession);
@@ -19,6 +20,7 @@ interface ChatRow {
   worker_name?: string;
   worker_has_avatar?: number;
   worker_photo_url?: string | null;
+  online?: number;
 }
 
 function actorFromSession(session: SessionPayload | null) {
@@ -27,16 +29,46 @@ function actorFromSession(session: SessionPayload | null) {
   return null;
 }
 
+/** «В сети» — последние 2 минуты активности в разделе чатов (см.
+ *  touchLastSeen ниже), не по всему приложению: это не общий статус
+ *  присутствия, а именно «сейчас может ответить в переписке». Сравнение —
+ *  на стороне SQLite (datetime('now', ...)), а не разбором строки в JS:
+ *  last_seen_at хранится как 'YYYY-MM-DD HH:MM:SS' без таймзоны, и строковое
+ *  сравнение в этом формате работает прямо в SQL без догадок о том, как
+ *  его допарсит движок JS. NULL (никогда не заходил) сравнение просто не
+ *  проходит — отдельная проверка не нужна. */
+function onlineExpr(column: string): string {
+  return `${column} >= datetime('now', '-2 minutes')`;
+}
+
+/** Отмечает «сейчас активен» — но не чаще чем раз в минуту на человека,
+ *  иначе опрос открытого чата (раз в 2 секунды, см. ChatDetail.tsx) писал
+ *  бы в базу на каждый тик. last_seen_at (миграция 0041) уже существует и
+ *  раньше обновлялся только при входе в бот — здесь то же поле, просто
+ *  живее, пока человек реально в разделе чатов. */
+async function touchLastSeen(env: Env, actor: { role: 'worker' | 'company'; id: number }): Promise<void> {
+  const table = actor.role === 'worker' ? 'workers' : 'companies';
+  await env.DB.prepare(
+    `UPDATE ${table} SET last_seen_at = datetime('now')
+     WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at <= datetime('now', '-1 minute'))`,
+  )
+    .bind(actor.id)
+    .run();
+}
+
 chatRoutes.get('/', async (c) => {
   const actor = actorFromSession(c.get('session'));
   if (!actor) return c.json({ error: 'auth_required' }, 401);
 
+  c.executionCtx.waitUntil(touchLastSeen(c.env, actor));
+
   const sql =
     actor.role === 'worker'
       ? `SELECT ch.*, co.name as company_name, co.logo_initial as company_logo_initial, co.logo_color as company_logo_color,
-           (co.avatar_data IS NOT NULL) as company_has_avatar
+           (co.avatar_data IS NOT NULL) as company_has_avatar, ${onlineExpr('co.last_seen_at')} as online
          FROM chats ch JOIN companies co ON co.id = ch.company_id WHERE ch.worker_id = ? ORDER BY ch.created_at DESC`
-      : `SELECT ch.*, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url
+      : `SELECT ch.*, w.name as worker_name, (w.avatar_data IS NOT NULL) as worker_has_avatar, w.photo_url as worker_photo_url,
+           ${onlineExpr('w.last_seen_at')} as online
          FROM chats ch JOIN workers w ON w.id = ch.worker_id WHERE ch.company_id = ? ORDER BY ch.created_at DESC`;
 
   const { results } = await c.env.DB.prepare(sql).bind(actor.id).all<ChatRow>();
@@ -75,8 +107,9 @@ chatRoutes.get('/', async (c) => {
       avatarUrl,
       logoInitial: row.company_logo_initial,
       logoColor: row.company_logo_color,
-      lastMessage: last,
+      lastMessage: last?.kind === 'image' ? { text: '📷 Фото' } : last,
       unread: unread?.n ?? 0,
+      online: !!row.online,
     });
   }
   return c.json({ chats });
@@ -87,6 +120,33 @@ async function assertParticipant(env: Env, chatId: string, actor: { role: 'worke
   return env.DB.prepare(`SELECT id, company_id, worker_id FROM chats WHERE id = ? AND ${col} = ?`)
     .bind(chatId, actor.id)
     .first<{ id: number; company_id: number; worker_id: number }>();
+}
+
+/** Применена ли миграция 0048 (messages.file_data/file_content_type). Та же
+ *  осторожность, что и везде в этом кодбейзе: миграции накатываются
+ *  руками, и запрос к несуществующей колонке уронил бы не только вложения,
+ *  а вообще всю переписку — GET .../messages вызывается на каждый опрос
+ *  открытого чата. */
+let chatMediaColumnsConfirmed = false;
+
+async function chatMediaColumnsExist(env: Env): Promise<boolean> {
+  if (chatMediaColumnsConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(messages)').all<{ name: string }>();
+    chatMediaColumnsConfirmed = results.some((r) => r.name === 'file_data');
+    return chatMediaColumnsConfirmed;
+  } catch {
+    return false;
+  }
+}
+
+/** Колонки сообщения без самого вложения — отдавать BLOB внутри JSON на
+ *  каждый опрос (раз в 2 секунды, пока чат открыт) означало бы слать
+ *  картинку заново каждый раз. Экран подгружает её отдельным
+ *  авторизованным запросом (GET .../image) только когда она правда нужна. */
+async function messageColumns(env: Env): Promise<string> {
+  const hasImage = (await chatMediaColumnsExist(env)) ? '(file_data IS NOT NULL) as has_image' : '0 as has_image';
+  return `id, chat_id, sender, kind, text, read, visible_to, created_at, ${hasImage}`;
 }
 
 /** История чата — целиком, либо только то, что появилось после
@@ -101,13 +161,16 @@ chatRoutes.get('/:id/messages', async (c) => {
   const actor = actorFromSession(c.get('session'));
   if (!actor) return c.json({ error: 'auth_required' }, 401);
   const chatId = c.req.param('id');
-  if (!(await assertParticipant(c.env, chatId, actor))) return c.json({ error: 'not_found' }, 404);
+  const chat = await assertParticipant(c.env, chatId, actor);
+  if (!chat) return c.json({ error: 'not_found' }, 404);
+
+  c.executionCtx.waitUntil(touchLastSeen(c.env, actor));
 
   const afterParam = c.req.query('after');
   const after = afterParam && /^\d+$/.test(afterParam) ? Number(afterParam) : null;
 
   const { results } = await c.env.DB.prepare(
-    `SELECT * FROM messages
+    `SELECT ${await messageColumns(c.env)} FROM messages
      WHERE chat_id = ? AND (visible_to IS NULL OR visible_to = ?)${after === null ? '' : ' AND id > ?'}
      ORDER BY id ASC`,
   )
@@ -130,7 +193,14 @@ chatRoutes.get('/:id/messages', async (c) => {
       .run();
   }
 
-  return c.json({ messages: results });
+  // «В сети» у собеседника — тем же запросом, которым и так опрашивается
+  // чат: отдельный поллинг под это заводить незачем.
+  const counterpartyTable = actor.role === 'worker' ? 'companies' : 'workers';
+  const counterparty = await c.env.DB.prepare(`SELECT ${onlineExpr('last_seen_at')} as online FROM ${counterpartyTable} WHERE id = ?`)
+    .bind(actor.role === 'worker' ? chat.company_id : chat.worker_id)
+    .first<{ online: number }>();
+
+  return c.json({ messages: results, counterparty: { online: !!counterparty?.online } });
 });
 
 chatRoutes.post('/:id/messages', async (c) => {
@@ -148,7 +218,7 @@ chatRoutes.post('/:id/messages', async (c) => {
   }
 
   const inserted = await c.env.DB.prepare(
-    "INSERT INTO messages (chat_id, sender, kind, text) VALUES (?, ?, 'text', ?) RETURNING *",
+    `INSERT INTO messages (chat_id, sender, kind, text) VALUES (?, ?, 'text', ?) RETURNING ${await messageColumns(c.env)}`,
   )
     .bind(chatId, actor.role, text.trim())
     .first();
@@ -163,4 +233,74 @@ chatRoutes.post('/:id/messages', async (c) => {
   // с этого момента никем не читаются и остаются только как след.
 
   return c.json({ message: inserted });
+});
+
+/** Фото или документ прямо в переписке — то же тело запроса, что у
+ *  аватарки (сырые байты, Content-Type из заголовка), просто кладётся на
+ *  само сообщение, а не на профиль. Тот же лимит на чат, что и у текста
+ *  (MESSAGE_LIMIT): вложение — такая же строка messages. */
+chatRoutes.post('/:id/messages/image', async (c) => {
+  const actor = actorFromSession(c.get('session'));
+  if (!actor) return c.json({ error: 'auth_required' }, 401);
+  if (!(await chatMediaColumnsExist(c.env))) {
+    return c.json({ error: 'migration_required', migration: '0048_chat_media' }, 400);
+  }
+  const chatId = c.req.param('id');
+  const chat = await assertParticipant(c.env, chatId, actor);
+  if (!chat) return c.json({ error: 'not_found' }, 404);
+
+  if (await overLimit(c.env, 'messages', 'chat_id', chatId, MESSAGE_LIMIT)) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+
+  const contentType = c.req.header('Content-Type') ?? 'application/octet-stream';
+  const bytes = await c.req.arrayBuffer();
+  const check = readUpload(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  const inserted = await c.env.DB.prepare(
+    `INSERT INTO messages (chat_id, sender, kind, text, file_data, file_content_type)
+     VALUES (?, ?, 'image', '', ?, ?) RETURNING ${await messageColumns(c.env)}`,
+  )
+    .bind(chatId, actor.role, bytes, contentType)
+    .first();
+
+  return c.json({ message: inserted });
+});
+
+/** D1 hands a BLOB column back as a plain `number[]`, not an
+ *  ArrayBuffer/Uint8Array — feeding that straight into `new Response()`
+ *  silently stringifies it instead of sending the actual bytes (same gotcha
+ *  as routes/media.ts's toBytes). */
+function toBytes(raw: unknown): Uint8Array | null {
+  if (raw == null) return null;
+  if (raw instanceof Uint8Array) return raw;
+  if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+  if (Array.isArray(raw)) return new Uint8Array(raw);
+  return null;
+}
+
+/** В отличие от аватарок и фото анкеты (routes/media.ts), это не публичная
+ *  раздача: то, что прислали в личном чате, видят только двое участников
+ *  этого чата, а не кто угодно по ссылке — отсюда проверка участника и то,
+ *  что этот маршрут сидит за attachSession, а не в открытом mediaRoutes. */
+chatRoutes.get('/:id/messages/:messageId/image', async (c) => {
+  const actor = actorFromSession(c.get('session'));
+  if (!actor) return c.json({ error: 'auth_required' }, 401);
+  if (!(await chatMediaColumnsExist(c.env))) return c.notFound();
+  const chatId = c.req.param('id');
+  if (!(await assertParticipant(c.env, chatId, actor))) return c.json({ error: 'not_found' }, 404);
+
+  const row = await c.env.DB.prepare('SELECT file_data, file_content_type FROM messages WHERE id = ? AND chat_id = ?')
+    .bind(c.req.param('messageId'), chatId)
+    .first<{ file_data: unknown; file_content_type: string | null }>();
+  const bytes = toBytes(row?.file_data);
+  if (!bytes) return c.notFound();
+
+  // Сообщение неизменяемо после отправки — тот же адрес всегда отдаёт те
+  // же байты, так что кэшировать его навсегда безопасно (как у галереи
+  // фото в lib/media.ts, в отличие от аватарки, которая перезаписывается).
+  return new Response(bytes, {
+    headers: { 'Content-Type': row!.file_content_type ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=31536000, immutable' },
+  });
 });

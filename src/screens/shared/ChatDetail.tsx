@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePoll } from '@/lib/usePoll';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Send, ChevronLeft, RotateCw, Flag } from 'lucide-react';
+import { Send, ChevronLeft, RotateCw, Flag, Paperclip, Zap, Check, CheckCheck, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { Avatar, LogoBadge } from '@/components/ui/Avatar';
+import { SafeImage } from '@/components/ui/SafeImage';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Chip } from '@/components/ui/Chip';
 import { ReportSheet } from '@/components/ReportSheet';
 import { useChatStore } from '@/store/useChatStore';
 import { useRole } from '@/hooks/useRole';
 import { QUICK_REPLIES } from '@/data/chats';
+import { VISUALLY_HIDDEN_FILE_INPUT } from '@/lib/visuallyHidden';
+import { compressImageFile, UnsupportedImageError } from '@/lib/imageCompress';
 import { cn } from '@/lib/cn';
 import type { ChatMessage } from '@/types';
 
@@ -31,16 +36,22 @@ export function ChatDetail() {
   const loadChats = useChatStore((s) => s.load);
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const messages = useChatStore((s) => (chatId ? s.messagesByChat[chatId] : undefined) ?? EMPTY_MESSAGES);
+  const imageBlobs = useChatStore((s) => s.imageBlobs);
   const loadMessages = useChatStore((s) => s.loadMessages);
   const syncMessages = useChatStore((s) => s.syncMessages);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendImage = useChatStore((s) => s.sendImage);
+  const loadImage = useChatStore((s) => s.loadImage);
   const markRead = useChatStore((s) => s.markRead);
 
   const [text, setText] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
+  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
   const [messagesError, setMessagesError] = useState(false);
   const [sendError, setSendError] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function reloadMessages() {
     if (!chatId) return;
@@ -76,6 +87,19 @@ export function ChatDetail() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
+
+  // Вложения подгружаются по одному авторизованному запросу на сообщение,
+  // лениво — как только карточка с ним появилась на экране, а не все
+  // разом при каждом опросе переписки.
+  useEffect(() => {
+    if (!chatId) return;
+    for (const m of messages) {
+      if (m.kind === 'image' && m.hasImage && !m.id.startsWith('local-') && !imageBlobs[m.id]) {
+        loadImage(chatId, m.id, actor).catch(() => {});
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, messages]);
 
   // Navigating away belongs in an effect, not the render body: calling
   // navigate(-1) directly while rendering used to bounce back to a chat
@@ -122,21 +146,39 @@ export function ChatDetail() {
     });
   }
 
+  async function handleImageChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !chatId) return;
+    setImageError(null);
+    try {
+      await sendImage(chatId, await compressImageFile(file), actor);
+    } catch (err) {
+      setImageError(err instanceof UnsupportedImageError ? err.message : 'Фото не отправилось — проверьте связь и попробуйте ещё раз.');
+    }
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center gap-3 px-5 pt-4 pb-3 safe-top shrink-0 border-b border-border-soft">
         <IconButton onClick={() => navigate(-1)} aria-label="Назад">
           <ChevronLeft size={20} />
         </IconButton>
-        {chat.avatarUrl ? (
-          <Avatar src={chat.avatarUrl} name={chat.contactName} size={38} />
-        ) : chat.logoInitial ? (
-          <LogoBadge initial={chat.logoInitial} color={chat.logoColor ?? '#6b6d76'} size={38} />
-        ) : (
-          <Avatar name={chat.contactName} size={38} />
-        )}
+        <div className="relative shrink-0">
+          {chat.avatarUrl ? (
+            <Avatar src={chat.avatarUrl} name={chat.contactName} size={38} />
+          ) : chat.logoInitial ? (
+            <LogoBadge initial={chat.logoInitial} color={chat.logoColor ?? '#6b6d76'} size={38} />
+          ) : (
+            <Avatar name={chat.contactName} size={38} />
+          )}
+          {chat.online && (
+            <span className="absolute right-[-1px] bottom-[-1px] h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-bg" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[15px] truncate">{chat.contactName}</p>
+          {chat.online && <p className="text-[11px] font-semibold text-accent -mt-0.5">в сети</p>}
         </div>
         {chat.shiftId && (
           <span className="text-[12px] font-semibold text-text-muted bg-surface-2 rounded-full px-3 py-1.5 shrink-0">Смена</span>
@@ -151,7 +193,21 @@ export function ChatDetail() {
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
+      {/* Постоянное напоминание, а не разовое системное сообщение: его не
+          должно уносить вверх вместе с историей переписки (экран всегда
+          проматывает к последнему сообщению — см. endRef ниже), и видеть
+          его должны обе стороны при каждом открытии чата, а не один раз. */}
+      <div className="flex items-start gap-2 px-5 py-2.5 shrink-0 bg-warning-soft border-b border-border-soft">
+        <ShieldAlert size={14} className="text-warning shrink-0 mt-0.5" />
+        <p className="text-[11.5px] leading-snug text-text-muted">
+          Договорённости и переписка за пределами Wolso — на ваш риск, мы их не контролируем и ответственности за них не несём.
+        </p>
+      </div>
+
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 bg-bg"
+        style={{ backgroundImage: 'url(/chat-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
         {messagesError && (
           <div className="rounded-2xl bg-danger/10 border border-danger/30 px-4 py-3 flex items-center justify-between gap-3">
             <p className="text-[13px] text-danger">Не удалось загрузить сообщения</p>
@@ -165,6 +221,7 @@ export function ChatDetail() {
         {sendError && (
           <p className="text-[12px] text-danger text-center">Сообщение не отправилось — проверьте связь и попробуйте ещё раз.</p>
         )}
+        {imageError && <p className="text-[12px] text-danger text-center">{imageError}</p>}
         {messages.map((m) => {
           if (m.kind === 'system') {
             return (
@@ -180,12 +237,39 @@ export function ChatDetail() {
               </div>
             );
           }
+
+          if (m.kind === 'image') {
+            const url = imageBlobs[m.id];
+            return (
+              <motion.div
+                key={m.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn('flex flex-col gap-1', m.from === 'me' ? 'items-end' : 'items-start')}
+              >
+                <div
+                  className={cn(
+                    'max-w-[72%] w-56 rounded-2xl overflow-hidden',
+                    m.from === 'me' ? 'rounded-br-md bg-accent p-1' : 'rounded-bl-md bg-surface-2 p-1',
+                  )}
+                >
+                  {url ? (
+                    <SafeImage src={url} alt="Фото" className="w-full h-auto rounded-xl block" />
+                  ) : (
+                    <div className="w-full aspect-[4/3] rounded-xl bg-surface animate-pulse" />
+                  )}
+                </div>
+                {m.from === 'me' && <ReadReceipt read={!!m.read} />}
+              </motion.div>
+            );
+          }
+
           return (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className={cn('flex', m.from === 'me' ? 'justify-end' : 'justify-start')}
+              className={cn('flex flex-col gap-1', m.from === 'me' ? 'items-end' : 'items-start')}
             >
               <div
                 className={cn(
@@ -195,34 +279,44 @@ export function ChatDetail() {
               >
                 {m.text}
               </div>
+              {m.from === 'me' && <ReadReceipt read={!!m.read} />}
             </motion.div>
           );
         })}
         <div ref={endRef} />
       </div>
 
-      {role === 'worker' && (
-        <div className="flex gap-2 px-5 pb-2 shrink-0 overflow-x-auto">
-          {QUICK_REPLIES.map((r) => (
-            <button
-              key={r}
-              onClick={() => handleSend(r)}
-              className="shrink-0 h-9 px-3.5 rounded-full border border-border text-[13px] font-medium text-text-muted"
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="flex items-center gap-2 px-5 pb-5 pt-2 shrink-0 safe-bottom">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={VISUALLY_HIDDEN_FILE_INPUT}
+          onChange={handleImageChosen}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="h-11 w-11 rounded-2xl bg-surface border border-border text-text-muted flex items-center justify-center shrink-0"
+          aria-label="Прикрепить фото"
+        >
+          <Paperclip size={17} />
+        </button>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend(text)}
           placeholder="Сообщение…"
-          className="flex-1 h-11 rounded-2xl bg-surface border border-border px-4 text-[14px] outline-none focus:border-accent placeholder:text-text-faint"
+          className="flex-1 min-w-0 h-11 rounded-2xl bg-surface border border-border px-4 text-[14px] outline-none focus:border-accent placeholder:text-text-faint"
         />
+        {role === 'worker' && (
+          <button
+            onClick={() => setQuickRepliesOpen(true)}
+            className="h-11 w-11 rounded-2xl bg-surface border border-border text-text-muted flex items-center justify-center shrink-0"
+            aria-label="Готовые ответы"
+          >
+            <Zap size={17} />
+          </button>
+        )}
         <button
           onClick={() => handleSend(text)}
           className="h-11 w-11 rounded-2xl bg-accent text-accent-fg flex items-center justify-center shrink-0"
@@ -231,6 +325,25 @@ export function ChatDetail() {
           <Send size={17} />
         </button>
       </div>
+
+      {role === 'worker' && (
+        <BottomSheet open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)}>
+          <p className="font-bold text-[16px] mb-4">Готовые ответы</p>
+          <div className="flex flex-wrap gap-2 pb-2">
+            {QUICK_REPLIES.map((r) => (
+              <Chip
+                key={r}
+                onClick={() => {
+                  setQuickRepliesOpen(false);
+                  handleSend(r);
+                }}
+              >
+                {r}
+              </Chip>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
 
       {reportTargetId && (
         <ReportSheet
@@ -243,5 +356,16 @@ export function ChatDetail() {
         />
       )}
     </div>
+  );
+}
+
+/** Доставлено / прочитано — под своими сообщениями, тем же приёмом, что и
+ *  в мессенджерах: одна галочка значит «дошло», две — что собеседник уже
+ *  открыл чат после этого. */
+function ReadReceipt({ read }: { read: boolean }) {
+  return (
+    <span className={cn('flex items-center gap-0.5 pr-1 text-[10px]', read ? 'text-accent' : 'text-text-faint')}>
+      {read ? <CheckCheck size={12} /> : <Check size={12} />}
+    </span>
   );
 }

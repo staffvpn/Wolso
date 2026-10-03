@@ -1,4 +1,4 @@
-import { apiFetch, resolveMediaUrl } from '@/lib/apiClient';
+import { apiFetch, apiFetchBlob, resolveMediaUrl } from '@/lib/apiClient';
 import type { Chat, ChatMessage } from '@/types';
 
 export type ChatActor = 'worker' | 'company';
@@ -14,15 +14,18 @@ interface ApiChat {
   logoColor?: string;
   unread: number;
   lastMessage?: { text: string } | null;
+  online?: boolean;
 }
 
 interface ApiMessage {
   id: number;
   chat_id: number;
   sender: 'worker' | 'company' | 'system';
-  kind: 'text' | 'location' | 'system';
+  kind: 'text' | 'location' | 'system' | 'image';
   text: string;
+  read: number;
   created_at: string;
+  has_image?: number;
 }
 
 function chatFromApi(c: ApiChat): Chat {
@@ -37,6 +40,7 @@ function chatFromApi(c: ApiChat): Chat {
     shiftId: c.shiftId ? String(c.shiftId) : undefined,
     unread: c.unread,
     lastMessagePreview: c.lastMessage?.text?.split('\n')[0],
+    online: !!c.online,
   };
 }
 
@@ -48,6 +52,8 @@ function messageFromApi(m: ApiMessage, mine: ChatActor): ChatMessage {
     kind: m.kind,
     text: m.text,
     createdAt: m.created_at,
+    read: !!m.read,
+    hasImage: !!m.has_image,
   };
 }
 
@@ -58,13 +64,21 @@ export async function fetchChats(as: ChatActor): Promise<Chat[]> {
 
 /** Вся переписка, либо только то, что появилось после сообщения `after`.
  *  Второе — для опроса открытого чата: возить всю историю раз в пару
- *  секунд ради нуля новых строк ни к чему. */
-export async function fetchMessages(chatId: string, as: ChatActor, after?: string): Promise<ChatMessage[]> {
+ *  секунд ради нуля новых строк ни к чему. Заодно возвращает «в сети» у
+ *  собеседника — тем же запросом, которым и так опрашивается чат. */
+export async function fetchMessages(
+  chatId: string,
+  as: ChatActor,
+  after?: string,
+): Promise<{ messages: ChatMessage[]; counterpartyOnline: boolean }> {
   // Оптимистичные сообщения (id вида `local-…`) серверу не отдаём: он ждёт
   // число, а такого id у него всё равно нет.
   const cursor = after && /^\d+$/.test(after) ? `?after=${after}` : '';
-  const { messages } = await apiFetch<{ messages: ApiMessage[] }>(`/chats/${chatId}/messages${cursor}`, { as });
-  return messages.map((m) => messageFromApi(m, as));
+  const { messages, counterparty } = await apiFetch<{ messages: ApiMessage[]; counterparty: { online: boolean } }>(
+    `/chats/${chatId}/messages${cursor}`,
+    { as },
+  );
+  return { messages: messages.map((m) => messageFromApi(m, as)), counterpartyOnline: counterparty.online };
 }
 
 export async function postMessage(chatId: string, text: string, as: ChatActor): Promise<ChatMessage> {
@@ -74,4 +88,21 @@ export async function postMessage(chatId: string, text: string, as: ChatActor): 
     as,
   });
   return messageFromApi(message, as);
+}
+
+export async function postImageMessage(chatId: string, file: File, as: ChatActor): Promise<ChatMessage> {
+  const body = await file.arrayBuffer();
+  const { message } = await apiFetch<{ message: ApiMessage }>(`/chats/${chatId}/messages/image`, {
+    method: 'POST',
+    body,
+    raw: { contentType: file.type || 'application/octet-stream' },
+    as,
+  });
+  return messageFromApi(message, as);
+}
+
+/** blob-URL вложения — см. apiClient.ts's apiFetchBlob про то, почему не
+ *  просто <img src>. */
+export async function fetchMessageImage(chatId: string, messageId: string, as: ChatActor): Promise<string> {
+  return apiFetchBlob(`/chats/${chatId}/messages/${messageId}/image`, as);
 }

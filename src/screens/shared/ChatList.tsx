@@ -52,6 +52,7 @@ export function ChatList() {
                   ) : (
                     <Avatar name={chat.contactName} size={46} />
                   )}
+                  {chat.online && <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full bg-accent ring-2 ring-bg" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[15px] truncate">{chat.contactName}</p>
