@@ -702,7 +702,7 @@ function ReviewsBlock({ received, given, receivedLabel, givenLabel, receivedSide
         {list.map((r) => (
           <div key={`${tab}-${r.id}`} className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px]">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-text truncate">{r.counterpartyName}</span>
+              <span className="font-semibold text-text truncate min-w-0">{r.counterpartyName}</span>
               <span className="flex items-center gap-2 shrink-0">
                 <Stars value={r.rating} />
                 <button

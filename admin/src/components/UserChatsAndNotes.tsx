@@ -125,10 +125,10 @@ function ChatsBlock({ kind, id }: { kind: 'seeker' | 'employer'; id: string }) {
               className="rounded-lg bg-surface-2 px-3 py-2 text-left hover:bg-surface-hover transition-colors"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-semibold text-text truncate">
+                <span className="text-[13px] font-semibold text-text truncate min-w-0">
                   {kind === 'seeker' ? c.companyName : c.workerName}
                 </span>
-                <Badge tone="neutral">
+                <Badge tone="neutral" className="shrink-0">
                   <MessageSquare size={11} /> {c.messageCount}
                 </Badge>
               </div>

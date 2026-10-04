@@ -76,7 +76,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               }
             >
               <item.icon size={17} strokeWidth={2} className="shrink-0" />
-              <span className="flex-1 truncate">{item.label}</span>
+              <span className="flex-1 min-w-0 truncate">{item.label}</span>
               {item.to === '/support' && supportUnread > 0 && (
                 <span className="h-5 min-w-5 px-1 rounded-full bg-danger text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                   {supportUnread}

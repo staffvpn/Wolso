@@ -78,7 +78,7 @@ export function Support() {
                 <Avatar name={t.contactName} size={38} square={t.kind === 'employer'} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-[14px] truncate">{t.contactName}</p>
+                    <p className="font-semibold text-[14px] truncate min-w-0">{t.contactName}</p>
                     {t.lastMessageMinAgo !== undefined && (
                       <span className="text-[11px] text-text-faint shrink-0">{timeAgo(t.lastMessageMinAgo)}</span>
                     )}

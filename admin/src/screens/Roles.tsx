@@ -69,11 +69,14 @@ export function Roles() {
                 selectedRoleId === role.id ? 'border-accent bg-accent-soft/40 ring-1 ring-accent' : 'hover:border-border',
               )}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-[15px]" style={{ color: selectedRoleId === role.id ? 'var(--color-accent)' : undefined }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="font-bold text-[15px] truncate min-w-0"
+                  style={{ color: selectedRoleId === role.id ? 'var(--color-accent)' : undefined }}
+                >
                   {role.name}
                 </span>
-                {!role.isSystem && <Badge tone="neutral">своя</Badge>}
+                {!role.isSystem && <Badge tone="neutral" className="shrink-0">своя</Badge>}
               </div>
               <p className="text-[13px] text-text-muted leading-relaxed mb-3">{role.description}</p>
               <p className="text-[13px] font-semibold text-text-faint">{memberCountFor(role.id)} человек</p>
