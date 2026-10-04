@@ -4,9 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#f4f4f1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121310" media="(prefers-color-scheme: dark)" />
     <title>Wolso Admin</title>
+    <!-- Применяем сохранённую тему до отрисовки — иначе страница на долю
+         секунды мелькает светлой темой перед тем, как React и CSS решат,
+         что человек выбрал тёмную. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('wolso-admin-theme');
+          if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+        } catch {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

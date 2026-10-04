@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Logo } from '../ui/Logo';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,7 +27,8 @@ export function AppShell() {
             <Menu size={20} />
           </button>
           <Logo size={20} className="text-accent" />
-          <span className="font-extrabold tracking-tight text-[14px]">WOLSO ADMIN</span>
+          <span className="font-extrabold tracking-tight text-[14px] flex-1 min-w-0 truncate">WOLSO ADMIN</span>
+          <ThemeToggle variant="bar" />
         </div>
         <main className="flex-1 min-w-0 overflow-y-auto">
           <Outlet />

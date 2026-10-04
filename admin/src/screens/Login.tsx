@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSessionStore } from '@/store/useSessionStore';
 import { Logo } from '@/components/ui/Logo';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import type { TelegramLoginPayload } from '@/services/authApi';
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME as string | undefined;
@@ -38,7 +39,8 @@ export function Login() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-bg">
+    <div className="relative flex h-screen w-screen items-center justify-center bg-bg">
+      <ThemeToggle variant="bar" className="absolute top-5 right-5" />
       <div className="w-full max-w-[360px] flex flex-col items-center text-center">
         <div className="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center mb-4">
           <Logo size={26} className="text-accent" />

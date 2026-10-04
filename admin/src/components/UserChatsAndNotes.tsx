@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
 import { useCan } from '@/store/useSessionStore';
+import { cn } from '@/lib/cn';
 import {
   fetchUserChats,
   fetchChatMessages,
@@ -15,6 +16,11 @@ import {
   type UserNote,
 } from '@/services/usersApi';
 import { formatDayMonth } from '@/lib/format';
+
+function chatTime(createdAt: string): string {
+  const d = new Date(createdAt.includes('T') ? createdAt : `${createdAt.replace(' ', 'T')}Z`);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
 
 /** Переписка сторон и заметки команды — в карточке пользователя, а не
  *  отдельным экраном: разбираться в споре начинают, глядя на человека, и
@@ -76,17 +82,35 @@ function ChatsBlock({ kind, id }: { kind: 'seeker' | 'employer'; id: string }) {
             {openChat.workerName} ↔ {openChat.companyName}
             {openChat.positionLabel ? ` · «${openChat.positionLabel}»` : ''}
           </p>
-          <div className="rounded-xl bg-surface-2 p-3 max-h-[320px] overflow-y-auto space-y-2">
+          <div className="rounded-xl bg-surface-2 p-3 max-h-[320px] overflow-y-auto flex flex-col gap-1.5">
             {messages.length === 0 && <p className="text-[13px] text-text-faint">Сообщений нет</p>}
-            {messages.map((m) => (
-              <div key={m.id} className="text-[13px]">
-                <span className="font-semibold text-text-muted">
-                  {m.sender === 'worker' ? openChat.workerName : m.sender === 'company' ? openChat.companyName : 'Система'}:
-                </span>{' '}
-                <span className="text-text whitespace-pre-line">{m.kind === 'image' ? '📷 Фото' : m.text}</span>
-              </div>
-            ))}
+            {messages.map((m) =>
+              m.sender === 'system' ? (
+                <div key={m.id} className="self-center text-[11.5px] text-text-faint text-center px-3 py-1">
+                  {m.text}
+                </div>
+              ) : (
+                <div
+                  key={m.id}
+                  className={cn(
+                    'max-w-[82%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed',
+                    m.sender === 'worker'
+                      ? 'self-start bg-surface text-text rounded-bl-md border border-border-soft'
+                      : 'self-end bg-accent text-accent-fg rounded-br-md',
+                  )}
+                >
+                  <span className="whitespace-pre-line break-words">{m.kind === 'image' ? '📷 Фото' : m.text}</span>
+                  <span className={cn('block text-[10px] mt-0.5 font-mono', m.sender === 'worker' ? 'text-text-faint' : 'text-accent-fg/70')}>
+                    {chatTime(m.createdAt)}
+                  </span>
+                </div>
+              ),
+            )}
           </div>
+          <p className="text-[11px] text-text-faint mt-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-surface border border-border-soft align-middle mr-1" /> {openChat.workerName}
+            <span className="inline-block h-2 w-2 rounded-full bg-accent align-middle mx-1 ml-3" /> {openChat.companyName}
+          </p>
           {/* Только чтение: писать в чужой чат от лица одной из сторон —
               совсем другое дело, чем в нём разобраться. */}
           <p className="text-[12px] text-text-faint mt-2">Только просмотр. Открытие записано в аудит-лог.</p>

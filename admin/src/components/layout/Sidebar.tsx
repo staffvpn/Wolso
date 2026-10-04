@@ -7,6 +7,7 @@ import { useCurrentRole, useCan, useSessionStore } from '@/store/useSessionStore
 import { useSupportStore } from '@/store/useSupportStore';
 import { Avatar } from '../ui/Avatar';
 import { Logo } from '../ui/Logo';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 interface SidebarProps {
   /** Whether the mobile drawer is open. Ignored at the `lg` breakpoint,
@@ -91,6 +92,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <p className="text-[13px] font-semibold text-sidebar-text truncate">{staff?.name?.split(' ')[0]}</p>
             <p className="text-[12px] text-sidebar-text-muted truncate">{role.name}</p>
           </div>
+          <ThemeToggle />
           <button
             onClick={logout}
             aria-label="Выйти"

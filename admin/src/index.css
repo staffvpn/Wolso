@@ -42,6 +42,18 @@ html, body, #root {
   height: 100%;
 }
 
+:root {
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
@@ -63,4 +75,63 @@ body {
 
 kbd {
   font-family: inherit;
+}
+
+/* Тёмная тема — те же токены, другие значения. Sidebar не переопределяется:
+ * он и так тёмный в любой теме (см. комментарий выше), поэтому в тёмном
+ * режиме просто сливается с остальной страницей вместо контраста с ней.
+ * По умолчанию следует системной теме (prefers-color-scheme), [data-theme]
+ * на <html> — это явный выбор человека поверх системного (см. lib/theme.ts). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-accent: #35c37c;
+    --color-accent-hover: #2aa868;
+    --color-accent-soft: #163426;
+    --color-accent-fg: #06130c;
+
+    --color-bg: #121310;
+    --color-surface: #1a1b16;
+    --color-surface-2: #202119;
+    --color-border: #2b2c23;
+    --color-border-soft: #242519;
+
+    --color-text: #f1f0e9;
+    --color-text-muted: #a4a69b;
+    --color-text-faint: #6f7266;
+
+    --color-danger: #e35a45;
+    --color-danger-soft: #3a1f1a;
+    --color-warning: #d79a1f;
+    --color-warning-soft: #332616;
+    --color-info: #5b9bdb;
+    --color-info-soft: #16222e;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-accent: #35c37c;
+  --color-accent-hover: #2aa868;
+  --color-accent-soft: #163426;
+  --color-accent-fg: #06130c;
+
+  --color-bg: #121310;
+  --color-surface: #1a1b16;
+  --color-surface-2: #202119;
+  --color-border: #2b2c23;
+  --color-border-soft: #242519;
+
+  --color-text: #f1f0e9;
+  --color-text-muted: #a4a69b;
+  --color-text-faint: #6f7266;
+
+  --color-danger: #e35a45;
+  --color-danger-soft: #3a1f1a;
+  --color-warning: #d79a1f;
+  --color-warning-soft: #332616;
+  --color-info: #5b9bdb;
+  --color-info-soft: #16222e;
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #35362c;
 }

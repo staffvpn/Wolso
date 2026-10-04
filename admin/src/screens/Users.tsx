@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star, BellOff, Eye, EyeOff } from 'lucide-react';
+import { Search, UserPlus, Send, ImageOff, Copy, Check, RefreshCw, Trash2, Star, BellOff, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -380,8 +380,12 @@ export function Users() {
         </p>
       )}
 
+      {/* На телефоне список и карточка пользователя не делят экран пополам
+          (там попросту не влезает) — выбор человека прячет список и
+          показывает карточку на весь экран, с кнопкой «Назад» сверху.
+          От lg и шире — как было, два столбца разом, назад не нужен. */}
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
           <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_0.9fr_1fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Пользователь</span>
             <span className="hidden sm:block">Роль</span>
@@ -409,6 +413,18 @@ export function Users() {
                     <span className="min-w-0">
                       <span className="block text-[14px] font-semibold text-text truncate">{name}</span>
                       <span className="block text-[12px] text-text-faint truncate">{contact}</span>
+                      {/* Роль и бот были полностью скрыты на мобильном —
+                          видимость роли человека решали только тапом в
+                          карточку. Компактная строка ниже видна только
+                          <sm, где у выделенных колонок нет места. */}
+                      <span className="flex sm:hidden items-center gap-1.5 mt-1">
+                        <Badge tone={r.kind === 'team' ? 'dark' : 'neutral'} className="text-[10px] px-1.5 py-0">{roleLabel}</Badge>
+                        {r.kind !== 'team' && (
+                          <Badge tone={BOT_STATUS_TONE[r.user.botStatus]} className="text-[10px] px-1.5 py-0">
+                            {BOT_STATUS_SHORT[r.user.botStatus]}
+                          </Badge>
+                        )}
+                      </span>
                     </span>
                   </span>
                   <span className="hidden sm:block min-w-0 pr-3">
@@ -437,7 +453,15 @@ export function Users() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
+        <Card className={cn('p-6 h-fit lg:sticky lg:top-0', !selected && 'hidden lg:block')}>
+          {selected && (
+            <button
+              onClick={() => setSelected(null)}
+              className="lg:hidden flex items-center gap-1.5 text-[13px] font-semibold text-text-muted mb-4 -mt-1"
+            >
+              <ArrowLeft size={15} /> Все пользователи
+            </button>
+          )}
           {!selected && <EmptyPanel title="Выберите пользователя" description="Нажмите на строку слева, чтобы увидеть подробности." />}
           {selected?.kind === 'team' && <TeamDetail member={selected.member} />}
           {selected?.kind === 'seeker' && <SeekerDetail user={selected.user} />}
