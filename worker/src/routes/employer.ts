@@ -1167,6 +1167,15 @@ employerRoutes.get('/workers', async (c) => {
        ${notHidden}
        ${wantsType}
        AND (t.active_role = 'worker' OR t.active_role IS NULL)
+       -- Та же анкета-целиком-заполнена, что держит ProfileGate на клиенте
+       -- (routes/profile.ts's isComplete) — здесь не проверялась вообще,
+       -- так что в ленту работодателя попадал кто угодно с одной лишь
+       -- строкой в worker_positions, даже без фото, био или навыков.
+       -- hasExperience (months > 0) отдельно: сама строка в worker_positions
+       -- могла остаться от сид-значения при регистрации с нулевым стажем.
+       AND w.name != '' AND w.city != '' AND w.bio != '' AND w.skills != '' AND w.birthdate IS NOT NULL
+       AND (w.avatar_data IS NOT NULL OR w.photo_url IS NOT NULL)
+       AND EXISTS (SELECT 1 FROM worker_positions wp3 WHERE wp3.worker_id = w.id AND wp3.months > 0)
        AND w.id NOT IN (
          SELECT worker_id FROM company_worker_passes
          WHERE company_id = ? AND created_at >= datetime('now', '-${PASS_COOLDOWN_DAYS} days')
