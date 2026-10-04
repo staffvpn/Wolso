@@ -6,8 +6,8 @@ type Size = 'sm' | 'md' | 'icon';
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: 'bg-accent text-accent-fg hover:bg-accent-hover',
-  dark: 'bg-text text-white hover:bg-black',
-  outline: 'bg-white text-text border border-border hover:bg-surface-2',
+  dark: 'bg-ink text-white hover:bg-ink-hover',
+  outline: 'bg-surface text-text border border-border hover:bg-surface-2',
   ghost: 'bg-transparent text-text-muted hover:bg-surface-2',
   danger: 'bg-danger-soft text-danger hover:bg-danger/15',
 };

@@ -25,7 +25,7 @@ export function Tabs({ options, value, onChange, className }: TabsProps) {
             onClick={() => onChange(opt.id)}
             className={cn(
               'h-9 px-3.5 rounded-full text-[13px] font-semibold border transition-colors duration-150',
-              selected ? 'bg-text text-white border-text' : 'bg-white text-text-muted border-border hover:bg-surface-2',
+              selected ? 'bg-ink text-white border-ink' : 'bg-surface text-text-muted border-border hover:bg-surface-2',
             )}
           >
             {opt.label}

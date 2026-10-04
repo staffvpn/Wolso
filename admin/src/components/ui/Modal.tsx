@@ -31,7 +31,7 @@ export function Modal({ open, onClose, title, description, children, width = 440
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 420, damping: 36 }}
-            className="relative w-full rounded-2xl bg-white shadow-2xl max-h-[86vh] flex flex-col"
+            className="relative w-full rounded-2xl bg-surface shadow-2xl max-h-[86vh] flex flex-col"
             style={{ maxWidth: width }}
           >
             <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-border-soft shrink-0">

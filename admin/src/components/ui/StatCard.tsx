@@ -14,7 +14,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, delta, footnote, dark, className }: StatCardProps) {
   return (
-    <Card className={cn('p-5', dark && 'bg-text border-text', className)}>
+    <Card className={cn('p-5', dark && 'bg-ink border-ink', className)}>
       <p className={cn('text-[13px] font-medium', dark ? 'text-white/60' : 'text-text-muted')}>{label}</p>
       <div className="flex items-baseline gap-2 mt-2">
         <span className={cn('text-[26px] font-extrabold leading-none', dark ? 'text-white' : 'text-text')}>{value}</span>
