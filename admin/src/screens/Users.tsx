@@ -353,7 +353,12 @@ export function Users() {
             { id: 'team', label: 'Команда', count: team.length },
           ]}
         />
-        <div className="ml-auto flex items-center gap-2">
+        {/* flex-wrap здесь, а не только на родителе — иначе три кнопки
+            держались в одну нерастяжимую строку и тащили всю страницу в
+            горизонтальный скролл на телефоне вместо переноса. w-full на
+            мобильном — чтобы блок сразу падал на свою строку, а не жался
+            к Tabs в попытке остаться в одной линии. */}
+        <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
           <Button variant="outline" disabled={syncingUsernames} onClick={syncUsernames} title="Подтянуть @username из Telegram для тех, у кого его ещё нет в базе">
             <RefreshCw size={15} className={cn(syncingUsernames && 'animate-spin')} /> {syncingUsernames ? 'Обновляем…' : 'Обновить username'}
           </Button>

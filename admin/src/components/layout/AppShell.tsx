@@ -30,7 +30,12 @@ export function AppShell() {
           <span className="font-extrabold tracking-tight text-[14px] flex-1 min-w-0 truncate">WOLSO ADMIN</span>
           <ThemeToggle variant="bar" />
         </div>
-        <main className="flex-1 min-w-0 overflow-y-auto">
+        {/* overflow-x-hidden не просто для симметрии: overflow-y: auto без
+            него на самом деле вычисляется браузером как overflow-x: auto
+            тоже (так работает CSS) — любой переполняющий элемент на любом
+            экране утаскивал всю страницу в горизонтальный скролл вместо
+            того, чтобы перенестись на новую строку. */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>
