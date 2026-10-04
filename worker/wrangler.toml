@@ -18,7 +18,7 @@ fallthrough = true
 ADMIN_ORIGIN = "https://wolso-admin.pages.dev"
 APP_ORIGIN = "https://wolso.pages.dev"
 # Support account the automatic reminders point people at. Without the '@'.
-SUPPORT_USERNAME = "nchtsupport"
+SUPPORT_USERNAME = "wolso_support"
 
 # Two schedules, разведённые по смыслу (диспетчеризация — по event.cron
 # в `scheduled`, см. src/index.ts).
