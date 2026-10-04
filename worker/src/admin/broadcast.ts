@@ -1,7 +1,23 @@
 import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, actorLabel, logAction, requirePermission, requireStaff } from '../middleware/auth';
-import { sendTelegramMessage } from '../lib/telegramBot';
+import { sendTelegramMessage, type TelegramEntity } from '../lib/telegramBot';
+
+/** Применена ли миграция 0050 (broadcasts.entities). Та же осторожность,
+ *  что и везде в этом кодбейзе — named-колонка в INSERT уронила бы вообще
+ *  всё создание рассылок на базе, где миграцию ещё не накатили руками. */
+let entitiesColumnConfirmed = false;
+
+async function entitiesColumnExists(env: Env): Promise<boolean> {
+  if (entitiesColumnConfirmed) return true;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(broadcasts)').all<{ name: string }>();
+    entitiesColumnConfirmed = results.some((r) => r.name === 'entities');
+    return entitiesColumnConfirmed;
+  } catch {
+    return false;
+  }
+}
 
 export const adminBroadcastRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminBroadcastRoutes.use('*', attachSession);
@@ -167,7 +183,17 @@ adminBroadcastRoutes.get('/cities', requirePermission('sendBroadcasts'), async (
  *  copy-paste версия. */
 export async function createBroadcast(
   env: Env,
-  params: { text: string; audience?: string; city?: string | null; telegramIds?: number[]; createdBy: string },
+  params: {
+    text: string;
+    audience?: string;
+    city?: string | null;
+    telegramIds?: number[];
+    createdBy: string;
+    /** Telegram-разметка текста (жирный/ссылки/премиальные эмодзи) — только
+     *  у рассылок из команды /broadcast в самом боте; дашборд шлёт
+     *  обычный textarea без неё. */
+    entities?: TelegramEntity[];
+  },
 ): Promise<{ id: number; total: number } | { error: 'text_required' | 'no_recipients' }> {
   const text = params.text?.trim();
   if (!text) return { error: 'text_required' };
@@ -180,11 +206,21 @@ export async function createBroadcast(
   const recipients = await resolveRecipients(env, audience, city, chosen);
   if (recipients.length === 0) return { error: 'no_recipients' };
 
+  const hasEntities = await entitiesColumnExists(env);
+  const entitiesJson = hasEntities && params.entities && params.entities.length > 0 ? JSON.stringify(params.entities) : null;
+
   const inserted = await env.DB.prepare(
-    `INSERT INTO broadcasts (text, audience, city, recipients, total, created_by)
-     VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+    hasEntities
+      ? `INSERT INTO broadcasts (text, audience, city, recipients, total, created_by, entities)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
+      : `INSERT INTO broadcasts (text, audience, city, recipients, total, created_by)
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
   )
-    .bind(text, audience, city, JSON.stringify(recipients), recipients.length, params.createdBy)
+    .bind(
+      ...(hasEntities
+        ? [text, audience, city, JSON.stringify(recipients), recipients.length, params.createdBy, entitiesJson]
+        : [text, audience, city, JSON.stringify(recipients), recipients.length, params.createdBy]),
+    )
     .first<{ id: number }>();
 
   return { id: inserted!.id, total: recipients.length };
@@ -212,8 +248,13 @@ export async function sendBroadcastBatch(env: Env, id: number): Promise<Broadcas
     cursor: number;
     sent_count: number;
     failed_count: number;
+    entities?: string | null;
   }>();
   if (!row) return null;
+
+  // SELECT * просто не вернёт поле на базе без миграции 0050 — row.entities
+  // окажется undefined, и ветка ниже тихо отправит как обычный текст.
+  const entities: TelegramEntity[] | undefined = row.entities ? JSON.parse(row.entities) : undefined;
 
   const recipients = JSON.parse(row.recipients) as number[];
   const slice = recipients.slice(row.cursor, row.cursor + BATCH_SIZE);
@@ -224,7 +265,7 @@ export async function sendBroadcastBatch(env: Env, id: number): Promise<Broadcas
     // sendTelegramMessage swallows its own errors (blocked bot, deleted
     // account) and reports false-ish by logging — check the result so a
     // blocked user counts as "не доставлено" rather than silently as sent.
-    const ok = await sendTelegramMessage(env, telegramId, row.text);
+    const ok = await sendTelegramMessage(env, telegramId, row.text, entities);
     if (ok) sent++;
     else failed++;
     if (GAP_MS > 0) await new Promise((resolve) => setTimeout(resolve, GAP_MS));

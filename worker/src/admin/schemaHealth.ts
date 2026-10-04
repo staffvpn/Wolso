@@ -34,6 +34,7 @@ import sql0045 from '../../migrations/0045_worker_address.sql';
 import sql0046 from '../../migrations/0046_notification_log.sql';
 import sql0047 from '../../migrations/0047_proxy_employers.sql';
 import sql0048 from '../../migrations/0048_chat_media.sql';
+import sql0050 from '../../migrations/0050_broadcast_entities.sql';
 
 export const adminSchemaHealthRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSchemaHealthRoutes.use('*', attachSession);
@@ -87,6 +88,7 @@ const REQUIRED_COLUMNS: { table: string; column: string; migration: string; brea
   { table: 'workers', column: 'address', migration: '0045_worker_address', breaks: 'адрес в анкете соискателя' },
   { table: 'companies', column: 'is_proxy', migration: '0047_proxy_employers', breaks: 'вакансии прокси-работодателей' },
   { table: 'messages', column: 'file_data', migration: '0048_chat_media', breaks: 'фото и файлы в чате' },
+  { table: 'broadcasts', column: 'entities', migration: '0050_broadcast_entities', breaks: 'разметка (жирный/ссылки/премиальные эмодзи) в рассылке из бота' },
 ];
 
 /** Same idea for whole tables a migration creates — a missing table fails
@@ -141,6 +143,7 @@ const MIGRATION_FILES: Record<string, string> = {
   '0046_notification_log': sql0046,
   '0047_proxy_employers': sql0047,
   '0048_chat_media': sql0048,
+  '0050_broadcast_entities': sql0050,
 };
 
 /** Strips the explanatory comments and splits into individual statements,

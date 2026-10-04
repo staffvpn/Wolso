@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { recordBotStatus } from '../lib/botStatus';
 import { createBroadcast, sendBroadcastBatch } from '../admin/broadcast';
+import type { TelegramEntity } from '../lib/telegramBot';
 
 export const botRoutes = new Hono<{ Bindings: Env; Variables: { session: unknown } }>();
 
@@ -29,7 +30,26 @@ interface TelegramUpdate {
   message?: {
     chat?: { id?: number; type?: string };
     text?: string;
+    entities?: TelegramEntity[];
   };
+}
+
+/** Сдвигает entities на длину срезанного префикса команды (например,
+ *  `/broadcast `) — Telegram даёт их смещения относительно ВСЕГО текста
+ *  сообщения, включая саму команду. Сущность, целиком лежащая в префиксе,
+ *  выбрасывается; задевающая границу — обрезается по границе, а не
+ *  отбрасывается целиком (на случай если кто-то умудрился выделить
+ *  форматированием часть самой команды вместе с текстом). */
+function shiftEntities(entities: TelegramEntity[] | undefined, cut: number): TelegramEntity[] {
+  if (!entities || cut <= 0) return entities ?? [];
+  const shifted: TelegramEntity[] = [];
+  for (const e of entities) {
+    const end = e.offset + e.length - cut;
+    if (end <= 0) continue;
+    const start = Math.max(e.offset, cut) - cut;
+    shifted.push({ ...e, offset: start, length: end - start });
+  }
+  return shifted;
 }
 
 /** Владелец — единственный, у кого бот вообще на что-то реагирует в
@@ -47,12 +67,17 @@ function isOwnerChat(env: Env, chatId: number): boolean {
 /** Ответ владельцу в тот же чат, откуда пришла команда — не через
  *  notifyAdmin (который всегда шлёт в ADMIN_CHAT_ID), потому что owner и
  *  admin-chat могут отличаться, а ответить нужно туда, откуда спросили. */
-async function reply(env: Env, chatId: number, text: string): Promise<void> {
+async function reply(env: Env, chatId: number, text: string, entities?: TelegramEntity[]): Promise<void> {
   try {
     await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        ...(entities && entities.length > 0 ? { entities } : {}),
+        disable_web_page_preview: true,
+      }),
     });
   } catch (err) {
     console.error('bot admin reply failed', err);
@@ -76,7 +101,8 @@ async function runBroadcastToCompletion(env: Env, id: number, chatId: number): P
 const HELP_TEXT =
   'Команды для владельца:\n\n' +
   '/status — быстрая сводка по площадке\n' +
-  '/broadcast <текст> — подготовить рассылку всем, у кого есть бот\n' +
+  '/broadcast <текст> — подготовить рассылку всем, у кого есть бот ' +
+  '(жирный, курсив, ссылки и премиальные эмодзи из форматирования Telegram сохраняются)\n' +
   '/confirm <id> — разослать подготовленную рассылку #id\n' +
   '/help — это сообщение';
 
@@ -123,11 +149,17 @@ async function handleOwnerCommand(
   waitUntil: (promise: Promise<unknown>) => void,
   chatId: number,
   text: string,
+  entities: TelegramEntity[] | undefined,
 ): Promise<void> {
-  const trimmed = text.trim();
-  const spaceAt = trimmed.indexOf(' ');
-  const cmd = (spaceAt === -1 ? trimmed : trimmed.slice(0, spaceAt)).split('@')[0]; // срезает /cmd@botname
-  const arg = spaceAt === -1 ? '' : trimmed.slice(spaceAt + 1).trim();
+  // Без .trim() на всём тексте — смещения entities считаются от исходного
+  // text, и трим головы сдвинул бы их на пустом месте (на практике Telegram
+  // и так не присылает ведущие пробелы перед командой). Граница команды —
+  // первый ПРОБЕЛЬНЫЙ символ, не только пробел: иначе перенос строки сразу
+  // после команды (объявление в несколько строк) ломал бы распознавание.
+  const spaceAt = text.search(/\s/);
+  const cmd = (spaceAt === -1 ? text : text.slice(0, spaceAt)).split('@')[0]; // срезает /cmd@botname
+  const argStart = spaceAt === -1 ? text.length : spaceAt + 1;
+  const arg = text.slice(argStart).trim();
 
   if (cmd === '/start' || cmd === '/help') {
     await reply(env, chatId, HELP_TEXT);
@@ -144,17 +176,21 @@ async function handleOwnerCommand(
       await reply(env, chatId, 'Напиши текст после команды, например:\n/broadcast Сегодня временные технические работы, скоро всё вернём.');
       return;
     }
-    const result = await createBroadcast(env, { text: arg, audience: 'all', createdBy: 'владелец (из бота)' });
+    // Жирный/курсив/ссылки-с-подписью/премиальные эмодзи — ровно то, что
+    // владелец применил через меню форматирования самого Telegram, набирая
+    // команду. shiftEntities переносит их смещения с полного текста команды
+    // на один arg.
+    const argEntities = shiftEntities(entities, argStart);
+    const result = await createBroadcast(env, { text: arg, audience: 'all', createdBy: 'владелец (из бота)', entities: argEntities });
     if ('error' in result) {
       await reply(env, chatId, result.error === 'no_recipients' ? 'Получателей не нашлось.' : 'Не получилось подготовить рассылку.');
       return;
     }
-    await reply(
-      env,
-      chatId,
-      `Рассылка #${result.id} подготовлена, но ещё не отправлена.\nПолучателей: ${result.total}\n\nТекст:\n${arg}\n\n` +
-        `Чтобы разослать — пришли /confirm ${result.id}\nЕсли передумал — просто ничего не делай, сама она не уйдёт.`,
-    );
+    await reply(env, chatId, `Рассылка #${result.id} подготовлена, но ещё не отправлена.\nПолучателей: ${result.total}\n\nКак будет выглядеть:`);
+    // Отдельным сообщением, с той же разметкой — чтобы владелец видел
+    // ровно то, что получат люди, а не голый текст без форматирования.
+    await reply(env, chatId, arg, argEntities);
+    await reply(env, chatId, `Чтобы разослать — пришли /confirm ${result.id}\nЕсли передумал — просто ничего не делай, сама она не уйдёт.`);
     return;
   }
 
@@ -191,7 +227,7 @@ botRoutes.post('/webhook/:token', async (c) => {
   const message = update.message;
   const messageChatId = message?.chat?.id;
   if (messageChatId && message?.chat?.type === 'private' && message.text?.startsWith('/') && isOwnerChat(c.env, messageChatId)) {
-    await handleOwnerCommand(c.env, (p) => c.executionCtx.waitUntil(p), messageChatId, message.text);
+    await handleOwnerCommand(c.env, (p) => c.executionCtx.waitUntil(p), messageChatId, message.text, message.entities);
   }
 
   // Always 200: a non-2xx makes Telegram retry the same update for hours.

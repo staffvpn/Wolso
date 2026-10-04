@@ -1,6 +1,19 @@
 import type { Env } from '../types';
 import { classifyTelegramFailure, recordBotStatus } from './botStatus';
 
+/** Telegram'овская разметка текста (жирный, курсив, ссылка-с-подписью,
+ *  премиальный эмодзи и т.д.) — отдельный массив со смещениями в тексте,
+ *  не часть самого text. custom_emoji_id — это и есть «премиальный
+ *  смайл»: без него type: 'custom_emoji' ничего не отрисует. */
+export interface TelegramEntity {
+  type: string;
+  offset: number;
+  length: number;
+  url?: string;
+  custom_emoji_id?: string;
+  language?: string;
+}
+
 /** Looks up a person's current @username via the Bot API's getChat — works
  *  for any chat_id the bot has ever exchanged messages with (which, in
  *  practice, is every worker/company: launching the Mini App or getting a
@@ -27,8 +40,8 @@ export async function getTelegramUsername(env: Env, chatId: number): Promise<str
  *  pings their phone. Best-effort: a blocked bot, deactivated account, or
  *  any other single failure is logged and swallowed rather than thrown,
  *  so one bad chat_id in a batch never takes down the rest. */
-export async function sendTelegramMessage(env: Env, chatId: number, text: string): Promise<boolean> {
-  return (await sendTelegramMessageResult(env, chatId, text)) === 'sent';
+export async function sendTelegramMessage(env: Env, chatId: number, text: string, entities?: TelegramEntity[]): Promise<boolean> {
+  return (await sendTelegramMessageResult(env, chatId, text, entities)) === 'sent';
 }
 
 /** Исход отправки для тех, кто на него смотрит.
@@ -51,6 +64,7 @@ export async function sendTelegramMessageResult(
   env: Env,
   chatId: number,
   text: string,
+  entities?: TelegramEntity[],
 ): Promise<TelegramSendResult> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
@@ -59,6 +73,11 @@ export async function sendTelegramMessageResult(
       body: JSON.stringify({
         chat_id: chatId,
         text,
+        // entities вместо parse_mode: ровно та разметка, что владелец
+        // применил в самом Telegram (жирный/ссылки/премиальные эмодзи),
+        // без риска что markdown-спецсимволы в обычном тексте что-то
+        // случайно разъэкранируют.
+        ...(entities && entities.length > 0 ? { entities } : {}),
         reply_markup: {
           inline_keyboard: [[{ text: 'Открыть Wolso', web_app: { url: env.APP_ORIGIN } }]],
         },
