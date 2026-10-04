@@ -137,9 +137,9 @@ function PromoRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-bold text-[15px] truncate">{promo.title}</p>
-            <Badge tone={promo.status === 'active' ? 'accent' : 'neutral'}>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-bold text-[15px] truncate min-w-0">{promo.title}</p>
+            <Badge tone={promo.status === 'active' ? 'accent' : 'neutral'} className="shrink-0">
               {promo.status === 'active' ? 'Показывается' : 'На паузе'}
             </Badge>
           </div>
@@ -174,8 +174,7 @@ function PromoRow({
         <Button variant="outline" disabled={!canManage} onClick={() => fileRef.current?.click()} aria-label="Картинка">
           <ImageIcon size={15} />
         </Button>
-        <span className="flex-1" />
-        <Button variant="outline" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
+        <Button variant="outline" className="ml-auto" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
           <Trash2 size={15} className="text-danger" />
         </Button>
       </div>

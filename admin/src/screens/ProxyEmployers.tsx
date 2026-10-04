@@ -181,8 +181,7 @@ function EmployerRow({
         <Button variant="outline" disabled={!canManage} onClick={() => fileRef.current?.click()} aria-label="Фото профиля">
           <ImageIcon size={15} />
         </Button>
-        <span className="flex-1" />
-        <Button variant="outline" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
+        <Button variant="outline" className="ml-auto" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
           <Trash2 size={15} className="text-danger" />
         </Button>
       </div>

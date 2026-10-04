@@ -9,7 +9,10 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, right }: PageHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-8 pt-5 sm:pt-7 pb-4 sm:pb-5 shrink-0">
-      <div className="flex items-baseline gap-2.5 min-w-0">
+      {/* flex-col на телефоне — иначе длинный подзаголовок в одной строке
+          с заголовком отжимал ему всю ширину, и «Реклама» превращалось в
+          «Рекла…» при живых данных. */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2.5 min-w-0">
         <h1 className="text-[19px] sm:text-[22px] font-extrabold text-text truncate">{title}</h1>
         {subtitle && <span className="text-[13px] sm:text-[14px] text-text-muted truncate">{subtitle}</span>}
       </div>

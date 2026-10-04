@@ -146,7 +146,7 @@ function AchievementRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-bold text-[15px] truncate">{achievement.title}</p>
+            <p className="font-bold text-[15px] truncate min-w-0">{achievement.title}</p>
             <Badge tone={achievement.status === 'active' ? 'accent' : 'neutral'}>
               {achievement.status === 'active' ? 'Активно' : 'На паузе'}
             </Badge>
@@ -185,8 +185,7 @@ function AchievementRow({
         <Button variant="outline" disabled={!canManage} onClick={onEdit}>
           <Pencil size={15} /> Изменить
         </Button>
-        <span className="flex-1" />
-        <Button variant="outline" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
+        <Button variant="outline" className="ml-auto" disabled={!canManage} onClick={() => setConfirmDelete(true)} aria-label="Удалить">
           <Trash2 size={15} className="text-danger" />
         </Button>
       </div>
