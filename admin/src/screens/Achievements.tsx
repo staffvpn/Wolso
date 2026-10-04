@@ -134,7 +134,9 @@ function AchievementRow({
   const Icon = ACHIEVEMENT_ICONS[achievement.icon] ?? Award;
 
   return (
-    <Card className="p-5">
+    // min-w-0: Card — элемент CSS grid'а, который без этого не сжимается
+    // ниже ширины содержимого (та же причина, что на Promos.tsx).
+    <Card className="p-5 min-w-0">
       <div className="flex gap-4">
         <div
           className={cn(

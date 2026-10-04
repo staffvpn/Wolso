@@ -126,7 +126,11 @@ function PromoRow({
   const ctr = promo.impressions > 0 ? ((promo.clicks / promo.impressions) * 100).toFixed(1) : '—';
 
   return (
-    <Card className="p-5">
+    // min-w-0 обязателен именно здесь: Card — элемент CSS grid'а (см. родителя
+    // в Promos()), а элементы грида по умолчанию не сжимаются уже сами
+    // (min-width: auto), раньше того, как до их содержимого вообще
+    // доходило дело, — весь ряд уезжал за край экрана на телефоне.
+    <Card className="p-5 min-w-0">
       <div className="flex gap-4">
         <div className="h-20 w-20 rounded-xl bg-surface-2 overflow-hidden shrink-0 flex items-center justify-center">
           {promo.imageUrl ? (

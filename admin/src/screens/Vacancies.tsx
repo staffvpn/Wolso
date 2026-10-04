@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import { Card } from '@/components/ui/Card';
@@ -86,7 +87,7 @@ export function Vacancies() {
       </div>
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', selected && 'hidden lg:flex')}>
           <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_1fr_0.8fr_0.8fr_1fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Вакансия</span>
             <span className="hidden sm:block">Город</span>
@@ -123,7 +124,7 @@ export function Vacancies() {
           </div>
         </Card>
 
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', !selected && 'hidden lg:flex')}>
           {!selected && (
             <div className="p-6">
               <EmptyPanel title="Выберите вакансию" description="Нажмите на строку слева, чтобы увидеть подробности." />
@@ -132,6 +133,12 @@ export function Vacancies() {
           {selected && (
             <>
               <div className="p-6 pb-0 lg:overflow-y-auto lg:min-h-0">
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="lg:hidden flex items-center gap-1.5 text-[13px] font-semibold text-text-muted mb-4"
+                >
+                  <ArrowLeft size={15} /> Все вакансии
+                </button>
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar name={selected.companyName} size={44} square />
                   <div>

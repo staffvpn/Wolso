@@ -158,7 +158,7 @@ export function BroadcastScreen() {
       <PageHeader title="Рассылка" subtitle="Сообщение от лица бота — придёт в Telegram каждому получателю" />
 
       <div className="px-4 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
-        <Card className="p-6">
+        <Card className="p-6 min-w-0">
           {!canSend && (
             <p className="text-[13px] text-warning mb-4 leading-relaxed">
               Отправлять рассылки может только владелец — у вашей роли нет этого права.
@@ -312,7 +312,7 @@ export function BroadcastScreen() {
           </Button>
         </Card>
 
-        <Card className="p-6 h-fit">
+        <Card className="p-6 h-fit min-w-0">
           <p className="text-[12px] font-semibold uppercase tracking-wide text-text-faint mb-3">История рассылок</p>
           {history.length === 0 && <EmptyPanel title="Пока ничего не отправляли" description="Здесь появятся прошлые рассылки и как они дошли." />}
           <div className="flex flex-col gap-2.5">

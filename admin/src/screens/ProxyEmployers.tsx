@@ -154,7 +154,9 @@ function EmployerRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <Card className="p-5">
+    // min-w-0: Card — элемент CSS grid'а, который без этого не сжимается
+    // ниже ширины содержимого (та же причина, что на Promos.tsx).
+    <Card className="p-5 min-w-0">
       <div className="flex gap-4">
         <Avatar src={employer.avatarUrl} name={employer.name} size={56} className="shrink-0" square />
 

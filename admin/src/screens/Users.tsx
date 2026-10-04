@@ -390,7 +390,7 @@ export function Users() {
           показывает карточку на весь экран, с кнопкой «Назад» сверху.
           От lg и шире — как было, два столбца разом, назад не нужен. */}
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
-        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
+        <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', selected && 'hidden lg:flex')}>
           <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_0.9fr_1fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Пользователь</span>
             <span className="hidden sm:block">Роль</span>
@@ -458,7 +458,7 @@ export function Users() {
           </div>
         </Card>
 
-        <Card className={cn('p-6 h-fit lg:sticky lg:top-0', !selected && 'hidden lg:block')}>
+        <Card className={cn('p-6 h-fit lg:sticky lg:top-0 min-w-0', !selected && 'hidden lg:block')}>
           {selected && (
             <button
               onClick={() => setSelected(null)}

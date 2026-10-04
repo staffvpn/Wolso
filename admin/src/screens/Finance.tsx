@@ -64,7 +64,7 @@ export function Finance() {
       </div>
 
       <div className="px-4 sm:px-8 mt-4 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 items-start">
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden min-w-0">
           {/* Фиксированная 4-колоночная сетка без мобильного варианта на
               узком экране сжимала имя и смену до нечитаемых обрубков —
               на <sm смена и статус уходят во вторую строку под именем и
@@ -101,7 +101,7 @@ export function Finance() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-5 min-w-0">
           <p className="font-bold text-[15px] mb-1">Аудит-лог</p>
           <p className="text-[12px] text-text-faint mb-4">Все действия команды, без удаления</p>
           <div className="space-y-3.5">

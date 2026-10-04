@@ -41,7 +41,7 @@ export function Verification() {
       <PageHeader title="Проверка работодателей" subtitle={employers.length > 0 ? `Ожидают решения: ${employers.length}` : undefined} />
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
-        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
+        <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', selected && 'hidden lg:flex')}>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {employers.map((e) => (
               <button
@@ -73,7 +73,7 @@ export function Verification() {
           </div>
         </Card>
 
-        <Card className={cn('p-6 h-fit lg:sticky lg:top-0', !selected && 'hidden lg:block')}>
+        <Card className={cn('p-6 h-fit lg:sticky lg:top-0 min-w-0', !selected && 'hidden lg:block')}>
           {selected && (
             <button
               onClick={() => setSelectedId(null)}

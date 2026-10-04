@@ -63,7 +63,7 @@ export function Support() {
       <PageHeader title="Поддержка" subtitle="Переписка с работниками и работодателями" />
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5">
-        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
+        <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', selected && 'hidden lg:flex')}>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {threads.length === 0 && <p className="px-5 py-8 text-center text-[13px] text-text-faint">Обращений пока нет</p>}
             {threads.map((t) => (
@@ -95,7 +95,7 @@ export function Support() {
           </div>
         </Card>
 
-        <Card className={cn('p-0 overflow-hidden flex flex-col lg:h-full', !selected && 'hidden lg:flex')}>
+        <Card className={cn('p-0 overflow-hidden flex flex-col lg:h-full min-w-0', !selected && 'hidden lg:flex')}>
           {!selected ? (
             <div className="p-6">
               <EmptyPanel title="Выберите обращение" description="Нажмите на строку слева, чтобы открыть переписку." />
