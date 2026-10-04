@@ -156,7 +156,7 @@ function PromoRow({
         <Stat label="CTR" value={ctr === '—' ? '—' : `${ctr}%`} />
       </div>
 
-      <div className="flex items-center gap-2 mt-4">
+      <div className="flex flex-wrap items-center gap-2 mt-4">
         <Button variant={promo.status === 'active' ? 'outline' : 'primary'} disabled={!canManage} onClick={onToggle}>
           {promo.status === 'active' ? (
             <>

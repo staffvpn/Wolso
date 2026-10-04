@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Flag, ExternalLink } from 'lucide-react';
+import { Flag, ExternalLink, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
@@ -85,7 +85,7 @@ export function Complaints() {
       {loadError && <p className="px-4 sm:px-8 pb-3 text-[13px] text-danger leading-relaxed max-w-3xl">{loadError}</p>}
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {items.map((c) => (
               <button
@@ -123,7 +123,15 @@ export function Complaints() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
+        <Card className={cn('p-6 h-fit lg:sticky lg:top-0', !selected && 'hidden lg:block')}>
+          {selected && (
+            <button
+              onClick={() => setSelected(null)}
+              className="lg:hidden flex items-center gap-1.5 text-[13px] font-semibold text-text-muted mb-4 -mt-1"
+            >
+              <ArrowLeft size={15} /> Все жалобы
+            </button>
+          )}
           {!selected && <EmptyPanel title="Выберите жалобу" description="Нажмите на строку слева, чтобы разобраться." />}
           {selected && (
             <ComplaintDetail

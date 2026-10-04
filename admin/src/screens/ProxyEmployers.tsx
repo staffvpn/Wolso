@@ -171,7 +171,7 @@ function EmployerRow({
         <Badge tone={employer.activeVacancies > 0 ? 'accent' : 'neutral'}>{employer.activeVacancies} активных вакансий</Badge>
       </div>
 
-      <div className="flex items-center gap-2 mt-4">
+      <div className="flex flex-wrap items-center gap-2 mt-4">
         <Button variant="outline" disabled={!canManage} onClick={onVacancies}>
           <Briefcase size={15} /> Вакансии
         </Button>

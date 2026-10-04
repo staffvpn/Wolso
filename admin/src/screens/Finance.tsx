@@ -65,7 +65,11 @@ export function Finance() {
 
       <div className="px-4 sm:px-8 mt-4 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 items-start">
         <Card className="overflow-hidden">
-          <div className="grid grid-cols-[1.4fr_1.2fr_0.8fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+          {/* Фиксированная 4-колоночная сетка без мобильного варианта на
+              узком экране сжимала имя и смену до нечитаемых обрубков —
+              на <sm смена и статус уходят во вторую строку под именем и
+              под сумму. */}
+          <div className="hidden sm:grid grid-cols-[1.4fr_1.2fr_0.8fr_0.9fr] px-5 py-3 border-b border-border-soft text-[11px] font-semibold uppercase tracking-wide text-text-faint">
             <span>Исполнитель</span>
             <span>Смена</span>
             <span>Сумма</span>
@@ -76,12 +80,22 @@ export function Finance() {
               <button
                 key={t.id}
                 onClick={() => t.status === 'dispute' && setDisputeTx(t)}
-                className={cn('w-full grid grid-cols-[1.4fr_1.2fr_0.8fr_0.9fr] items-center px-5 py-3.5 text-left', t.status === 'dispute' && 'hover:bg-surface-2 cursor-pointer')}
+                className={cn(
+                  'w-full grid grid-cols-[1fr_auto] sm:grid-cols-[1.4fr_1.2fr_0.8fr_0.9fr] items-center gap-x-2 px-5 py-3.5 text-left',
+                  t.status === 'dispute' && 'hover:bg-surface-2 cursor-pointer',
+                )}
               >
-                <span className="text-[14px] font-semibold text-text truncate">{t.workerName}</span>
-                <span className="text-[13px] text-text-muted truncate">{t.shiftLabel}</span>
-                <span className="text-[14px] font-bold text-text">{formatMoney(t.amount)}</span>
-                <span><Badge tone={STATUS_BADGE[t.status].tone}>{STATUS_BADGE[t.status].label}</Badge></span>
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-semibold text-text truncate">{t.workerName}</span>
+                  <span className="block text-[12px] text-text-faint truncate sm:hidden">{t.shiftLabel}</span>
+                </span>
+                <span className="hidden sm:block text-[13px] text-text-muted truncate">{t.shiftLabel}</span>
+                <span className="flex flex-col items-end gap-1 sm:hidden">
+                  <span className="text-[14px] font-bold text-text">{formatMoney(t.amount)}</span>
+                  <Badge tone={STATUS_BADGE[t.status].tone} className="text-[10px] px-1.5 py-0">{STATUS_BADGE[t.status].label}</Badge>
+                </span>
+                <span className="hidden sm:block text-[14px] font-bold text-text">{formatMoney(t.amount)}</span>
+                <span className="hidden sm:block"><Badge tone={STATUS_BADGE[t.status].tone}>{STATUS_BADGE[t.status].label}</Badge></span>
               </button>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Send, FileSearch, RefreshCw, Check, X, BadgeCheck, Copy, ExternalLink } from 'lucide-react';
+import { Send, FileSearch, RefreshCw, Check, X, BadgeCheck, Copy, ExternalLink, ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -41,7 +41,7 @@ export function Verification() {
       <PageHeader title="Проверка работодателей" subtitle={employers.length > 0 ? `Ожидают решения: ${employers.length}` : undefined} />
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {employers.map((e) => (
               <button
@@ -73,7 +73,15 @@ export function Verification() {
           </div>
         </Card>
 
-        <Card className="p-6 h-fit lg:sticky lg:top-0">
+        <Card className={cn('p-6 h-fit lg:sticky lg:top-0', !selected && 'hidden lg:block')}>
+          {selected && (
+            <button
+              onClick={() => setSelectedId(null)}
+              className="lg:hidden flex items-center gap-1.5 text-[13px] font-semibold text-text-muted mb-4 -mt-1"
+            >
+              <ArrowLeft size={15} /> Все анкеты
+            </button>
+          )}
           {!selected && <EmptyPanel title="Выберите анкету" description="Нажмите на работодателя слева, чтобы посмотреть детали и принять решение." />}
           {selected && <EmployerDetail employer={selected} onDone={() => setSelectedId(null)} />}
         </Card>

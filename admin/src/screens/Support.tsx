@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
@@ -25,8 +25,10 @@ export function Support() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Только на широком экране: на телефоне список должен быть первым
+  // экраном, а не мгновенно уступать место переписке с первым в очереди.
   useEffect(() => {
-    if (!selectedId && threads[0]) setSelectedId(threads[0].id);
+    if (!selectedId && threads[0] && window.matchMedia('(min-width: 1024px)').matches) setSelectedId(threads[0].id);
   }, [threads, selectedId]);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export function Support() {
       <PageHeader title="Поддержка" subtitle="Переписка с работниками и работодателями" />
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5">
-        <Card className="lg:overflow-hidden flex flex-col">
+        <Card className={cn('lg:overflow-hidden flex flex-col', selected && 'hidden lg:flex')}>
           <div className="lg:overflow-y-auto divide-y divide-border-soft">
             {threads.length === 0 && <p className="px-5 py-8 text-center text-[13px] text-text-faint">Обращений пока нет</p>}
             {threads.map((t) => (
@@ -93,7 +95,7 @@ export function Support() {
           </div>
         </Card>
 
-        <Card className="p-0 overflow-hidden flex flex-col lg:h-full">
+        <Card className={cn('p-0 overflow-hidden flex flex-col lg:h-full', !selected && 'hidden lg:flex')}>
           {!selected ? (
             <div className="p-6">
               <EmptyPanel title="Выберите обращение" description="Нажмите на строку слева, чтобы открыть переписку." />
@@ -101,6 +103,9 @@ export function Support() {
           ) : (
             <>
               <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border-soft shrink-0">
+                <button onClick={() => setSelectedId(null)} className="lg:hidden shrink-0 text-text-muted" aria-label="Назад к списку">
+                  <ArrowLeft size={18} />
+                </button>
                 <Avatar name={selected.contactName} size={36} square={selected.kind === 'employer'} />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-[14px] truncate">{selected.contactName}</p>
