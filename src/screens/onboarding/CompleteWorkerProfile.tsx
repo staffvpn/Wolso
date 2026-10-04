@@ -213,7 +213,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
               <Camera size={13} />
             </span>
           </button>
-          <p className="text-[12px] text-text-faint">Главное фото</p>
+          <p className="text-[12px] text-text-faint">
+            Главное фото <span className="text-danger">*</span>
+          </p>
           {/* Signup copies whatever picture Telegram had, so everyone
               technically has one — and half of those are a car or a
               landscape. This is the moment to say what the photo is for. */}
@@ -225,6 +227,10 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
         </div>
 
         <div className="space-y-4">
+          <p className="text-[12px] text-text-faint -mb-1">
+            <span className="text-danger">*</span> — обязательные поля, без них анкету не увидят работодатели
+          </p>
+
           <div>
             <SectionLabel>
               Имя и фамилия <span className="text-danger">*</span>
@@ -244,7 +250,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
 
           <div>
-            <SectionLabel>Город</SectionLabel>
+            <SectionLabel>
+              Город <span className="text-danger">*</span>
+            </SectionLabel>
             <select value={city} onChange={(e) => setCity(e.target.value)} className={FIELD_CLASS}>
               <option value="" disabled>Выберите город</option>
               {/* Анкета, заполненная до этого списка, могла указывать город
@@ -268,7 +276,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
 
           <div>
-            <SectionLabel>Дата рождения</SectionLabel>
+            <SectionLabel>
+              Дата рождения <span className="text-danger">*</span>
+            </SectionLabel>
             <input
               type="date"
               value={birthdate}
@@ -284,7 +294,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
 
           <div>
-            <SectionLabel>О себе</SectionLabel>
+            <SectionLabel>
+              О себе <span className="text-danger">*</span>
+            </SectionLabel>
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
@@ -295,7 +307,9 @@ export function CompleteWorkerProfile({ gate = false }: { gate?: boolean }) {
           </div>
 
           <div>
-            <SectionLabel>Навыки</SectionLabel>
+            <SectionLabel>
+              Навыки <span className="text-danger">*</span>
+            </SectionLabel>
             <textarea
               value={skills}
               onChange={(e) => setSkills(e.target.value)}
