@@ -3,6 +3,7 @@ import type { Env } from '../types';
 import { verifyInitData, verifyLoginWidget, type TelegramUser } from '../lib/telegramAuth';
 import { signSession } from '../lib/session';
 import { notifyAdmin, adminNotifyHandle } from '../lib/adminNotify';
+import { withinLimit } from '../lib/edgeRateLimit';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -87,6 +88,11 @@ async function issueSessionForRole(env: Env, user: TelegramUser, name: string, r
  *  screen for that. Pre-existing accounts from before this lock existed
  *  are backfilled here (worker takes priority if somehow both exist). */
 authRoutes.post('/telegram', async (c) => {
+  // Отдельный, более строгий лимитер — эта ручка на каждый вызов либо
+  // провижинит воркера/компанию, либо трогает несколько таблиц разом,
+  // самая дорогая публичная ручка во всём API (см. lib/edgeRateLimit.ts).
+  if (!(await withinLimit(c.env.AUTH_RATE_LIMITER, c.req.raw, 'auth'))) return c.json({ error: 'rate_limited' }, 429);
+
   const { initData } = await c.req.json<{ initData: string }>().catch(() => ({ initData: '' }));
   const user = await verifyInitData(initData, c.env.BOT_TOKEN);
   if (!user) return c.json({ error: 'invalid_init_data' }, 401);

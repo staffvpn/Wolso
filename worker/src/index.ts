@@ -4,6 +4,7 @@ import type { Env } from './types';
 import { attachSession, rejectSuspended } from './middleware/auth';
 import { runReminders } from './lib/reminders';
 import { runUnreadChatPings } from './lib/unreadChats';
+import { withinLimit } from './lib/edgeRateLimit';
 
 import { authRoutes } from './routes/auth';
 import { feedRoutes } from './routes/feed';
@@ -46,6 +47,17 @@ app.use('*', async (c, next) => {
     allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   });
   return middleware(c, next);
+});
+
+// Первая линия защиты от флуда — на границе сети Cloudflare, раньше
+// любого обращения к базе. 300 запросов в минуту с одного IP — щедро для
+// живого человека (даже с учётом опроса открытого чата раз в 2 секунды),
+// но останавливает направленный скрипт/бота. OPTIONS пропускаем мимо —
+// это просто CORS-preflight без какой-либо нагрузки на базу.
+app.use('*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') return next();
+  if (!(await withinLimit(c.env.RATE_LIMITER, c.req.raw))) return c.json({ error: 'rate_limited' }, 429);
+  return next();
 });
 
 app.get('/', (c) => c.json({ ok: true, service: 'wolso-api' }));

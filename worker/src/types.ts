@@ -12,6 +12,10 @@ export interface Env {
    *  '@' (see wrangler.toml). A var rather than a literal so changing who
    *  answers support doesn't need a code change. */
   SUPPORT_USERNAME?: string;
+  /** Лимитеры на границе сети Cloudflare — см. wrangler.toml про то, почему
+   *  не через D1. */
+  RATE_LIMITER: RateLimit;
+  AUTH_RATE_LIMITER: RateLimit;
 }
 
 export type PermissionKey =

@@ -46,6 +46,29 @@ database_id = "3bd49b64-c1ac-494a-a747-b5a02d421b59"
 # migrations/0005_document_blob_storage.sql). R2 needs a billing
 # subscription even on the free tier, which isn't available everywhere.
 
+# Лимитер на границе сети Cloudflare — срабатывает ДО того, как запрос
+# вообще доходит до воркера или базы, и не трогает D1 ни чтением, ни
+# записью (в отличие от lib/rateLimit.ts, который считает по строкам в
+# самой базе) — специально на случай направленного флуда, когда именно
+# D1-чтения и были узким местом. RATE_LIMITER — общий, на весь API по IP;
+# AUTH_RATE_LIMITER — отдельный, строже, на /auth/telegram (там на каждый
+# запрос провижининг воркера/компании — самая дорогая публичная ручка).
+# namespace_id — просто уникальный номер привязки в аккаунте, ничего не
+# означает и не требует создавать заранее.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+[ratelimits.simple]
+limit = 300
+period = 60
+
+[[ratelimits]]
+name = "AUTH_RATE_LIMITER"
+namespace_id = "1002"
+[ratelimits.simple]
+limit = 20
+period = 60
+
 # Secrets (never put these here — set with `wrangler secret put <NAME>`):
 #   BOT_TOKEN          — the Telegram bot token from @BotFather
 #   SESSION_SECRET      — any long random string, used to sign session tokens
