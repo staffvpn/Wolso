@@ -935,6 +935,50 @@ adminUserRoutes.get('/chat-messages/:chatId', requirePermission('viewSupportChat
   return c.json({ chat, messages });
 });
 
+/** Подсказки для «написать пользователю первым» — сотрудник ищет человека
+ *  по имени, не зная заранее, соискатель это или работодатель, поэтому
+ *  ищем сразу по обеим таблицам. Лёгкая выборка (только id и имя): это
+ *  список для клика, а не профиль. */
+adminUserRoutes.get('/support-contacts', requirePermission('viewSupportChats'), async (c) => {
+  const q = (c.req.query('q') ?? '').trim();
+  if (!q) return c.json({ results: [] });
+  const like = `%${q}%`;
+
+  const { results: seekers } = await c.env.DB.prepare('SELECT id, name FROM workers WHERE name LIKE ? ORDER BY created_at DESC LIMIT 10')
+    .bind(like)
+    .all<{ id: number; name: string }>();
+  const { results: employers } = await c.env.DB.prepare('SELECT id, name FROM companies WHERE name LIKE ? ORDER BY created_at DESC LIMIT 10')
+    .bind(like)
+    .all<{ id: number; name: string }>();
+
+  return c.json({
+    results: [
+      ...seekers.map((s) => ({ kind: 'seeker' as const, id: s.id, name: s.name })),
+      ...employers.map((e) => ({ kind: 'employer' as const, id: e.id, name: e.name })),
+    ],
+  });
+});
+
+/** Треды поддержки обычно заводит сам пользователь, первым сообщением
+ *  (routes/support.ts). Эта ручка — для обратного случая: сотрудник хочет
+ *  написать первым, а треда ещё нет. Отдаёт существующий тред или создаёт
+ *  пустой — дальше обычные `/admin/support/threads/:id/messages` читают и
+ *  отвечают в нём как в любом другом. */
+adminUserRoutes.get('/support-thread/:kind/:id', requirePermission('viewSupportChats'), async (c) => {
+  const kind = c.req.param('kind');
+  const id = c.req.param('id');
+  if (kind !== 'seeker' && kind !== 'employer') return c.json({ error: 'not_found' }, 404);
+
+  const column = kind === 'seeker' ? 'worker_id' : 'company_id';
+  const existing = await c.env.DB.prepare(`SELECT id FROM support_threads WHERE ${column} = ?`).bind(id).first<{ id: number }>();
+  if (existing) return c.json({ threadId: existing.id });
+
+  const inserted = await c.env.DB.prepare(`INSERT INTO support_threads (${column}) VALUES (?) RETURNING id`)
+    .bind(id)
+    .first<{ id: number }>();
+  return c.json({ threadId: inserted!.id });
+});
+
 /** Заметки команды по человеку. История решений («звонил, обещал заменить
  *  фото») до сих пор жила в голове того, кто решал, — а решают по очереди
  *  разные люди. */

@@ -1,13 +1,83 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, ArrowLeft } from 'lucide-react';
+import { Send, ArrowLeft, Pencil, Search } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useSupportStore } from '@/store/useSupportStore';
+import { searchSupportContacts, getOrCreateSupportThread, type SupportContact } from '@/services/usersApi';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
+
+/** Выбор человека, который ещё не писал в поддержку сам: ищем по имени
+ *  сразу среди соискателей и работодателей, а не только по уже
+ *  существующим обращениям слева. */
+function NewMessageModal({ open, onClose, onPicked }: { open: boolean; onClose: () => void; onPicked: (id: string) => void }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<SupportContact[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setQ('');
+      setResults([]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      searchSupportContacts(q)
+        .then(setResults)
+        .catch(() => setResults([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  async function pick(contact: SupportContact) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const threadId = await getOrCreateSupportThread(contact.kind, contact.id);
+      onPicked(threadId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Написать пользователю" description="Сообщение придёт ему от лица поддержки.">
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-faint" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Имя соискателя или компании…" className="pl-9" autoFocus />
+      </div>
+      <div className="flex flex-col gap-1 max-h-[320px] overflow-y-auto">
+        {q.trim() && results.length === 0 && <p className="text-[13px] text-text-faint px-1 py-2">Никого не нашли</p>}
+        {results.map((r) => (
+          <button
+            key={`${r.kind}-${r.id}`}
+            disabled={busy}
+            onClick={() => pick(r)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-surface-2 transition-colors disabled:opacity-50"
+          >
+            <Avatar name={r.name} size={32} square={r.kind === 'employer'} />
+            <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-text">{r.name}</span>
+            <Badge tone="neutral" className="shrink-0">
+              {r.kind === 'seeker' ? 'Соискатель' : 'Работодатель'}
+            </Badge>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
 
 export function Support() {
   const threads = useSupportStore((s) => s.threads);
@@ -18,6 +88,7 @@ export function Support() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [text, setText] = useState('');
+  const [composing, setComposing] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,9 +129,25 @@ export function Support() {
     setText('');
   }
 
+  async function startNewThread(threadId: string) {
+    setComposing(false);
+    await loadThreads(true);
+    setSelectedId(threadId);
+  }
+
   return (
     <div className="pb-10 flex flex-col lg:h-full lg:min-h-0">
-      <PageHeader title="Поддержка" subtitle="Переписка с работниками и работодателями" />
+      <PageHeader
+        title="Поддержка"
+        subtitle="Переписка с работниками и работодателями"
+        right={
+          <Button variant="primary" onClick={() => setComposing(true)}>
+            <Pencil size={14} /> Написать первым
+          </Button>
+        }
+      />
+
+      <NewMessageModal open={composing} onClose={() => setComposing(false)} onPicked={startNewThread} />
 
       <div className="lg:flex-1 lg:min-h-0 px-4 sm:px-8 pb-6 lg:pb-0 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5">
         <Card className={cn('lg:overflow-hidden flex flex-col min-w-0', selected && 'hidden lg:flex')}>

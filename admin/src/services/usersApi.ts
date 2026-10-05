@@ -484,3 +484,26 @@ export async function addUserNote(kind: 'seeker' | 'employer', id: string, text:
 export async function deleteUserNote(noteId: string): Promise<void> {
   await apiFetch(`/admin/users/notes/${noteId}`, { method: 'DELETE' });
 }
+
+export interface SupportContact {
+  kind: 'seeker' | 'employer';
+  id: string;
+  name: string;
+}
+
+/** Поиск человека для «написать первым» — по имени, сразу среди соискателей
+ *  и работодателей, без похода за полным профилем каждого. */
+export async function searchSupportContacts(q: string): Promise<SupportContact[]> {
+  if (!q.trim()) return [];
+  const { results } = await apiFetch<{ results: { kind: 'seeker' | 'employer'; id: number; name: string }[] }>(
+    `/admin/users/support-contacts?q=${encodeURIComponent(q.trim())}`,
+  );
+  return results.map((r) => ({ kind: r.kind, id: String(r.id), name: r.name }));
+}
+
+/** Отдаёт id существующего треда поддержки с этим человеком либо создаёт
+ *  пустой — дальше это обычный тред, как если бы он написал сам. */
+export async function getOrCreateSupportThread(kind: 'seeker' | 'employer', id: string): Promise<string> {
+  const { threadId } = await apiFetch<{ threadId: number }>(`/admin/users/support-thread/${kind}/${id}`);
+  return String(threadId);
+}
