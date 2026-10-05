@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, SessionPayload } from '../types';
 import { attachSession, requirePermission, requireStaff } from '../middleware/auth';
 import { sendTelegramMessage } from '../lib/telegramBot';
+import { pluralize } from '../lib/plural';
 
 export const adminSupportRoutes = new Hono<{ Bindings: Env; Variables: { session: SessionPayload | null } }>();
 adminSupportRoutes.use('*', attachSession);
@@ -66,17 +67,26 @@ adminSupportRoutes.post('/threads/:id/messages', requirePermission('viewSupportC
   const thread = await c.env.DB.prepare('SELECT worker_id, company_id FROM support_threads WHERE id = ?')
     .bind(id)
     .first<{ worker_id: number | null; company_id: number | null }>();
-  const preview = text.trim().length > 200 ? `${text.trim().slice(0, 200)}…` : text.trim();
+
+  // Как и в напоминании о непрочитанной переписке (lib/unreadChats.ts) —
+  // без текста самого сообщения: пуш виден на заблокированном экране и
+  // через плечо, а ответ поддержки может касаться чего угодно личного.
+  const unread = await c.env.DB.prepare("SELECT COUNT(*) as n FROM support_messages WHERE thread_id = ? AND sender = 'staff' AND read = 0")
+    .bind(id)
+    .first<{ n: number }>();
+  const unreadCount = unread?.n ?? 1;
+  const pushText = `🛟 Поддержка Wolso\nУ вас ${unreadCount} ${pluralize(unreadCount, 'непрочитанное сообщение', 'непрочитанных сообщения', 'непрочитанных сообщений')} от поддержки — откройте Wolso, чтобы прочитать.`;
+
   if (thread?.worker_id) {
     const worker = await c.env.DB.prepare('SELECT telegram_id FROM workers WHERE id = ?')
       .bind(thread.worker_id)
       .first<{ telegram_id: number }>();
-    if (worker) c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, `🛟 Поддержка Wolso:\n${preview}`));
+    if (worker) c.executionCtx.waitUntil(sendTelegramMessage(c.env, worker.telegram_id, pushText));
   } else if (thread?.company_id) {
     const company = await c.env.DB.prepare('SELECT owner_telegram_id FROM companies WHERE id = ?')
       .bind(thread.company_id)
       .first<{ owner_telegram_id: number }>();
-    if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, `🛟 Поддержка Wolso:\n${preview}`));
+    if (company) c.executionCtx.waitUntil(sendTelegramMessage(c.env, company.owner_telegram_id, pushText));
   }
 
   return c.json({ message: inserted });
