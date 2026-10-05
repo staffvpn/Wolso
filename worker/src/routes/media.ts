@@ -15,9 +15,14 @@ const GALLERY_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=31536000, immu
 
 // The avatar URL, unlike gallery photos, is NOT unique per upload — it's
 // always /media/.../avatar for a given worker/company, re-used every time
-// they replace their photo. Never cache it, so a stale response can never
-// mask a fresh re-upload.
-const NO_CACHE_HEADERS = { 'Cache-Control': 'no-store' };
+// they replace their photo. Раньше было no-store (всегда бить в базу) —
+// при направленном флуде это самая дешёвая цель во всём API: публичный,
+// предсказуемый адрес (id — просто целое число по порядку), ни сессии,
+// ни лимита, и каждый запрос — чтение из D1. Короткий публичный кэш
+// отдаёт повторные запросы прямо с edge Cloudflare, не доходя до воркера
+// и базы вообще; смена фото станет видна за минуту, а не мгновенно — тот
+// же компромисс, на который идёт большинство подобных сервисов.
+const SHORT_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=60' };
 
 /** D1 hands a BLOB column back as a plain `number[]` over the binding it
  *  uses here, not an ArrayBuffer/Uint8Array — feeding that array straight
@@ -38,7 +43,7 @@ mediaRoutes.get('/workers/:id/avatar', async (c) => {
     .first<{ avatar_data: unknown; avatar_content_type: string | null }>();
   const bytes = toBytes(row?.avatar_data);
   if (!bytes) return c.notFound();
-  return new Response(bytes, { headers: { 'Content-Type': row!.avatar_content_type ?? 'application/octet-stream', ...NO_CACHE_HEADERS } });
+  return new Response(bytes, { headers: { 'Content-Type': row!.avatar_content_type ?? 'application/octet-stream', ...SHORT_CACHE_HEADERS } });
 });
 
 mediaRoutes.get('/workers/:id/photos/:photoId', async (c) => {
@@ -60,7 +65,7 @@ mediaRoutes.get('/promos/:id/image', async (c) => {
     .catch(() => null);
   const bytes = toBytes(row?.image_data);
   if (!bytes) return c.notFound();
-  return new Response(bytes, { headers: { 'Content-Type': row!.image_content_type ?? 'application/octet-stream', ...NO_CACHE_HEADERS } });
+  return new Response(bytes, { headers: { 'Content-Type': row!.image_content_type ?? 'application/octet-stream', ...SHORT_CACHE_HEADERS } });
 });
 
 mediaRoutes.get('/companies/:id/avatar', async (c) => {
@@ -69,7 +74,7 @@ mediaRoutes.get('/companies/:id/avatar', async (c) => {
     .first<{ avatar_data: unknown; avatar_content_type: string | null }>();
   const bytes = toBytes(row?.avatar_data);
   if (!bytes) return c.notFound();
-  return new Response(bytes, { headers: { 'Content-Type': row!.avatar_content_type ?? 'application/octet-stream', ...NO_CACHE_HEADERS } });
+  return new Response(bytes, { headers: { 'Content-Type': row!.avatar_content_type ?? 'application/octet-stream', ...SHORT_CACHE_HEADERS } });
 });
 
 mediaRoutes.get('/companies/:id/photos/:photoId', async (c) => {
