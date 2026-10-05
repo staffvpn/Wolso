@@ -489,16 +489,20 @@ export interface SupportContact {
   kind: 'seeker' | 'employer';
   id: string;
   name: string;
+  telegramId: number;
+  telegramUsername?: string;
 }
 
-/** Поиск человека для «написать первым» — по имени, сразу среди соискателей
- *  и работодателей, без похода за полным профилем каждого. */
+/** Поиск человека для «написать первым» — по имени, @username или
+ *  числовому Telegram id, сразу среди соискателей и работодателей, без
+ *  похода за полным профилем каждого. Username не у всех есть, поэтому
+ *  поиск не завязан только на него. */
 export async function searchSupportContacts(q: string): Promise<SupportContact[]> {
   if (!q.trim()) return [];
-  const { results } = await apiFetch<{ results: { kind: 'seeker' | 'employer'; id: number; name: string }[] }>(
-    `/admin/users/support-contacts?q=${encodeURIComponent(q.trim())}`,
-  );
-  return results.map((r) => ({ kind: r.kind, id: String(r.id), name: r.name }));
+  const { results } = await apiFetch<{
+    results: { kind: 'seeker' | 'employer'; id: number; name: string; telegramId: number; telegramUsername: string | null }[];
+  }>(`/admin/users/support-contacts?q=${encodeURIComponent(q.trim())}`);
+  return results.map((r) => ({ kind: r.kind, id: String(r.id), name: r.name, telegramId: r.telegramId, telegramUsername: r.telegramUsername ?? undefined }));
 }
 
 /** Отдаёт id существующего треда поддержки с этим человеком либо создаёт

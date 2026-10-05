@@ -940,21 +940,40 @@ adminUserRoutes.get('/chat-messages/:chatId', requirePermission('viewSupportChat
  *  ищем сразу по обеим таблицам. Лёгкая выборка (только id и имя): это
  *  список для клика, а не профиль. */
 adminUserRoutes.get('/support-contacts', requirePermission('viewSupportChats'), async (c) => {
-  const q = (c.req.query('q') ?? '').trim();
-  if (!q) return c.json({ results: [] });
+  const raw = (c.req.query('q') ?? '').trim();
+  if (!raw) return c.json({ results: [] });
+  // Юзернейм в Telegram не обязателен — у части людей его просто нет, и
+  // искать их можно только по имени или по числовому id. Ведущую «@»
+  // срезаем, чтобы её можно было как вставить, так и не вставлять.
+  const q = raw.replace(/^@/, '');
   const like = `%${q}%`;
+  const isNumeric = /^\d+$/.test(q);
 
-  const { results: seekers } = await c.env.DB.prepare('SELECT id, name FROM workers WHERE name LIKE ? ORDER BY created_at DESC LIMIT 10')
-    .bind(like)
-    .all<{ id: number; name: string }>();
-  const { results: employers } = await c.env.DB.prepare('SELECT id, name FROM companies WHERE name LIKE ? ORDER BY created_at DESC LIMIT 10')
-    .bind(like)
-    .all<{ id: number; name: string }>();
+  const { results: seekers } = await c.env.DB.prepare(
+    `SELECT id, name, telegram_id, telegram_username FROM workers
+     WHERE name LIKE ? OR telegram_username LIKE ?${isNumeric ? ' OR telegram_id = ?' : ''}
+     ORDER BY created_at DESC LIMIT 10`,
+  )
+    .bind(...(isNumeric ? [like, like, q] : [like, like]))
+    .all<{ id: number; name: string; telegram_id: number; telegram_username: string | null }>();
+  const { results: employers } = await c.env.DB.prepare(
+    `SELECT id, name, owner_telegram_id, telegram_username FROM companies
+     WHERE name LIKE ? OR telegram_username LIKE ?${isNumeric ? ' OR owner_telegram_id = ?' : ''}
+     ORDER BY created_at DESC LIMIT 10`,
+  )
+    .bind(...(isNumeric ? [like, like, q] : [like, like]))
+    .all<{ id: number; name: string; owner_telegram_id: number; telegram_username: string | null }>();
 
   return c.json({
     results: [
-      ...seekers.map((s) => ({ kind: 'seeker' as const, id: s.id, name: s.name })),
-      ...employers.map((e) => ({ kind: 'employer' as const, id: e.id, name: e.name })),
+      ...seekers.map((s) => ({ kind: 'seeker' as const, id: s.id, name: s.name, telegramId: s.telegram_id, telegramUsername: s.telegram_username })),
+      ...employers.map((e) => ({
+        kind: 'employer' as const,
+        id: e.id,
+        name: e.name,
+        telegramId: e.owner_telegram_id,
+        telegramUsername: e.telegram_username,
+      })),
     ],
   });
 });

@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyPanel } from '@/components/EmptyPanel';
 import { useSupportStore } from '@/store/useSupportStore';
 import { searchSupportContacts, getOrCreateSupportThread, type SupportContact } from '@/services/usersApi';
-import { timeAgo } from '@/lib/format';
+import { timeAgo, telegramLabel } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
 /** Выбор человека, который ещё не писал в поддержку сам: ищем по имени
@@ -56,7 +56,7 @@ function NewMessageModal({ open, onClose, onPicked }: { open: boolean; onClose: 
     <Modal open={open} onClose={onClose} title="Написать пользователю" description="Сообщение придёт ему от лица поддержки.">
       <div className="relative mb-3">
         <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-faint" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Имя соискателя или компании…" className="pl-9" autoFocus />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Имя, @username или Telegram ID…" className="pl-9" autoFocus />
       </div>
       <div className="flex flex-col gap-1 max-h-[320px] overflow-y-auto">
         {q.trim() && results.length === 0 && <p className="text-[13px] text-text-faint px-1 py-2">Никого не нашли</p>}
@@ -68,7 +68,10 @@ function NewMessageModal({ open, onClose, onPicked }: { open: boolean; onClose: 
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-surface-2 transition-colors disabled:opacity-50"
           >
             <Avatar name={r.name} size={32} square={r.kind === 'employer'} />
-            <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-text">{r.name}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block truncate text-[13px] font-semibold text-text">{r.name}</span>
+              <span className="block truncate text-[12px] text-text-faint">{telegramLabel(r.telegramId, r.telegramUsername)}</span>
+            </span>
             <Badge tone="neutral" className="shrink-0">
               {r.kind === 'seeker' ? 'Соискатель' : 'Работодатель'}
             </Badge>
